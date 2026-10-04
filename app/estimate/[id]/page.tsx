@@ -86,9 +86,11 @@ export default function ClientEstimatePage() {
         setWasConverted(result.converted === true);
         if (result.contractor) setContractor(result.contractor as ContractorBrand);
         if (Array.isArray(result.photos)) setPhotos(result.photos as ProposalPhoto[]);
+        let estimateOwner = false;
         try {
           const ownerResponse = await fetch(`/api/estimates/${encodeURIComponent(id)}`, { cache: "no-store" });
           if (ownerResponse.ok) {
+            estimateOwner = true;
             setIsOwner(true);
             const ownerData = await ownerResponse.json();
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
@@ -97,7 +99,7 @@ export default function ClientEstimatePage() {
         setSignatureName(estData.signature_name || "");
         const savedPackageIndex = Array.isArray(estData.package_options) ? estData.package_options.findIndex((option: EstimatePackage) => option.name === estData.selected_package) : -1;
         if (savedPackageIndex >= 0) setSelectedPackage(savedPackageIndex);
-        void fetch(`/api/estimates/${id}/view`, { method: "POST" });
+        if (!estimateOwner) void fetch(`/api/estimates/${id}/view`, { method: "POST" });
 
         setLineItems(result.lineItems || []);
       } catch (err: unknown) {
@@ -371,7 +373,7 @@ export default function ClientEstimatePage() {
             )}
           </div>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
+          {!isOwner && <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-bold text-slate-900">Have a question about this proposal?</h2>
             <p className="mt-1 text-xs text-slate-600">Send it directly to {contractor.businessName}. Your email will be used so they can reply.</p>
             <form onSubmit={sendQuestion} className="mt-3 space-y-3">
@@ -381,10 +383,10 @@ export default function ClientEstimatePage() {
               <button type="submit" disabled={sendingQuestion} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: contractor.brandColor }}>{sendingQuestion ? "Sending…" : "Send question"}</button>
               {questionStatus && <p role="status" className="text-xs text-slate-700">{questionStatus}</p>}
             </form>
-          </section>
+          </section>}
 
           {/* Client Action Button */}
-          {estimate.status === "paid" ? (
+          {!isOwner && (estimate.status === "paid" ? (
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
               ✓ Estimate paid in full. Thank you.
             </div>
@@ -405,7 +407,7 @@ export default function ClientEstimatePage() {
           ) : (
             <>
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {estimate.package_options?.length && selectedPackage === null && <p className="text-xs font-semibold text-amber-800">Select a package above to continue.</p>}
+                {Boolean(estimate.package_options?.length) && selectedPackage === null && <p className="text-xs font-semibold text-amber-800">Select a package above to continue.</p>}
                 <label className="block text-xs font-semibold text-slate-700">Type your full name to approve<input value={signatureName} onChange={(event) => { setSignatureName(event.target.value); setErrorMsg(""); }} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" autoComplete="name" placeholder="Full name" /></label>
                 <p className="text-[11px] leading-5 text-slate-500">Typing your name records your approval of this estimate.</p>
                 {estimate.signature_name && <p className="text-xs font-medium text-green-700">Approved by {estimate.signature_name}{estimate.accepted_at ? ` on ${new Date(estimate.accepted_at).toLocaleDateString()}` : ""}</p>}
@@ -424,7 +426,7 @@ export default function ClientEstimatePage() {
                 : `Approve Proposal ($${subtotal.toFixed(2)})`}
             </button>
             </>
-          )}
+          ))}
         </div>
       </div>
     </div>
