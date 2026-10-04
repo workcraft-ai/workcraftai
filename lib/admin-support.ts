@@ -6,7 +6,7 @@ import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 export type TradeFlowAdminRole = "support" | "billing" | "super_admin";
 const roles: TradeFlowAdminRole[] = ["support", "billing", "super_admin"];
 
-export async function requireTradeFlowAdmin(required: "support" | "billing" = "support", requireMfa = true) {
+export async function requireTradeFlowAdmin(required: "support" | "billing" | "super_admin" = "support", requireMfa = true) {
   const userClient = await createUserSupabaseClient();
   const { data: { user }, error } = await userClient.auth.getUser();
   if (error || !user) return { response: NextResponse.json({ error: "Sign in required." }, { status: 401 }) };
@@ -22,7 +22,7 @@ export async function requireTradeFlowAdmin(required: "support" | "billing" = "s
     return { response: NextResponse.json({ error: "Admin access is not configured. Apply the admin support migration." }, { status: 503 }) };
   }
   const role = membership?.role as TradeFlowAdminRole | undefined;
-  if (!role || !roles.includes(role) || (required === "billing" && role !== "billing" && role !== "super_admin")) {
+  if (!role || !roles.includes(role) || (required === "billing" && role !== "billing" && role !== "super_admin") || (required === "super_admin" && role !== "super_admin")) {
     return { response: NextResponse.json({ error: "You are not authorized to use this support tool." }, { status: 403 }) };
   }
   const { data: assurance } = await userClient.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -49,7 +49,7 @@ export function validReason(value: unknown): value is string {
 
 type AdminDatabase = SupabaseClient;
 
-export async function startAudit(admin: AdminDatabase, actorId: string, targetId: string, action: string, reason: string, details: Record<string, unknown> = {}, actorEmail?: string) {
+export async function startAudit(admin: AdminDatabase, actorId: string | null, targetId: string, action: string, reason: string, details: Record<string, unknown> = {}, actorEmail?: string) {
   const { data, error } = await admin.from("tradeflow_admin_audit_log").insert({
     actor_user_id: actorId,
     actor_email: actorEmail ?? null,

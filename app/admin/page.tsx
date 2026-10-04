@@ -19,7 +19,7 @@ type Account = {
   has_stripe_subscription: boolean;
 };
 type AccountDetail = {
-  account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null };
+  account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; last_active_at: string | null; deletion_status: "active" | "pending_deletion" | "deleting"; deletion_notice_sent_at: string | null; deletion_due_at: string | null; is_admin: boolean; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null };
   notes: { id: string; note: string; category: string; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   audit: { id: string; action: string; reason: string; outcome: string; details: Record<string, unknown>; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   questions: { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null }[];
@@ -71,11 +71,17 @@ export default function AdminPage() {
   const [aiDailyLimitInput, setAiDailyLimitInput] = useState("");
   const [aiSettingsReason, setAiSettingsReason] = useState("");
   const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
+  const [deletionConfirmEmail, setDeletionConfirmEmail] = useState("");
+  const [deletionReason, setDeletionReason] = useState("");
+  const [retentionReason, setRetentionReason] = useState("");
 
   const loadDetail = useCallback(async (id: string) => {
     setSelectedId(id);
     setDetail(null);
     setError("");
+    setDeletionConfirmEmail("");
+    setDeletionReason("");
+    setRetentionReason("");
     try {
       setDetail(await requestJson(`/api/admin/accounts/${encodeURIComponent(id)}`));
     } catch (cause) {
@@ -235,6 +241,41 @@ export default function AdminPage() {
     });
   };
 
+  const deleteSelectedAccount = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!detail || role !== "super_admin" || detail.account.is_admin || deletionReason.trim().length < 8) return;
+    if (deletionConfirmEmail.trim().toLowerCase() !== detail.account.email.toLowerCase()) {
+      setError("Type the account email exactly to confirm deletion.");
+      return;
+    }
+    const accepted = window.confirm(`Permanently delete ${detail.account.email} and its WorkCraft AI data? This cannot be undone. The contractor’s separate Stripe account will not be deleted.`);
+    if (!accepted) return;
+    setBusy("account-deletion");
+    setError("");
+    setNotice("");
+    try {
+      const result = await requestJson(`/api/admin/accounts/${encodeURIComponent(selectedId)}/delete`, {
+        method: "POST", body: JSON.stringify({ confirm_email: deletionConfirmEmail, reason: deletionReason }),
+      });
+      setNotice(result.message || "The account was deleted.");
+      setAccounts((previous) => previous.filter((account) => account.id !== selectedId));
+      setSelectedId("");
+      setDetail(null);
+      setDeletionConfirmEmail("");
+      setDeletionReason("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The account could not be deleted.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const cancelPendingDeletion = (event: FormEvent) => {
+    event.preventDefault();
+    if (!detail || role !== "super_admin" || retentionReason.trim().length < 8) return;
+    void runAction("retention", `/api/admin/accounts/${encodeURIComponent(selectedId)}/retention`, { action: "cancel_pending_deletion", reason: retentionReason }, "Pending deletion canceled.").then((canceled) => { if (canceled) setRetentionReason(""); });
+  };
+
   const saveFreeEstimateLimit = async (event: FormEvent) => {
     event.preventDefault();
     if (!freeEstimateLimitInput.trim()) return;
@@ -358,13 +399,18 @@ export default function AdminPage() {
       {detail && <div className="mt-6 grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Account</p><h2 className="mt-1 break-all text-xl font-bold text-slate-950">{detail.account.email}</h2><p className="mt-1 text-sm text-slate-600">{detail.account.business_name || "No business name on file"}</p></div>
-          <dl className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Email confirmed</dt><dd className="mt-1 font-semibold text-slate-900">{detail.account.email_confirmed_at ? "Yes" : "No"}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Plan status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.status}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Joined</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.created_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last sign in</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_sign_in_at)}</dd></div><div className="col-span-2 rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Current billing period ends</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.current_period_end)}</dd></div></dl>
+          <dl className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Email confirmed</dt><dd className="mt-1 font-semibold text-slate-900">{detail.account.email_confirmed_at ? "Yes" : "No"}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Plan status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.status}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Joined</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.created_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last sign in</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_sign_in_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last app activity</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_active_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Retention status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.deletion_status.replaceAll("_", " ")}</dd></div><div className="col-span-2 rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Current billing period ends</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.current_period_end)}</dd></div></dl>
+
+          {detail.account.deletion_status === "pending_deletion" && <section className="rounded-xl border border-amber-300 bg-amber-50 p-4"><h3 className="font-bold text-amber-950">Inactivity deletion is pending</h3><p className="mt-1 text-sm leading-5 text-amber-900">Warning sent {date(detail.account.deletion_notice_sent_at)} · deletion due {date(detail.account.deletion_due_at)}. The user signing in cancels it automatically.</p>{role === "super_admin" && <form onSubmit={cancelPendingDeletion} className="mt-3"><label className="block text-xs font-semibold text-amber-950">Reason to cancel<input value={retentionReason} onChange={(event) => setRetentionReason(event.target.value)} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || retentionReason.trim().length < 8} className="mt-3 rounded-lg border border-amber-700 px-4 py-2 text-sm font-semibold text-amber-950 disabled:opacity-50">{busy === "retention" ? "Saving…" : "Cancel pending deletion"}</button></form>}</section>}
+          {detail.account.deletion_status === "deleting" && <p role="status" className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">An account deletion is currently being processed.</p>}
 
           <div className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Password assistance</h3><p className="mt-1 text-xs leading-5 text-slate-600">Sends a Supabase recovery email. You cannot view or set the customer’s existing password.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Reason for support action<input value={recoveryReason} onChange={(event) => setRecoveryReason(event.target.value)} maxLength={500} placeholder="For example: customer requested account access help" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="button" onClick={sendRecovery} disabled={busy !== "" || recoveryReason.trim().length < 8} className="mt-3 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "recovery" ? "Sending…" : "Send password recovery email"}</button></div>
 
           {role !== "support" && <form onSubmit={applyCoupon} className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Temporary subscription discount</h3><p className="mt-1 text-xs leading-5 text-slate-600">Apply an existing Stripe 100% off coupon lasting once or up to 3 months. Create the coupon in Stripe first.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Stripe coupon ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} maxLength={120} placeholder="e.g. support_one_month" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-slate-700">Reason<input value={billingReason} onChange={(event) => setBillingReason(event.target.value)} maxLength={500} placeholder="Service issue and agreed credit" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || couponId.trim().length < 3 || billingReason.trim().length < 8 || !detail.account.has_stripe_subscription || !["active", "trialing"].includes(detail.account.status)} className="mt-3 rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "billing" ? "Applying…" : "Apply Stripe coupon"}</button><p className="mt-2 text-xs text-slate-500">Billing action is recorded in the admin audit log.</p></form>}
 
           <form onSubmit={saveNote} className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Internal support note</h3><label className="mt-3 block text-xs font-semibold text-slate-700">Issue type<select value={noteCategory} onChange={(event) => setNoteCategory(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="support">General support</option><option value="bug_report">Bug report</option><option value="billing">Billing issue</option><option value="email_delivery">Email delivery issue</option></select></label><label className="mt-3 block text-xs font-semibold text-slate-700">Note<textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={5000} placeholder="Record relevant support context. Avoid passwords or payment-card data." className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-slate-700">Reason for adding note<input value={noteReason} onChange={(event) => setNoteReason(event.target.value)} maxLength={500} placeholder="Why this note is needed" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button disabled={busy !== "" || !note.trim() || noteReason.trim().length < 8} className="mt-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50">{busy === "note" ? "Saving…" : "Save support note"}</button></form>
+
+          {role === "super_admin" && <form onSubmit={deleteSelectedAccount} className="border-t border-red-200 pt-5">{detail.account.is_admin ? <div className="rounded-xl border border-slate-300 bg-slate-50 p-4"><h3 className="font-bold text-slate-800">Administrator account protected</h3><p className="mt-1 text-sm text-slate-600">Admin accounts cannot be deleted through this console.</p></div> : <div className="rounded-xl border border-red-300 bg-red-50 p-4"><h3 className="font-bold text-red-950">Delete this account</h3><p className="mt-1 text-sm leading-5 text-red-900">Permanently removes the WorkCraft AI account, its estimates, customer and job data, uploaded estimate media, and payment records. Any WorkCraft AI subscription is canceled first. The contractor’s separate Stripe account is not deleted. This cannot be undone.</p><label className="mt-3 block text-xs font-semibold text-red-950">Reason for deletion<textarea value={deletionReason} onChange={(event) => setDeletionReason(event.target.value)} rows={2} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-red-300 bg-white px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-red-950">Type the account email to confirm<input value={deletionConfirmEmail} onChange={(event) => setDeletionConfirmEmail(event.target.value)} autoComplete="off" className="mt-1 w-full rounded-lg border border-red-300 bg-white px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || deletionConfirmEmail.trim().toLowerCase() !== detail.account.email.toLowerCase() || deletionReason.trim().length < 8 || detail.account.deletion_status === "deleting"} className="mt-3 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "account-deletion" ? "Deleting account…" : "Delete account permanently"}</button><p className="mt-2 text-xs text-red-900">Every deletion is audited. Multi-factor authentication is required.</p></div>}</form>}
         </section>
 
         <section className="space-y-6">
