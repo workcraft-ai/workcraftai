@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
@@ -11,8 +10,22 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [leavingReset, setLeavingReset] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  const handleBackToSignIn = async () => {
+    setLeavingReset(true);
+    setError(null);
+    const supabase = createClient();
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+    if (signOutError) {
+      setError("Could not safely end the password reset session. Please try again.");
+      setLeavingReset(false);
+      return;
+    }
+    router.replace("/login");
+  };
 
   const handleUpdatePassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +77,7 @@ export default function ResetPasswordPage() {
             {loading ? "Updating password…" : "Update password"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-400"><Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">Back to sign in</Link></p>
+        <p className="mt-6 text-center text-sm text-slate-400"><button type="button" onClick={() => void handleBackToSignIn()} disabled={leavingReset} className="font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50">{leavingReset ? "Ending reset session…" : "Back to sign in"}</button></p>
       </section>
     </main>
     </LocalizedTree>
