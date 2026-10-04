@@ -43,6 +43,7 @@ const spanish: Record<string, string> = {
   "+ New estimate": "+ Nueva cotización", "+ New Estimate": "+ Nueva cotización", "New estimate": "Nueva cotización",
   "Sign in": "Iniciar sesión", "Create account": "Crear cuenta", "Sign out": "Cerrar sesión", "Signed in as": "Sesión iniciada como",
   "Profile & preferences": "Perfil y preferencias", "Profile & Preferences": "Perfil y preferencias", "Language": "Idioma", "English": "Inglés", "Spanish": "Español", "Español": "Español",
+  "Check your email for a confirmation link to complete registration.": "Revisa tu correo para obtener un enlace de confirmación y completar el registro.", "If you already have an account, you can": "Si ya tienes una cuenta, puedes", "sign in": "iniciar sesión", " or ": " o ", "reset your password": "restablecer tu contraseña",
   "WorkCraft AI Dashboard": "Panel de WorkCraft AI", "Manage estimates, tracking, and payments": "Administra cotizaciones, trabajos y pagos",
   "Plan upcoming work and keep every job moving.": "Planifica el trabajo y mantén cada tarea en marcha.",
   "Operations": "Operaciones", "Active jobs": "Trabajos activos", "On the schedule today": "Programados para hoy", "Completed jobs": "Trabajos completados",
