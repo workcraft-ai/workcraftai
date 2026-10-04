@@ -17,9 +17,9 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecrets = [...new Set([process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((secret): secret is string => Boolean(secret)))];
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!stripeKey || !webhookSecret || !serviceRoleKey) {
+  if (!stripeKey || webhookSecrets.length === 0 || !serviceRoleKey) {
     return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 503 });
   }
 
@@ -27,12 +27,17 @@ export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   if (!signature) return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(await request.text(), signature, webhookSecret);
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid signature." }, { status: 400 });
+  const payload = await request.text();
+  let event: Stripe.Event | undefined;
+  for (const secret of webhookSecrets) {
+    try {
+      event = stripe.webhooks.constructEvent(payload, signature, secret);
+      break;
+    } catch {
+      // Connect and account-scope endpoints have distinct signing secrets.
+    }
   }
+  if (!event) return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
 
