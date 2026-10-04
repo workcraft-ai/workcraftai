@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { startTransition, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -160,11 +160,13 @@ export default function CreateEstimatePage() {
     if (savedTemplate) {
       try {
         const template = JSON.parse(savedTemplate);
-        if (Array.isArray(template.line_items) && template.line_items.length) setLineItems(template.line_items);
-        if (Array.isArray(template.package_options)) setPackageOptions(template.package_options);
-        if (template.trade) setTrade(template.trade);
-        if (typeof template.require_deposit === "boolean") setRequireDeposit(template.require_deposit);
-        if (template.deposit_percentage) setDepositPercentage(Number(template.deposit_percentage));
+        startTransition(() => {
+          if (Array.isArray(template.line_items) && template.line_items.length) setLineItems(template.line_items);
+          if (Array.isArray(template.package_options)) setPackageOptions(template.package_options);
+          if (template.trade) setTrade(template.trade);
+          if (typeof template.require_deposit === "boolean") setRequireDeposit(template.require_deposit);
+          if (template.deposit_percentage) setDepositPercentage(Number(template.deposit_percentage));
+        });
         sessionStorage.removeItem("tradeflow-estimate-template");
       } catch {
         sessionStorage.removeItem("tradeflow-estimate-template");

@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { createClient } from "@/app/utils/supabase/client";
 
@@ -9,6 +9,33 @@ type LanguageContextValue = { language: Language; setLanguage: (language: Langua
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 const storageKey = "tradeflow-language";
+const languageListeners = new Set<() => void>();
+
+function getLanguageSnapshot(): Language {
+  if (typeof window === "undefined") return "en";
+  const saved = localStorage.getItem(storageKey);
+  if (saved === "es" || saved === "en") return saved;
+  return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+}
+
+function subscribeToLanguage(listener: () => void) {
+  languageListeners.add(listener);
+  window.addEventListener("storage", handleLanguageStorage);
+  return () => {
+    languageListeners.delete(listener);
+    if (languageListeners.size === 0) window.removeEventListener("storage", handleLanguageStorage);
+  };
+}
+
+function handleLanguageStorage(event: StorageEvent) {
+  if (event.key === storageKey) languageListeners.forEach((listener) => listener());
+}
+
+function persistLanguage(language: Language) {
+  localStorage.setItem(storageKey, language);
+  document.documentElement.lang = language;
+  languageListeners.forEach((listener) => listener());
+}
 
 const spanish: Record<string, string> = {
   "Estimates": "Cotizaciones", "Schedule & jobs": "Agenda y trabajos", "Schedule & job tracking": "Agenda y seguimiento de trabajos",
@@ -118,28 +145,24 @@ export function translate(language: Language, text: string): string {
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("en");
+  const language = useSyncExternalStore(subscribeToLanguage, getLanguageSnapshot, (): Language => "en");
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    const initial = saved === "es" || saved === "en" ? saved : navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
-    setLanguageState(initial);
-    document.documentElement.lang = initial;
     const supabase = createClient();
     void supabase.auth.getUser().then(({ data }) => {
       const preferred = data.user?.user_metadata?.app_language;
       if (preferred === "es" || preferred === "en") {
-        setLanguageState(preferred);
-        localStorage.setItem(storageKey, preferred);
-        document.documentElement.lang = preferred;
+        persistLanguage(preferred);
       }
     });
   }, []);
 
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
   const setLanguage = useCallback((value: Language) => {
-    setLanguageState(value);
-    localStorage.setItem(storageKey, value);
-    document.documentElement.lang = value;
+    persistLanguage(value);
     const supabase = createClient();
     void supabase.auth.updateUser({ data: { app_language: value } });
   }, []);

@@ -35,7 +35,6 @@ export default function DashboardPage() {
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
 
   async function fetchEstimates() {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("estimates")
@@ -63,7 +62,8 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    void fetchEstimates();
+    const task = window.setTimeout(() => { void fetchEstimates(); }, 0);
+    return () => window.clearTimeout(task);
   }, []);
 
   const markQuestionRead = async (question: ProposalQuestion) => {
