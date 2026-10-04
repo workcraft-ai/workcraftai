@@ -376,10 +376,10 @@ export default function CreateEstimatePage() {
         if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
       }
 
-      // 3. Redirect to Client Share Portal
+      // 3. Return to the dashboard so the contractor can review and share the proposal.
       await clearOfflineEstimateDraft().catch(() => undefined);
       localStorage.removeItem("tradeflow-unsent-estimate-v1");
-      router.push(`/estimate/${est.id}`);
+      router.push("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       alert(createdEstimateId
@@ -675,12 +675,13 @@ export default function CreateEstimatePage() {
           </section>
 
           {/* Submit Button */}
+          <p className="text-center text-xs text-slate-600">Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature.</p>
           <button
             type="submit"
             disabled={saving || !connectionOnline}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-sm"
           >
-            {saving ? "Generating Share Link..." : "Save & Generate Client Proposal Link"}
+            {saving ? "Saving Estimate..." : "Save Estimate"}
           </button>
         </form>
       </div>
