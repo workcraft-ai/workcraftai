@@ -85,6 +85,20 @@ const spanish: Record<string, string> = {
 };
 
 Object.assign(spanish, {
+  "Save Estimate": "Guardar cotización",
+  "Saving Estimate...": "Guardando cotización...",
+  "Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature.": "Al guardar, se crea un enlace para compartir la propuesta, pero no se envía ningún correo. Encuentra el enlace en tu panel; enviar correos a clientes es una función Pro.",
+  "Save Changes & Update Proposal": "Guardar cambios y actualizar propuesta",
+  "Updating the proposal does not send an email. Share it from your Dashboard when you are ready.": "Actualizar la propuesta no envía un correo. Compártela desde tu panel cuando esté lista.",
+  "Generating Share Link...": "Creando enlace para compartir...",
+  "Good / Better / Best options are included with Pro.": "Las opciones Bueno / Mejor / Óptimo están incluidas en Pro.",
+  "Require Down-Payment / Deposit": "Requerir anticipo",
+  "Require Down-Payment / Deposit (Pro)": "Requerir anticipo (Pro)",
+  "Updated Subtotal:": "Subtotal actualizado:",
+  "Upgrade to Pro": "Mejorar a Pro",
+});
+
+Object.assign(spanish, {
   "Field photos & voice note · Pro": "Fotos del trabajo y nota de voz · Pro",
   "Private photo and voice-note storage is included with Pro.": "El almacenamiento privado de fotos y notas de voz está incluido con Pro.",
   "Describe the work and measurements. Gemini drafts editable scope and quantities. Matching rates come from your Price Book; unmatched items stay at $0 for you to price.": "Describe el trabajo y las medidas. Gemini prepara un alcance y cantidades editables. Las tarifas coincidentes vienen de tu lista de precios; los artículos sin coincidencia quedan en $0 para que les asignes un precio.",
