@@ -4,7 +4,6 @@ import React, { startTransition, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { generateLocalEstimate } from "@/lib/localEstimator";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 import { isFreeEstimateLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
@@ -55,7 +54,7 @@ interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
 export default function CreateEstimatePage() {
   const router = useRouter();
 
-  // Tier Toggle State (Free Local vs Paid AI)
+  // Paid cloud drafting is available to Pro subscribers only.
   const [isProSubscriber, setIsProSubscriber] = useState(false);
   const [aiDailyAllowance, setAiDailyAllowance] = useState<{ enabled: boolean; daily_limit: number; used: number; remaining: number } | null>(null);
 
@@ -76,7 +75,7 @@ export default function CreateEstimatePage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
-  // AI / Smart Generator Prompt State
+  // Pro AI drafting prompt state
   const [promptText, setPromptText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
@@ -84,10 +83,11 @@ export default function CreateEstimatePage() {
 
   // Line Items
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
-    { description: "Standard Labor / Initial Assessment", description_es: "Mano de obra estándar / evaluación inicial", quantity: 1, unit_price: 150 },
+    { description: "", quantity: 1, unit_price: 0 },
   ]);
   const [priceBookItems, setPriceBookItems] = useState<PriceBookItem[]>([]);
   const [showPriceBook, setShowPriceBook] = useState(false);
+  const [selectedPriceBookItemId, setSelectedPriceBookItemId] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateMessage, setTemplateMessage] = useState("");
   const [packageOptions, setPackageOptions] = useState<EstimatePackage[]>([]);
@@ -198,45 +198,33 @@ export default function CreateEstimatePage() {
     })();
   }, []);
 
-  // Handle Smart Line-Item Generation (Local vs Paid API)
+  // Handle Pro cloud AI line-item drafting.
   const handleGenerateItems = async () => {
-    if (!promptText.trim()) return;
+    if (!isProSubscriber || !promptText.trim()) return;
     setIsGenerating(true);
 
     try {
-      let draftedItems: LineItemInput[];
-      if (isProSubscriber) {
-        // PRO TIER: Call Gemini AI Server Route
-        const res = await fetch("/api/generate-estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: promptText, trade }),
-        });
+      const res = await fetch("/api/generate-estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptText, trade }),
+      });
 
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
-        if (typeof data.remaining_daily_generations === "number") {
-          setAiDailyAllowance((previous) => previous ? {
-            ...previous,
-            used: previous.daily_limit - data.remaining_daily_generations,
-            remaining: data.remaining_daily_generations,
-          } : previous);
-        }
-
-        if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
-        draftedItems = data.line_items;
-      } else {
-        // FREE TIER: Execute Zero-Cost Local Catalog Engine
-        // Simulate a minor 400ms delay for a smooth UI transition
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        draftedItems = generateLocalEstimate(`${trade} ${promptText}`);
+      if (typeof data.remaining_daily_generations === "number") {
+        setAiDailyAllowance((previous) => previous ? {
+          ...previous,
+          used: previous.daily_limit - data.remaining_daily_generations,
+          remaining: data.remaining_daily_generations,
+        } : previous);
       }
-      const priced = applyPriceBookRates(draftedItems, priceBookItems, trade, isProSubscriber);
+
+      if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
+      const priced = applyPriceBookRates(data.line_items, priceBookItems, trade, true);
       setLineItems(priced.lines);
-      setDraftMessage(isProSubscriber
-        ? `${priced.matchedCount} line(s) matched your Price Book. Unmatched lines are $0 until you set your own rate.`
-        : `${priced.matchedCount} line(s) matched your Price Book. Other local prices are starter references; review them before sending.`);
+      setDraftMessage(`${priced.matchedCount} line(s) matched your Price Book. Unmatched lines are $0 until you set your own rate.`);
       setPromptText("");
     } catch (err: unknown) {
       alert("Error generating estimate: " + (err instanceof Error ? err.message : String(err)));
@@ -249,13 +237,15 @@ export default function CreateEstimatePage() {
     setLineItems([...lineItems, { description: "", quantity: 1, unit_price: 0 }]);
   };
 
-  const addPriceBookItem = (item: PriceBookItem) => {
+  const addSelectedPriceBookItem = () => {
+    const item = priceBookItems.find((priceBookItem) => priceBookItem.id === selectedPriceBookItemId);
+    if (!item) return;
     setLineItems((current) => [...current, {
       description: item.description ? `${item.name} — ${item.description}` : item.name,
       quantity: 1,
       unit_price: Number(item.unit_price),
     }]);
-    setShowPriceBook(false);
+    setSelectedPriceBookItemId("");
   };
 
   const saveTemplate = async () => {
@@ -518,7 +508,7 @@ export default function CreateEstimatePage() {
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Field photos & voice note {isProSubscriber ? "" : "· Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p></div>
+              <div><h2 className="text-sm font-semibold text-slate-900">{isProSubscriber ? "Field photos & voice note" : "Field photos & voice note · Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p></div>
               {isProSubscriber ? <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple className="sr-only" onChange={(event) => {
                 const selected = Array.from(event.target.files ?? []);
                 const photos = selected.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024);
@@ -536,69 +526,28 @@ export default function CreateEstimatePage() {
             {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
           </section>
 
-          {/* Smart Draft Generator UI */}
-          <div className={`p-4 rounded-xl border space-y-3 ${
-            isProSubscriber 
-              ? "bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200" 
-              : "bg-gradient-to-r from-blue-50 to-slate-50 border-blue-200"
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-base">{isProSubscriber ? "✦" : "✳"}</span>
-                <h3 className="text-sm font-bold text-slate-900">
-                  {isProSubscriber ? "Generative AI Assistant (Pro)" : "Smart Local Estimator (Free)"}
-                </h3>
-              </div>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
-                {isProSubscriber ? "Cloud AI" : "Zero Cost"}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600">
-              {isProSubscriber
-                ? "Describe the work and measurements. Gemini drafts the scope and quantities, then matching prices come from your Price Book; unmatched prices stay at $0 for you to fill in."
-                : "Describe the job and include measurements where you can. Trade-specific local rules draft common tasks and quantities; every line stays editable."}
-            </p>
-            {isProSubscriber && aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
-            {!isProSubscriber && (
-              <p className="text-[11px] text-slate-500">Local prices are starter reference rates, not live local quotes. Confirm measurements, materials, labor, and your own rates before sending.</p>
-            )}
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={promptText}
-                onChange={(e) => setPromptText(e.target.value)}
-                placeholder="e.g. Replaced 3 double-pane glass windows, sealant, and 3 hours labor"
-                className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="button"
-                onClick={handleGenerateItems}
-                disabled={isGenerating || !promptText.trim()}
-                className={`text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
-                  isProSubscriber ? "bg-purple-600 hover:bg-purple-500" : "bg-blue-600 hover:bg-blue-500"
-                }`}
-              >
-                {isGenerating ? "Drafting..." : "Draft Line Items"}
-              </button>
-            </div>
-            {draftMessage && <p role="status" className="rounded-md border border-blue-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
-          </div>
-
           {/* Scope of Work Table */}
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">
                 Scope & Line Items
               </h2>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
-                <button type="button" onClick={handleAddItem} className="text-xs font-semibold text-blue-600 hover:text-blue-500">+ Add Custom Line</button>
+                <button type="button" onClick={handleAddItem} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600">+ Add line item</button>
               </div>
             </div>
 
-            {showPriceBook && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="mb-3 text-xs text-slate-600">Add one of your saved rates to this estimate.</p>{priceBookItems.length ? <div className="flex flex-wrap gap-2">{priceBookItems.map((item) => <button key={item.id} type="button" onClick={() => addPriceBookItem(item)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs hover:border-blue-400"><span className="font-semibold">{item.name}</span><span className="ml-2 text-slate-500">${Number(item.unit_price).toFixed(2)} / {item.unit}</span></button>)}</div> : <p className="text-xs text-slate-500">Your price book is empty. <a href="/pricebook" className="font-semibold text-blue-700 underline">Add your rates</a></p>}</div>}
+            {showPriceBook && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              {priceBookItems.length ? <>
+                <label className="sr-only" htmlFor="estimate-price-book-item">Choose a saved price book item</label>
+                <select id="estimate-price-book-item" value={selectedPriceBookItemId} onChange={(event) => setSelectedPriceBookItemId(event.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
+                  <option value="">Choose a saved item</option>
+                  {priceBookItems.map((item) => <option key={item.id} value={item.id}>{item.name} · ${Number(item.unit_price).toFixed(2)} / {item.unit}</option>)}
+                </select>
+                <button type="button" onClick={addSelectedPriceBookItem} disabled={!selectedPriceBookItemId} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Add selected item</button>
+              </> : <p className="text-xs text-slate-600">Your price book is empty. <Link href="/pricebook" className="font-semibold text-blue-700 underline">Add your rates</Link></p>}
+            </div>}
 
             <div className="space-y-3">
               {lineItems.map((item, index) => (
@@ -647,11 +596,28 @@ export default function CreateEstimatePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Save this scope as a reusable template<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
-            <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
-            {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
-          </div>
+          {isProSubscriber && <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
+              <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
+            </div>
+            <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope and quantities. Matching rates come from your Price Book; unmatched items stay at $0 for you to price.</p>
+            {aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input type="text" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim()} className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+            </div>
+            {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
+          </section>}
+
+          <details className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Template name<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
+              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
+              {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
+            </div>
+          </details>
 
           {/* Deposit & Financial Options */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -664,7 +630,7 @@ export default function CreateEstimatePage() {
                   disabled={!isProSubscriber}
                   className="rounded text-blue-600 focus:ring-blue-500"
                 />
-                <span>Require Down-Payment / Deposit {isProSubscriber ? "" : "(Pro)"}</span>
+                <span>{isProSubscriber ? "Require Down-Payment / Deposit" : "Require Down-Payment / Deposit (Pro)"}</span>
               </label>
 
               {requireDeposit && (
@@ -681,10 +647,10 @@ export default function CreateEstimatePage() {
                 </div>
               )}
             </div>
-            {!isProSubscriber && <p className="text-xs text-slate-500">Online deposits and customer payments require Pro and a connected Stripe account. <Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
+            {!isProSubscriber && <p className="text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span>{" "}<Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
-              <span className="text-slate-600">Subtotal:</span>
+              <span className="text-slate-600">Subtotal de partidas:</span>
               <span className="font-bold text-slate-900">${subtotal.toFixed(2)}</span>
             </div>
             {markupPercentage > 0 && <div className="flex justify-between text-sm text-slate-600"><span>Markup ({markupPercentage}%):</span><span>${markupAmount.toFixed(2)}</span></div>}

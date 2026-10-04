@@ -85,6 +85,22 @@ const spanish: Record<string, string> = {
 };
 
 Object.assign(spanish, {
+  "Field photos & voice note · Pro": "Fotos del trabajo y nota de voz · Pro",
+  "Private photo and voice-note storage is included with Pro.": "El almacenamiento privado de fotos y notas de voz está incluido con Pro.",
+  "Describe the work and measurements. Gemini drafts editable scope and quantities. Matching rates come from your Price Book; unmatched items stay at $0 for you to price.": "Describe el trabajo y las medidas. Gemini prepara un alcance y cantidades editables. Las tarifas coincidentes vienen de tu lista de precios; los artículos sin coincidencia quedan en $0 para que les asignes un precio.",
+  "Describe the work and measurements": "Describe el trabajo y las medidas",
+  "+ Add line item": "+ Agregar partida",
+  "Choose a saved price book item": "Elige un artículo guardado en tu lista de precios",
+  "Choose a saved item": "Elige un artículo guardado",
+  "Add selected item": "Agregar artículo seleccionado",
+  "Template name": "Nombre de la plantilla",
+  "Online deposits and customer payments require Pro and a connected Stripe account.": "Los anticipos y pagos en línea requieren Pro y una cuenta de Stripe conectada.",
+  "Subtotal de partidas:": "Subtotal de las partidas:",
+  "Cloud estimate drafting is temporarily paused.": "La redacción de cotizaciones con IA en la nube está pausada temporalmente.",
+  "No usable line items were returned.": "No se recibieron partidas utilizables.",
+});
+
+Object.assign(spanish, {
   "We collect account and business profile details, customer contact information, estimate line items and prices, job addresses, schedules, notes, and approval details that you enter. For cloud AI cost controls, we also record your generation count, model, prompt length, outcome, and provider response status for cost controls, and we delete records older than 90 days the next time a cloud drafting request is processed; if the feature is idle or paused, those records may remain longer. We do not store your prompt or generated text in this usage log. If you contact support, we send the name, email address, topic, and message you provide to our email provider so our support team can reply. To limit spam, we use a keyed hash of the request IP address to enforce a daily submission limit. Expired hashes are pruned the next time a support request is processed after 30 days. Supabase provides account authentication and data storage. Payment card details are handled by Stripe Checkout and are not stored by WorkCraft AI.": "Recopilamos los datos de tu cuenta y del perfil de tu negocio, la información de contacto de tus clientes, las partidas y los precios de tus cotizaciones, las direcciones de los trabajos, los horarios, las notas y los datos de aprobación que ingresas. Para controlar los costos de la IA en la nube, también registramos la cantidad de generaciones, el modelo, la longitud de la solicitud, el resultado y el estado de respuesta del proveedor. Eliminamos los registros de más de 90 días la próxima vez que se procesa una solicitud de redacción en la nube; si la función está inactiva o pausada, esos registros podrían conservarse por más tiempo. No guardamos tus solicitudes ni el texto generado en este registro de uso. Si contactas a soporte, enviamos el nombre, correo electrónico, tema y mensaje que proporcionas a nuestro proveedor de correo para que el equipo pueda responderte. Para limitar el spam, usamos un hash con clave de la dirección IP de la solicitud para aplicar un límite diario de envíos. Los hashes vencidos se eliminan cuando se procesa una solicitud de soporte después de 30 días. Supabase proporciona la autenticación de cuentas y el almacenamiento de datos. Stripe Checkout procesa los datos de tarjetas de pago; WorkCraft AI no los almacena.",
   "We use information to create and manage estimates, price books, schedules, invoices, approvals, and reports. If you use cloud estimate drafting, the job description and selected trade are sent to Google Gemini for processing. Local drafting runs in your browser. If you send an estimate or enable a follow-up, the customer email address and proposal details are sent to our email provider to deliver the message. Support requests are sent to our support inbox through Resend; WorkCraft AI does not store their message contents in its app database.": "Usamos la información para crear y administrar cotizaciones, listas de precios, agendas, facturas, aprobaciones e informes. Si usas la redacción de cotizaciones con IA en la nube, enviamos la descripción del trabajo y el oficio seleccionado a Google Gemini para procesarlos. La redacción local se ejecuta en tu navegador. Si envías una cotización o activas un seguimiento, enviamos la dirección de correo del cliente y los detalles de la propuesta a nuestro proveedor de correo para entregar el mensaje. Las solicitudes de soporte se envían a nuestro buzón de soporte mediante Resend; WorkCraft AI no guarda el contenido de esos mensajes en la base de datos de la aplicación.",
   "4. Data Deletion": "4. Eliminación de datos",
@@ -139,6 +155,7 @@ export function translate(language: Language, text: string): string {
     [/^Delete (.+)$/, ([, item]) => `Eliminar ${item}`],
     [/^(\d+) rows ready to import\.$/, ([, count]) => `${count} filas listas para importar.`],
     [/^(\d+) starter line items$/, ([, count]) => `${count} partidas iniciales`],
+    [/^(\d+) line\(s\) matched your Price Book\. Unmatched lines are \$0 until you set your own rate\.$/, ([, count]) => `${count} partida(s) coincidieron con tu lista de precios. Las partidas sin coincidencia quedan en $0 hasta que asignes tu propia tarifa.`],
     [/^(\d+) unread$/, ([, count]) => `${count} sin leer`],
   ];
   for (const [pattern, format] of dynamicTranslations) {
