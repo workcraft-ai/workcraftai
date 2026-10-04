@@ -178,7 +178,7 @@ export default function HeaderNav() {
         {dropdownOpen && (
           <div role="menu" className="absolute right-0 z-50 mt-2 w-60 rounded-xl border border-slate-200 bg-white py-1 text-slate-800 shadow-xl">
             <div className="border-b border-slate-100 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Signed in as</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{translate(language, "Signed in as")}</p>
               <p className="mt-1 truncate text-sm font-medium text-slate-900">{user.email}</p>
             </div>
             <Link role="menuitem" href="/profile" onClick={() => setDropdownOpen(false)} className="block px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">
