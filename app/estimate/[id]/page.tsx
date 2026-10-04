@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
 
@@ -252,7 +253,7 @@ export default function ClientEstimatePage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
             <div>
               <div className="flex items-center gap-3">
-                {contractor.logoUrl && <img src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-12 max-w-32 object-contain" />}
+                {contractor.logoUrl && <Image unoptimized width={128} height={48} src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-12 w-32 object-contain" />}
                 <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -269,7 +270,7 @@ export default function ClientEstimatePage() {
             </div>
           </div>
 
-          {photos.length > 0 && <section className="space-y-3"><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Job photos</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Job site" className="h-36 w-full rounded-lg border border-slate-200 object-cover" /></a>)}</div></section>}
+          {photos.length > 0 && <section className="space-y-3"><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Job photos</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><Image unoptimized width={480} height={240} src={photo.url} alt="Job site" className="h-36 w-full rounded-lg border border-slate-200 object-cover" /></a>)}</div></section>}
           {ownerAttachments.some((item) => item.media_type === "voice") && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4"><h2 className="text-xs font-bold uppercase tracking-wider text-amber-900">Private contractor voice notes</h2>{ownerAttachments.filter((item) => item.media_type === "voice").map((item) => <audio key={item.id} controls src={item.url} className="w-full" />)}<p className="text-[11px] text-amber-900">Only signed-in account owners can load these recordings.</p></section>}
 
           <div className="flex justify-end print:hidden">

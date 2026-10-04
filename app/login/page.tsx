@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import LoginForm from "./LoginForm";
 
-export default function LoginPage() {
-  const [mounted, setMounted] = useState(false);
+const subscribeToMount = () => () => {};
+const getClientMounted = () => true;
+const getServerMounted = () => false;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+export default function LoginPage() {
+  const mounted = useSyncExternalStore(subscribeToMount, getClientMounted, getServerMounted);
 
   if (!mounted) {
     return (

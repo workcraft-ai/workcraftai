@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
@@ -19,11 +19,19 @@ export default function HeaderNav() {
   const [user, setUser] = useState<User | null>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState({ pathname: "", dropdown: false, mobile: false });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  const dropdownOpen = openMenus.pathname === pathname && openMenus.dropdown;
+  const mobileMenuOpen = openMenus.pathname === pathname && openMenus.mobile;
+  const setDropdownOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
+    setOpenMenus((current) => ({ pathname: pathname ?? "", dropdown: typeof next === "function" ? next(current.pathname === pathname && current.dropdown) : next, mobile: current.pathname === pathname && current.mobile }));
+  }, [pathname]);
+  const setMobileMenuOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
+    setOpenMenus((current) => ({ pathname: pathname ?? "", dropdown: current.pathname === pathname && current.dropdown, mobile: typeof next === "function" ? next(current.pathname === pathname && current.mobile) : next }));
+  }, [pathname]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -77,12 +85,8 @@ export default function HeaderNav() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, []);
+  }, [setDropdownOpen, setMobileMenuOpen]);
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-    setDropdownOpen(false);
-  }, [pathname]);
 
   const handleSignOut = async () => {
     const supabase = createClient();

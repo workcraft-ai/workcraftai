@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -55,8 +55,6 @@ export default function SchedulePage() {
   const [notes, setNotes] = useState("");
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setError("");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setIsPro(false); setLoading(false); return; }
     const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
@@ -73,19 +71,24 @@ export default function SchedulePage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    const task = window.setTimeout(() => { void loadData(); }, 0);
+    return () => window.clearTimeout(task);
+  }, [loadData]);
 
   useEffect(() => {
     const targetEstimate = new URLSearchParams(window.location.search).get("estimate");
     if (!targetEstimate || !estimates.length) return;
     const acceptedEstimate = estimates.find((estimate) => estimate.id === targetEstimate);
     if (acceptedEstimate) {
-      setEstimateId(acceptedEstimate.id);
-      setClientName(acceptedEstimate.client_name ?? "");
-      setClientEmail(acceptedEstimate.client_email ?? "");
-      setJobAddress(acceptedEstimate.job_address ?? "");
-      setTitle(`${acceptedEstimate.client_name || "Customer"} ${acceptedEstimate.trade || "service"} job`);
-      setShowForm(true);
+      startTransition(() => {
+        setEstimateId(acceptedEstimate.id);
+        setClientName(acceptedEstimate.client_name ?? "");
+        setClientEmail(acceptedEstimate.client_email ?? "");
+        setJobAddress(acceptedEstimate.job_address ?? "");
+        setTitle(`${acceptedEstimate.client_name || "Customer"} ${acceptedEstimate.trade || "service"} job`);
+        setShowForm(true);
+      });
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, [estimates]);

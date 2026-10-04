@@ -47,7 +47,10 @@ export default function InvoicePage() {
     }
     setLoading(false);
   }, [params.id]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const task = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(task);
+  }, [load]);
 
   const lineItemTotal = lines.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
   const subtotal = Number(job?.quoted_total || 0) || lineItemTotal;

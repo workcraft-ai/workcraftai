@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
@@ -16,6 +17,7 @@ const trades = ["Plumbing", "Electrical", "Roofing", "HVAC", "Painting", "Carpen
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function PriceBookPage() {
+  const router = useRouter();
   const [tab, setTab] = useState<"items" | "templates">("items");
   const [items, setItems] = useState<PriceItem[]>([]);
   const [templates, setTemplates] = useState<EstimateTemplate[]>([]);
@@ -32,7 +34,6 @@ export default function PriceBookPage() {
   const [importing, setImporting] = useState(false);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
     const [itemResult, templateResult] = await Promise.all([
       supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price").order("name"),
       supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name"),
@@ -47,7 +48,10 @@ export default function PriceBookPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    const task = window.setTimeout(() => { void loadData(); }, 0);
+    return () => window.clearTimeout(task);
+  }, [loadData]);
 
   const addItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -116,7 +120,7 @@ export default function PriceBookPage() {
 
   const applyTemplate = (template: EstimateTemplate) => {
     sessionStorage.setItem("tradeflow-estimate-template", JSON.stringify(template));
-    window.location.assign("/");
+    router.push("/estimate/new");
   };
 
   return (

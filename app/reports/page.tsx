@@ -20,7 +20,6 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
 
   const loadReport = useCallback(async () => {
-    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     const { data: subscription } = user
       ? await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle()
@@ -43,7 +42,10 @@ export default function ReportsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void loadReport(); }, [loadReport]);
+  useEffect(() => {
+    const task = window.setTimeout(() => { void loadReport(); }, 0);
+    return () => window.clearTimeout(task);
+  }, [loadReport]);
 
   const totals = new Map<string, number>();
   for (const line of lines) totals.set(line.estimate_id, (totals.get(line.estimate_id) ?? 0) + Number(line.quantity || 0) * Number(line.unit_price || 0));
