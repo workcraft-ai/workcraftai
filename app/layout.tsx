@@ -3,6 +3,7 @@ import React from "react";
 import HeaderNav from "@/app/components/HeaderNav";
 import Footer from "@/app/components/Footer";
 import Logo from "@/app/components/Logo";
+import AccountActivityTracker from "@/app/components/AccountActivityTracker";
 import { LanguageProvider } from "@/app/components/LanguageProvider";
 import "./globals.css";
 
@@ -37,9 +38,10 @@ export default function RootLayout({
         suppressHydrationWarning: true,
       },
       React.createElement(
-        LanguageProvider,
-        null,
-        React.createElement(
+      LanguageProvider,
+      null,
+      React.createElement(AccountActivityTracker, null),
+      React.createElement(
           "header",
           { className: "print:hidden relative z-20 bg-slate-900 text-white px-4 md:px-8 py-3.5 border-b border-slate-800 flex items-center justify-between shadow-sm" },
           React.createElement(Logo, null),

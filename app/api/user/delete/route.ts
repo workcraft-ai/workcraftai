@@ -1,41 +1,30 @@
-import { createServerClient } from "@supabase/ssr";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { createUserSupabaseClient } from "@/app/utils/supabase/server";
+import { deleteTradeFlowAccount } from "@/lib/account-deletion";
+import { sameOrigin, validReason } from "@/lib/admin-support";
+import { getServiceSupabase } from "@/lib/stripe-server";
 
-export async function DELETE() {
-  const cookieStore = await cookies();
-  
-  // Standard client to identify the current logged-in user
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-      },
-    }
-  );
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  const userClient = await createUserSupabaseClient();
+  const { data: { user }, error: userError } = await userClient.auth.getUser();
+  if (userError || !user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  const payload: unknown = await request.json().catch(() => null);
+  const body = payload as { confirm_email?: unknown; reason?: unknown } | null;
+  if (!body || typeof body.confirm_email !== "string" || !validReason(body.reason)) {
+    return NextResponse.json({ error: "Enter your account email and a reason of at least 8 characters." }, { status: 400 });
   }
-
-  // Supabase Admin client with SERVICE_ROLE_KEY to perform user deletion
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
-
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  if (body.confirm_email.trim().toLowerCase() !== (user.email ?? "").toLowerCase()) {
+    return NextResponse.json({ error: "The confirmation email does not match your account." }, { status: 400 });
   }
-
-  return NextResponse.json({ success: true });
+  try {
+    await deleteTradeFlowAccount({
+      admin: getServiceSupabase(), targetUserId: user.id, actorUserId: user.id,
+      actorEmail: "Account owner", reason: body.reason.trim(), trigger: "user_requested",
+    });
+    return NextResponse.json({ success: true });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "The account could not be deleted.";
+    return NextResponse.json({ error: message }, { status: 409 });
+  }
 }
