@@ -11,7 +11,7 @@ export default function SignupForm() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function SignupForm() {
     e.preventDefault();
 
     setError(null);
-    setMessage(null);
+    setMessage(false);
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -46,9 +46,7 @@ export default function SignupForm() {
     }
 
     if (data.user && !data.session) {
-      setMessage(
-        "Check your email for a confirmation link to complete registration."
-      );
+      setMessage(true);
       setLoading(false);
     } else {
       router.push("/dashboard");
@@ -89,7 +87,20 @@ export default function SignupForm() {
                 role="status"
                 className="rounded-md bg-green-900/30 border border-green-500/50 p-3 text-xs text-green-200"
               >
-                {message}
+                <p>
+                  Check your email for a confirmation link to complete registration.
+                </p>
+                <p className="mt-2">
+                  If you already have an account, you can{" "}
+                  <Link href="/login" className="font-semibold underline">
+                    sign in
+                  </Link>{" "}
+                  or{" "}
+                  <Link href="/forgot-password" className="font-semibold underline">
+                    reset your password
+                  </Link>
+                  .
+                </p>
               </div>
             )}
 
