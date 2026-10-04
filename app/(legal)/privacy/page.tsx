@@ -1,4 +1,5 @@
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+import LocalizedText from "@/app/components/LocalizedText";
 
 export default function PrivacyPage() {
   return (
@@ -36,9 +37,9 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900">4. Data Deletion</h2>
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="4. Data Deletion" /></h2>
           <p className="text-sm leading-7 text-slate-700">
-            You may request full deletion of your account and associated data at any time through your account settings or by contacting support.
+            <LocalizedText text="You may request full deletion of your account and associated data at any time through your account settings or by contacting support." />
           </p>
         </section>
       </article>

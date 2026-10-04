@@ -3,6 +3,7 @@ import Link from "next/link";
 import { emailAddressFromConfig } from "@/lib/email-address";
 import SupportForm from "./SupportForm";
 import SupportFaq from "./SupportFaq";
+import LocalizedText from "@/app/components/LocalizedText";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export const metadata: Metadata = {
@@ -28,8 +29,8 @@ export default function SupportPage() {
           <section aria-labelledby="faq-heading">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Quick answers</p>
-                <h2 id="faq-heading" className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Frequently asked questions</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500"><LocalizedText text="Quick answers" /></p>
+                <h2 id="faq-heading" className="mt-1 text-2xl font-bold tracking-tight text-slate-900"><LocalizedText text="Frequently asked questions" /></h2>
               </div>
               <span className="hidden rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm sm:inline">WorkCraft AI</span>
             </div>
@@ -37,9 +38,9 @@ export default function SupportPage() {
           </section>
 
           <section id="contact-support" aria-labelledby="contact-heading" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-800">Still need help?</p>
-            <h2 id="contact-heading" className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Send us a message</h2>
-            <p className="mt-2 mb-6 text-sm leading-6 text-slate-600">Share a few details and our support team will reply to the email address you provide.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-800"><LocalizedText text="Still need help?" /></p>
+            <h2 id="contact-heading" className="mt-2 text-2xl font-bold tracking-tight text-slate-900"><LocalizedText text="Send us a message" /></h2>
+            <p className="mt-2 mb-6 text-sm leading-6 text-slate-600"><LocalizedText text="Share a few details and our support team will reply to the email address you provide." /></p>
             <SupportForm />
             <p className="mt-6 border-t border-slate-100 pt-5 text-sm text-slate-600">Prefer email? <a href={`mailto:${supportEmail}`} className="font-semibold text-orange-800 underline underline-offset-2">{supportEmail}</a></p>
           </section>
