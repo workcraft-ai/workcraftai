@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { getAppOrigin, getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
+import { getServerProAccess } from "@/lib/pro-access";
 
 export async function POST(request: Request) {
   const supabase = await createUserSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to connect Stripe." }, { status: 401 });
 
-  const { data: subscription, error: subscriptionError } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-  if (subscriptionError) return NextResponse.json({ error: "Could not verify your plan." }, { status: 502 });
-  if (!subscription || !["active", "trialing"].includes(subscription.status)) {
+  let hasPro = false;
+  try { hasPro = (await getServerProAccess(user.id)).hasPro; }
+  catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 502 }); }
+  if (!hasPro) {
     return NextResponse.json({ error: "Stripe payments require an active WorkCraft AI Pro plan." }, { status: 403 });
   }
 

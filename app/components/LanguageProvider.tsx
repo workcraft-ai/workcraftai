@@ -152,6 +152,37 @@ Object.assign(spanish, {
   "Customer payment collection requires an active WorkCraft AI Pro plan.": "La cobranza de pagos de clientes requiere un plan activo de WorkCraft AI Pro.",
 });
 
+Object.assign(spanish, {
+  "Admin-granted Pro access": "Acceso Pro otorgado por administración",
+  "through": "hasta",
+  "until an administrator revokes it.": "hasta que lo revoque un administrador.",
+  "Admin granted": "Otorgado por administración",
+  "Pro access management": "Administrar acceso Pro",
+  "Grant Pro access": "Otorgar acceso Pro",
+  "Active temporary admin grant": "Acceso Pro temporal activo",
+  "Active permanent admin grant": "Acceso Pro permanente activo",
+  "Temporary admin Pro grant": "Acceso Pro temporal de administración",
+  "Permanent admin Pro grant": "Acceso Pro permanente de administración",
+  "Permanent": "Permanente",
+  "No automatic expiration; it stays active until an admin revokes it.": "No vence automáticamente; seguirá activo hasta que un administrador lo revoque.",
+  "Expires": "Vence",
+  "Reason:": "Motivo:",
+  "active until revoked": "activo hasta que se revoque",
+  "Reason for revocation": "Motivo de revocación",
+  "Grant history": "Historial de concesiones",
+  "Grant type": "Tipo de concesión",
+  "Temporary": "Temporal",
+  "Permanent until revoked": "Permanente hasta revocarlo",
+  "Duration (days)": "Duración (días)",
+  "Remains active until manually revoked.": "Permanece activo hasta que se revoque manualmente.",
+  "Reason": "Motivo",
+  "Revoke Pro access": "Revocar acceso Pro",
+  "Admin-granted Pro access revoked.": "Se revocó el acceso Pro otorgado por administración.",
+  "Pro access granted.": "Se otorgó acceso Pro.",
+  "Permanent Pro access granted until an admin revokes it.": "Se otorgó acceso Pro permanente hasta que un administrador lo revoque.",
+  "Temporary Pro access granted. It will expire automatically.": "Se otorgó acceso Pro temporal. Vencerá automáticamente.",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   if (spanish[text]) return spanish[text];
@@ -171,6 +202,9 @@ export function translate(language: Language, text: string): string {
     [/^(\d+) starter line items$/, ([, count]) => `${count} partidas iniciales`],
     [/^(\d+) line\(s\) matched your Price Book\. Unmatched lines are \$0 until you set your own rate\.$/, ([, count]) => `${count} partida(s) coincidieron con tu lista de precios. Las partidas sin coincidencia quedan en $0 hasta que asignes tu propia tarifa.`],
     [/^(\d+) unread$/, ([, count]) => `${count} sin leer`],
+    [/^revoked (.+)$/, ([, date]) => `revocado ${date}`],
+    [/^expired (.+)$/, ([, date]) => `venció ${date}`],
+    [/^expires (.+)$/, ([, date]) => `vence ${date}`],
   ];
   for (const [pattern, format] of dynamicTranslations) {
     const match = text.match(pattern);

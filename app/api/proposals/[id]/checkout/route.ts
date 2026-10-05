@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, paidCents, retrieveOpenSession } from "@/lib/customer-payments";
 import { getAppOrigin, getServiceSupabase } from "@/lib/stripe-server";
+import { getProAccess } from "@/lib/pro-access";
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
@@ -22,10 +23,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (estimate.status !== "accepted") return errorResponse("Approve this estimate before making a payment.", 409);
     if (!data.totalCents) return errorResponse("This estimate has no payable balance.", 409);
 
-    const { data: subscription, error: subscriptionError } = await admin.from("subscriptions")
-      .select("status").eq("user_id", estimate.user_id).maybeSingle();
-    if (subscriptionError) return errorResponse("Could not verify the contractor’s plan.", 502);
-    if (!subscription || !["active", "trialing"].includes(subscription.status)) {
+    let hasPro = false;
+    try { hasPro = (await getProAccess(admin, estimate.user_id)).hasPro; }
+    catch { return errorResponse("Could not verify the contractor’s plan.", 502); }
+    if (!hasPro) {
       return errorResponse("Online customer payments are currently unavailable for this estimate.", 403);
     }
 

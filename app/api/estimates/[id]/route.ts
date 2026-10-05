@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+import { getServerProAccess } from "@/lib/pro-access";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -132,8 +133,9 @@ export async function PUT(
   if (!existing) return jsonError("Estimate not found.", 404);
   if (["accepted", "paid"].includes(String(existing.status).toLowerCase())) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
 
-  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-  const isPro = subscription?.status === "active" || subscription?.status === "trialing";
+  let isPro = false;
+  try { isPro = (await getServerProAccess(user.id)).hasPro; }
+  catch { return jsonError("Could not verify your plan.", 503); }
   const requestedPackages = Array.isArray(body.package_options) ? body.package_options : [];
   const validPackages = requestedPackages.length <= 3 && requestedPackages.every((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return false;

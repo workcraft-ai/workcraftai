@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
+import { getProAccess } from "@/lib/pro-access";
 
 export async function GET(
   _request: Request,
@@ -55,16 +56,18 @@ export async function GET(
   }));
 
   const paymentData = await getEstimatePaymentData(admin, id);
-  const { data: subscription } = estimate.user_id
-    ? await admin.from("subscriptions").select("status").eq("user_id", estimate.user_id).maybeSingle()
-    : { data: null };
+  let hasPro = false;
+  if (estimate.user_id) {
+    try { hasPro = (await getProAccess(admin, estimate.user_id)).hasPro; }
+    catch (entitlementError) { console.error("Proposal payment entitlement lookup failed:", entitlementError instanceof Error ? entitlementError.message : "unknown error"); }
+  }
   const { data: connectedAccount } = estimate.user_id
     ? await admin.from("stripe_connected_accounts").select("charges_enabled").eq("user_id", estimate.user_id).maybeSingle()
     : { data: null };
   const paymentSummary = {
     amountPaidCents: paidCents(paymentData.payments),
     totalCents: paymentData.totalCents,
-    available: ["active", "trialing"].includes(subscription?.status ?? "") && connectedAccount?.charges_enabled === true,
+    available: hasPro && connectedAccount?.charges_enabled === true,
   };
 
   const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) => key !== "user_id" && key !== "converted_job_id"));

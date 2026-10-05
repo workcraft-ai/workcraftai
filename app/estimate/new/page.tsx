@@ -9,6 +9,7 @@ import { isFreeEstimateLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 interface LineItemInput {
   description: string;
@@ -192,8 +193,8 @@ export default function CreateEstimatePage() {
       if (user) {
         setTaxRate(Number(user.user_metadata?.tax_rate) || 0);
         setMarkupPercentage(Number(user.user_metadata?.markup_percentage) || 0);
-        const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-        const activePro = ["active", "trialing"].includes(plan?.status ?? "");
+        const entitlement = await getClientProEntitlement();
+        const activePro = entitlement?.has_pro === true;
         setIsProSubscriber(activePro);
         if (activePro) {
           void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,9 @@ export default function ProfilePage() {
   const [taxRate, setTaxRate] = useState("0");
   const [markupPercentage, setMarkupPercentage] = useState("0");
   const [planStatus, setPlanStatus] = useState("free");
+  const [hasProAccess, setHasProAccess] = useState(false);
+  const [proAccessSource, setProAccessSource] = useState<"stripe" | "admin_grant" | "free">("free");
+  const [proAccessExpiresAt, setProAccessExpiresAt] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
   const [connectLoading, setConnectLoading] = useState(true);
@@ -49,8 +53,15 @@ export default function ProfilePage() {
         setBrandColor(user.user_metadata?.brand_color ?? "#c85b2d");
         setTaxRate(String(user.user_metadata?.tax_rate ?? 0));
         setMarkupPercentage(String(user.user_metadata?.markup_percentage ?? 0));
-        const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-        if (plan) setPlanStatus(plan.status);
+        const entitlement = await getClientProEntitlement();
+        if (entitlement) {
+          setPlanStatus(entitlement.stripe_status);
+          setHasProAccess(entitlement.has_pro);
+          setProAccessSource(entitlement.source);
+          setProAccessExpiresAt(entitlement.expires_at);
+        } else {
+          setError("Could not verify your plan. Refresh the page before using Pro tools.");
+        }
         try {
           const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
           const connect = await response.json();
@@ -134,7 +145,6 @@ export default function ProfilePage() {
     }
   };
 
-  const hasProAccess = planStatus === "active" || planStatus === "trialing";
   const hasBillingHistory = planStatus !== "free";
   const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
 
@@ -158,9 +168,9 @@ export default function ProfilePage() {
       </div>
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{hasProAccess ? "Pro tools are enabled on this account." : "Create up to 10 estimates per day, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Pro tools are enabled on this account." : "Create up to 10 estimates per day, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{planStatus}</span>}
+          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus}</span>}
           {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
         </div>

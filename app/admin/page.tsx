@@ -19,12 +19,14 @@ type Account = {
   has_stripe_subscription: boolean;
 };
 type AccountDetail = {
-  account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; last_active_at: string | null; deletion_status: "active" | "pending_deletion" | "deleting"; deletion_notice_sent_at: string | null; deletion_due_at: string | null; is_admin: boolean; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null };
+  account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; last_active_at: string | null; deletion_status: "active" | "pending_deletion" | "deleting"; deletion_notice_sent_at: string | null; deletion_due_at: string | null; is_admin: boolean; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null; active_pro_grant: ProGrant | null };
+  pro_grants: ProGrant[];
   notes: { id: string; note: string; category: string; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   audit: { id: string; action: string; reason: string; outcome: string; details: Record<string, unknown>; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   questions: { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null }[];
   email_events: { id: string; estimate_id: string; recipient: string; event: string; created_at: string }[];
 };
+type ProGrant = { id: string; grant_type: "temporary" | "permanent"; reason: string; created_at: string; starts_at: string; expires_at: string | null; revoked_at: string | null; is_expired: boolean };
 type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number } };
 
 function date(value: string | null) {
@@ -63,6 +65,9 @@ export default function AdminPage() {
   const [recoveryReason, setRecoveryReason] = useState("");
   const [couponId, setCouponId] = useState("");
   const [billingReason, setBillingReason] = useState("");
+  const [proGrantType, setProGrantType] = useState<"temporary" | "permanent">("temporary");
+  const [proGrantDurationDays, setProGrantDurationDays] = useState("30");
+  const [proAccessReason, setProAccessReason] = useState("");
   const [freeEstimateLimit, setFreeEstimateLimit] = useState<number | null>(null);
   const [freeEstimateLimitInput, setFreeEstimateLimitInput] = useState("");
   const [freeEstimateLimitReason, setFreeEstimateLimitReason] = useState("");
@@ -202,7 +207,7 @@ export default function AdminPage() {
     }
   };
 
-  const runAction = async (name: string, url: string, payload: Record<string, string>, successMessage: string): Promise<boolean> => {
+  const runAction = async (name: string, url: string, payload: Record<string, unknown>, successMessage: string): Promise<boolean> => {
     if (!selectedId) return false;
     setBusy(name);
     setError("");
@@ -240,6 +245,30 @@ export default function AdminPage() {
     if (!window.confirm("Apply this existing 100% Stripe coupon to the customer’s subscription?")) return;
     void runAction("billing", `/api/admin/accounts/${encodeURIComponent(selectedId)}/billing`, { coupon_id: couponId, reason: billingReason }, "Stripe discount applied.").then((applied) => {
       if (applied) { setCouponId(""); setBillingReason(""); }
+    });
+  };
+
+  const saveProAccess = (event: FormEvent) => {
+    event.preventDefault();
+    const duration = Number(proGrantDurationDays);
+    if (!selectedId || proAccessReason.trim().length < 8
+      || (proGrantType === "temporary" && (!Number.isInteger(duration) || duration < 1 || duration > 365))) return;
+    void runAction("pro-access", `/api/admin/accounts/${encodeURIComponent(selectedId)}/pro-access`, {
+      operation: "grant", grant_type: proGrantType,
+      duration_days: proGrantType === "temporary" ? duration : null,
+      reason: proAccessReason,
+    }, "Pro access granted.").then((granted) => {
+      if (granted) setProAccessReason("");
+    });
+  };
+
+  const revokeProAccess = () => {
+    if (!selectedId || !detail?.account.active_pro_grant || proAccessReason.trim().length < 8) return;
+    if (!window.confirm(`Revoke admin-granted Pro access for ${detail.account.email}?`)) return;
+    void runAction("pro-access", `/api/admin/accounts/${encodeURIComponent(selectedId)}/pro-access`, {
+      operation: "revoke", reason: proAccessReason,
+    }, "Admin-granted Pro access revoked.").then((revoked) => {
+      if (revoked) setProAccessReason("");
     });
   };
 
@@ -401,6 +430,17 @@ export default function AdminPage() {
         </form>
         {accounts.length > 0 && <div className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200">{accounts.map((account) => <button key={account.id} type="button" onClick={() => void loadDetail(account.id)} className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-orange-50 sm:flex-row sm:items-center sm:justify-between ${selectedId === account.id ? "bg-orange-50" : ""}`}><span><span className="block font-semibold text-slate-900">{account.email}</span><span className="text-xs text-slate-500">{account.business_name || "No business name"} · Joined {date(account.created_at)}</span></span><span className="text-xs font-bold uppercase text-slate-600">{account.plan_status}</span></button>)}</div>}
       </section>
+
+      {detail && role !== "support" && <section className="mt-6 rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
+        <div><p className="text-xs font-bold uppercase tracking-wide text-orange-800">Pro access management</p><h2 className="mt-1 text-lg font-bold text-slate-950">{detail.account.email}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Grant Pro for product testing, feedback, or customer support. This is separate from Stripe billing. Pro includes cloud AI subject to the existing daily caps, and the grant is recorded in the admin audit log.</p></div>
+        {detail.account.active_pro_grant ? <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-950">{detail.account.active_pro_grant.grant_type === "permanent" ? "Active permanent admin grant" : "Active temporary admin grant"}</p><p className="mt-1 text-sm text-emerald-900">{detail.account.active_pro_grant.grant_type === "permanent" ? "No automatic expiration; it stays active until an admin revokes it." : <>{"Expires"} {date(detail.account.active_pro_grant.expires_at)}.</>}</p><p className="mt-1 text-xs text-emerald-900"><span>Reason:</span> {detail.account.active_pro_grant.reason}</p><div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end"><label className="min-w-0 flex-1 text-xs font-semibold text-slate-700">Reason for revocation<input value={proAccessReason} onChange={(event) => setProAccessReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: beta feedback period ended" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="button" onClick={revokeProAccess} disabled={busy !== "" || proAccessReason.trim().length < 8} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-800 disabled:opacity-50">{busy === "pro-access" ? "Saving…" : "Revoke Pro access"}</button></div></div> : <form onSubmit={saveProAccess} className="mt-4 grid gap-3 sm:grid-cols-[minmax(9rem,13rem)_minmax(8rem,10rem)_1fr_auto] sm:items-end">
+          <label className="block text-xs font-semibold text-slate-700">Grant type<select value={proGrantType} onChange={(event) => setProGrantType(event.target.value as "temporary" | "permanent")} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="temporary">Temporary</option><option value="permanent">Permanent until revoked</option></select></label>
+          {proGrantType === "temporary" ? <label className="block text-xs font-semibold text-slate-700">Duration (days)<input type="number" min={1} max={365} step={1} value={proGrantDurationDays} onChange={(event) => setProGrantDurationDays(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label> : <p className="pb-2 text-xs text-slate-500">Remains active until manually revoked.</p>}
+          <label className="block text-xs font-semibold text-slate-700">Reason<input value={proAccessReason} onChange={(event) => setProAccessReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: 30-day customer feedback program" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+          <button type="submit" disabled={busy !== "" || proAccessReason.trim().length < 8 || (proGrantType === "temporary" && (!Number.isInteger(Number(proGrantDurationDays)) || Number(proGrantDurationDays) < 1 || Number(proGrantDurationDays) > 365))} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "pro-access" ? "Saving…" : "Grant Pro access"}</button>
+        </form>}
+        {detail.pro_grants.length > 0 && <div className="mt-4 border-t border-slate-100 pt-3"><h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">Grant history</h3><ul className="mt-2 space-y-2">{detail.pro_grants.map((grant) => <li key={grant.id} className="flex flex-wrap justify-between gap-2 text-xs text-slate-600"><span>{grant.grant_type === "permanent" ? "Permanent" : "Temporary"} · {grant.revoked_at ? `revoked ${date(grant.revoked_at)}` : grant.is_expired ? `expired ${date(grant.expires_at)}` : grant.expires_at ? `expires ${date(grant.expires_at)}` : "active until revoked"}</span><span>{grant.reason}</span></li>)}</ul></div>}
+      </section>}
 
       {detail && <div className="mt-6 grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

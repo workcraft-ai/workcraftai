@@ -8,7 +8,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: userData, error: userError } = await access.admin.auth.admin.getUserById(id);
   if (userError || !userData.user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-  const [{ data: subscription, error: subscriptionError }, { data: notes, error: notesError }, { data: audit, error: auditError }, { data: questions, error: questionsError }, { data: emails, error: emailsError }, { data: lifecycle, error: lifecycleError }, { data: adminMembership, error: adminError }] = await Promise.all([
+  const [{ data: subscription, error: subscriptionError }, { data: notes, error: notesError }, { data: audit, error: auditError }, { data: questions, error: questionsError }, { data: emails, error: emailsError }, { data: lifecycle, error: lifecycleError }, { data: adminMembership, error: adminError }, { data: proGrants, error: proGrantsError }] = await Promise.all([
     access.admin.from("subscriptions").select("status, current_period_end, stripe_customer_id, stripe_subscription_id, updated_at").eq("user_id", id).maybeSingle(),
     access.admin.from("tradeflow_support_notes").select("id, note, category, created_at, actor_user_id, actor_email").eq("target_user_id", id).order("created_at", { ascending: false }).limit(50),
     access.admin.from("tradeflow_admin_audit_log").select("id, action, reason, outcome, details, created_at, actor_user_id, actor_email").eq("target_user_id", id).order("created_at", { ascending: false }).limit(50),
@@ -16,12 +16,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     access.admin.from("estimate_email_events").select("id, estimate_id, recipient, event, created_at").eq("user_id", id).order("created_at", { ascending: false }).limit(50),
     access.admin.from("tradeflow_account_lifecycle").select("last_active_at, deletion_status, notice_sent_at, deletion_due_at").eq("user_id", id).maybeSingle(),
     access.admin.from("tradeflow_admins").select("user_id").eq("user_id", id).maybeSingle(),
+    access.role === "support"
+      ? Promise.resolve({ data: [], error: null })
+      : access.admin.from("tradeflow_pro_access_grants").select("id, grant_type, reason, created_at, starts_at, expires_at, revoked_at")
+        .eq("user_id", id).order("created_at", { ascending: false }).limit(20),
   ]);
-  if (subscriptionError || notesError || auditError || questionsError || emailsError || lifecycleError || adminError) {
-    console.error("Admin account detail lookup failed:", subscriptionError?.message ?? notesError?.message ?? auditError?.message ?? questionsError?.message ?? emailsError?.message ?? lifecycleError?.message ?? adminError?.message);
+  if (subscriptionError || notesError || auditError || questionsError || emailsError || lifecycleError || adminError || proGrantsError) {
+    console.error("Admin account detail lookup failed:", subscriptionError?.message ?? notesError?.message ?? auditError?.message ?? questionsError?.message ?? emailsError?.message ?? lifecycleError?.message ?? adminError?.message ?? proGrantsError?.message);
     return NextResponse.json({ error: "Could not load account support history." }, { status: 502 });
   }
   const user = userData.user;
+  const now = Date.now();
+  const proGrantHistory = (proGrants ?? []).map((grant) => ({
+    ...grant,
+    is_expired: Boolean(grant.expires_at && new Date(grant.expires_at).getTime() <= now),
+  }));
+  const activeProGrant = proGrantHistory.find((grant) => grant.revoked_at === null
+    && new Date(grant.starts_at).getTime() <= now
+    && (grant.expires_at === null || new Date(grant.expires_at).getTime() > now)) ?? null;
   return NextResponse.json({
     account: {
       id: user.id,
@@ -40,7 +52,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       current_period_end: subscription?.current_period_end ?? null,
       has_stripe_subscription: Boolean(subscription?.stripe_subscription_id),
       subscription_updated_at: subscription?.updated_at ?? null,
+      active_pro_grant: activeProGrant,
     },
+    pro_grants: proGrantHistory,
     notes: notes ?? [],
     audit: audit ?? [],
     questions: questions ?? [],

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { localDateTimeToIso, toLocalDateTimeInput } from "@/lib/localDateTime.mjs";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 interface Job {
@@ -59,8 +60,8 @@ export default function SchedulePage() {
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setIsPro(false); setLoading(false); return; }
-    const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-    const pro = subscription?.status === "active" || subscription?.status === "trialing";
+    const entitlement = await getClientProEntitlement();
+    const pro = entitlement?.has_pro === true;
     setIsPro(pro);
     if (!pro) { setJobs([]); setEstimates([]); setLoading(false); return; }
     const [jobsResult, estimatesResult] = await Promise.all([

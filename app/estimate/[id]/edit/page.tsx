@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 interface LineItemInput {
   description: string;
@@ -67,8 +68,8 @@ export default function EditEstimatePage() {
         setMarkupPercentage(Number(estimate.markup_percentage) || 0);
         setProposalLanguage(estimate.proposal_language === "es" ? "es" : "en");
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: plan } = user ? await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle() : { data: null };
-        const activePro = ["active", "trialing"].includes(plan?.status ?? "");
+        const entitlement = user ? await getClientProEntitlement() : null;
+        const activePro = entitlement?.has_pro === true;
         setIsPro(activePro);
         setRequireDeposit(activePro ? (estimate.require_deposit ?? false) : false);
         setDepositPercentage(estimate.deposit_percentage || 20);

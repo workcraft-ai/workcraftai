@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+import { getProAccess } from "@/lib/pro-access";
 
 const MAX_QUESTION_BODY_BYTES = 8_000;
 
@@ -46,8 +47,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data: ownerData } = await admin.auth.admin.getUserById(estimate.user_id);
   const businessEmail = ownerData.user?.email;
-  const { data: subscription } = await admin.from("subscriptions").select("status").eq("user_id", estimate.user_id).maybeSingle();
-  const hasProEmail = subscription?.status === "active" || subscription?.status === "trialing";
+  let hasProEmail = false;
+  try { hasProEmail = (await getProAccess(admin, estimate.user_id)).hasPro; }
+  catch (entitlementError) { console.error("Proposal question entitlement lookup failed:", entitlementError instanceof Error ? entitlementError.message : "unknown error"); }
   const apiKey = process.env.RESEND_API_KEY;
   const sender = process.env.RESEND_FROM_EMAIL;
   let emailSent = false;

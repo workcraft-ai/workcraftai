@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { getServerProAccess } from "@/lib/pro-access";
 
 function escapeHtml(value: string) {
   const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -15,8 +16,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll: () => cookieStore.getAll() } });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to send estimates." }, { status: 401 });
-  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-  if (!subscription || !["active", "trialing"].includes(subscription.status)) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
+  let hasPro = false;
+  try { hasPro = (await getServerProAccess(user.id)).hasPro; }
+  catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 }); }
+  if (!hasPro) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
 
   const apiKey = process.env.RESEND_API_KEY;
   const sender = process.env.RESEND_FROM_EMAIL;

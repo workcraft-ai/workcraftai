@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getServerProAccess } from "@/lib/pro-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +19,10 @@ export async function GET() {
   );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to use cloud estimate drafting." }, { status: 401 });
-  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-  if (!subscription || !["active", "trialing"].includes(subscription.status)) {
+  let hasPro = false;
+  try { hasPro = (await getServerProAccess(user.id)).hasPro; }
+  catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 }); }
+  if (!hasPro) {
     return NextResponse.json({ error: "Cloud estimate drafting is a Pro feature." }, { status: 403 });
   }
 
@@ -82,8 +85,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to use cloud estimate drafting." }, { status: 401 });
 
-  const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-  if (!subscription || !["active", "trialing"].includes(subscription.status)) {
+  let hasPro = false;
+  try { hasPro = (await getServerProAccess(user.id)).hasPro; }
+  catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 }); }
+  if (!hasPro) {
     return NextResponse.json({ error: "Cloud estimate drafting is a Pro feature." }, { status: 403 });
   }
 
