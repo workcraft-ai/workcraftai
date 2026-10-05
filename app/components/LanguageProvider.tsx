@@ -161,6 +161,8 @@ Object.assign(spanish, {
   "Grant Pro access": "Otorgar acceso Pro",
   "Active temporary admin grant": "Acceso Pro temporal activo",
   "Active permanent admin grant": "Acceso Pro permanente activo",
+  "Pro · admin grant": "Pro · acceso de administración",
+  "Pro · temporary grant": "Pro · acceso temporal",
   "Temporary admin Pro grant": "Acceso Pro temporal de administración",
   "Permanent admin Pro grant": "Acceso Pro permanente de administración",
   "Permanent": "Permanente",
