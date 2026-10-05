@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: availability-monitor
-  cancel-in-progress: true
-
 jobs:
   check-public-endpoints:
     name: Check public site and app health
