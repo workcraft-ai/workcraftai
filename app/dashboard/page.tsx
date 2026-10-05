@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 interface Estimate {
   id: string;
@@ -45,8 +46,8 @@ export default function DashboardPage() {
       setEstimates(data || []);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: plan } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-        setIsPro(["active", "trialing"].includes(plan?.status ?? ""));
+        const entitlement = await getClientProEntitlement();
+        setIsPro(entitlement?.has_pro === true);
       }
       const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, event, created_at").order("created_at", { ascending: false });
       const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").order("created_at", { ascending: false }).limit(20);

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import Stripe from "stripe";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getServerProAccess } from "@/lib/pro-access";
 
 export async function POST(request: Request) {
   const cookieStore = await cookies();
@@ -12,6 +13,14 @@ export async function POST(request: Request) {
   );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to upgrade." }, { status: 401 });
+
+  try {
+    if ((await getServerProAccess(user.id)).hasPro) {
+      return NextResponse.json({ error: "Your account already has Pro access." }, { status: 409 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 });
+  }
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const proPriceId = process.env.STRIPE_PRO_PRICE_ID;

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { amountToCents, calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 interface JobInvoice {
   id: string;
@@ -34,8 +35,8 @@ export default function InvoicePage() {
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
-      setIsPro(subscription?.status === "active" || subscription?.status === "trialing");
+      const entitlement = await getClientProEntitlement();
+      setIsPro(entitlement?.has_pro === true);
     }
     const { data, error: jobError } = await supabase.from("jobs").select("*").eq("id", params.id).single();
     if (jobError || !data) { setError("Job not found. Check that the operations migration has been applied and that you own this job."); setLoading(false); return; }

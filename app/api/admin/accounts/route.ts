@@ -30,18 +30,28 @@ export async function GET(request: Request) {
 
   if (!matches.length) return NextResponse.json({ accounts: [] });
   const ids = matches.map((account) => account.id);
-  const { data: subscriptions, error: subscriptionError } = await access.admin
-    .from("subscriptions").select("user_id, status, current_period_end, stripe_customer_id, stripe_subscription_id").in("user_id", ids);
-  if (subscriptionError) {
-    console.error("Admin subscription lookup failed:", subscriptionError.message);
+  const [{ data: subscriptions, error: subscriptionError }, { data: grants, error: grantsError }] = await Promise.all([
+    access.admin.from("subscriptions").select("user_id, status, current_period_end, stripe_customer_id, stripe_subscription_id").in("user_id", ids),
+    access.role === "support"
+      ? Promise.resolve({ data: [], error: null })
+      : access.admin.from("tradeflow_pro_access_grants").select("user_id, grant_type, expires_at")
+        .in("user_id", ids).is("revoked_at", null).lte("starts_at", new Date().toISOString())
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
+  ]);
+  if (subscriptionError || grantsError) {
+    console.error("Admin plan lookup failed:", subscriptionError?.message ?? grantsError?.message);
     return NextResponse.json({ error: "Could not load billing status." }, { status: 502 });
   }
   const subscriptionByUser = new Map((subscriptions ?? []).map((row) => [row.user_id, row]));
+  const grantByUser = new Map((grants ?? []).map((row) => [row.user_id, row]));
   return NextResponse.json({ accounts: matches.map((account) => {
     const subscription = subscriptionByUser.get(account.id);
+    const grant = grantByUser.get(account.id);
     return {
       ...account,
-      plan_status: subscription?.status ?? "free",
+      plan_status: access.role !== "support" && grant && !["active", "trialing"].includes(subscription?.status ?? "")
+        ? grant.grant_type === "permanent" ? "Pro · admin grant" : "Pro · temporary grant"
+        : subscription?.status ?? "free",
       current_period_end: subscription?.current_period_end ?? null,
       has_stripe_customer: Boolean(subscription?.stripe_customer_id),
       has_stripe_subscription: Boolean(subscription?.stripe_subscription_id),

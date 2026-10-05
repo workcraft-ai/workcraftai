@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 type Estimate = { id: string; status: string; created_at: string; markup_percentage: number; tax_rate: number; package_options: Array<{ name: string; total: number }> | null; selected_package: string | null };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
@@ -22,10 +23,8 @@ export default function ReportsPage() {
 
   const loadReport = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: subscription } = user
-      ? await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle()
-      : { data: null };
-    const pro = subscription?.status === "active" || subscription?.status === "trialing";
+    const entitlement = user ? await getClientProEntitlement() : null;
+    const pro = entitlement?.has_pro === true;
     setIsPro(pro);
     const [estimateResult, lineResult, jobResult] = await Promise.all([
       supabase.from("estimates").select("id, status, created_at, markup_percentage, tax_rate, package_options, selected_package").order("created_at", { ascending: false }),
