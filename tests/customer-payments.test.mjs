@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { estimateTotalCents, paidCents } from "../lib/customer-payment-calculations.mjs";
+import { calculateEstimateMoney } from "../lib/estimate-money.mjs";
 
 test("calculates estimate total from line items, markup, and tax in cents", () => {
   assert.equal(estimateTotalCents({ markup_percentage: 10, tax_rate: 5 }, [
@@ -20,6 +21,27 @@ test("uses the selected package total without applying markup a second time", ()
 test("rejects non-finite, zero, or negative totals", () => {
   assert.equal(estimateTotalCents({ tax_rate: 0 }, [{ quantity: 1, unit_price: Number.NaN }]), 0);
   assert.equal(estimateTotalCents({ tax_rate: 0 }, [{ quantity: 1, unit_price: -2 }]), 0);
+});
+
+test("rounds line totals and percentage amounts to cents consistently", () => {
+  const result = calculateEstimateMoney({ markup_percentage: 10, tax_rate: 5 }, [
+    { quantity: 3, unit_price: 0.335 },
+    { quantity: 1, unit_price: 0.1 },
+  ]);
+  assert.deepEqual(result, {
+    lineItemCents: [101, 10],
+    subtotalCents: 111,
+    markupCents: 11,
+    taxCents: 6,
+    totalCents: 128,
+    depositCents: 0,
+  });
+});
+
+test("deposit amount is calculated from the same rounded total", () => {
+  assert.equal(calculateEstimateMoney({ require_deposit: true, deposit_percentage: 33.33 }, [
+    { quantity: 1, unit_price: 10.01 },
+  ]).depositCents, 334);
 });
 
 test("paid amount excludes open and failed checkouts and subtracts refunds", () => {

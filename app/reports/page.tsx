@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
-type Estimate = { id: string; status: string; created_at: string };
+type Estimate = { id: string; status: string; created_at: string; markup_percentage: number; tax_rate: number; package_options: Array<{ name: string; total: number }> | null; selected_package: string | null };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
 type Job = { status: string; quoted_total: number; actual_cost: number; scheduled_at: string | null };
 
@@ -27,7 +28,7 @@ export default function ReportsPage() {
     const pro = subscription?.status === "active" || subscription?.status === "trialing";
     setIsPro(pro);
     const [estimateResult, lineResult, jobResult] = await Promise.all([
-      supabase.from("estimates").select("id, status, created_at").order("created_at", { ascending: false }),
+      supabase.from("estimates").select("id, status, created_at, markup_percentage, tax_rate, package_options, selected_package").order("created_at", { ascending: false }),
       supabase.from("line_items").select("estimate_id, quantity, unit_price"),
       pro ? supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at") : Promise.resolve({ data: [], error: null }),
     ]);
@@ -37,7 +38,7 @@ export default function ReportsPage() {
       setLines((lineResult.data ?? []) as LineItem[]);
       setError("");
     }
-    if (jobResult.error && !jobResult.error.message.includes("jobs")) setError(jobResult.error.message);
+    if (jobResult.error) setError("Could not load job reports. Refresh the page or contact support if the problem continues.");
     else setJobs((jobResult.data ?? []) as Job[]);
     setLoading(false);
   }, []);
@@ -47,9 +48,9 @@ export default function ReportsPage() {
     return () => window.clearTimeout(task);
   }, [loadReport]);
 
-  const totals = new Map<string, number>();
-  for (const line of lines) totals.set(line.estimate_id, (totals.get(line.estimate_id) ?? 0) + Number(line.quantity || 0) * Number(line.unit_price || 0));
-  const estimateTotal = (estimate: Estimate) => totals.get(estimate.id) ?? 0;
+  const linesByEstimate = new Map<string, LineItem[]>();
+  for (const line of lines) linesByEstimate.set(line.estimate_id, [...(linesByEstimate.get(line.estimate_id) ?? []), line]);
+  const estimateTotal = (estimate: Estimate) => calculateEstimateMoney(estimate, linesByEstimate.get(estimate.id) ?? [], estimate.selected_package).totalCents / 100;
   const accepted = estimates.filter((estimate) => ["accepted", "paid"].includes(estimate.status.toLowerCase()));
   const sentOrDecided = estimates.filter((estimate) => !["draft", "archived"].includes(estimate.status.toLowerCase()));
   const acceptanceRate = sentOrDecided.length ? Math.round(accepted.length / sentOrDecided.length * 100) : 0;

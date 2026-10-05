@@ -12,7 +12,10 @@ select ok(
       'subscriptions', 'estimate_email_events', 'price_book_items',
       'estimate_templates', 'jobs', 'proposal_questions',
       'estimate_attachments', 'estimates', 'line_items',
-      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
+      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
+      'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
+      'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
+      'estimate_email_daily_usage', 'estimate_acceptances'
     ]) as tables(table_name)
     cross join unnest(array[
       'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
@@ -31,7 +34,10 @@ select ok(
         'subscriptions', 'estimate_email_events', 'price_book_items',
         'estimate_templates', 'jobs', 'proposal_questions',
         'estimate_attachments', 'estimates', 'line_items',
-        'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
+        'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
+        'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
+        'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
+        'estimate_email_daily_usage', 'estimate_acceptances'
       ])
       and roles && array['anon'::name, 'public'::name]
   ),
@@ -45,7 +51,10 @@ select ok(
       'subscriptions', 'estimate_email_events', 'price_book_items',
       'estimate_templates', 'jobs', 'proposal_questions',
       'estimate_attachments', 'estimates', 'line_items',
-      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage'
+      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
+      'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
+      'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
+      'estimate_email_daily_usage', 'estimate_acceptances'
     ]) as tables(table_name)
     where not (
       select c.relrowsecurity
@@ -165,8 +174,8 @@ select throws_ok(
 select throws_ok(
   $$insert into public.line_items (estimate_id, description)
     values ('b0000000-0000-4000-8000-000000000002', 'Cross-owner line')$$,
-  '42501',
-  'new row violates row-level security policy for table "line_items"',
+  '23503',
+  'ESTIMATE_NOT_FOUND',
   'Owner A cannot add a line item to Owner B estimate'
 );
 

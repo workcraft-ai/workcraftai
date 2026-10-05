@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 function localSupabaseEnvironment() {
-  const output = execFileSync("supabase", ["status", "-o", "env"], { encoding: "utf8" });
+  const args = ["status", "-o", "env"];
+  if (process.env.SUPABASE_WORKDIR) args.push("--workdir", process.env.SUPABASE_WORKDIR);
+  const output = execFileSync("supabase", args, { encoding: "utf8" });
   const values = Object.fromEntries(output.split(/\r?\n/).flatMap((line) => {
     const match = line.match(/^([A-Z_]+)=(.*)$/);
     return match ? [[match[1], match[2].replace(/^['"]|['"]$/g, "")]] : [];
@@ -18,22 +20,28 @@ const { url, serviceKey } = localSupabaseEnvironment();
 if (!url || !serviceKey) throw new Error("Start local Supabase first; API_URL and SERVICE_ROLE_KEY are required.");
 const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 const { data: settings, error: settingsError } = await admin.from("tradeflow_app_settings")
-  .select("ai_drafting_enabled, ai_daily_generation_limit").eq("singleton", true).single();
+  .select("ai_drafting_enabled, ai_daily_generation_limit, ai_global_daily_generation_limit").eq("singleton", true).single();
 if (settingsError) throw new Error(`Could not read AI settings: ${settingsError.message}`);
 
-const email = `ai-quota-race-${randomUUID()}@example.test`;
-let userId;
-try {
+const userIds = [];
+async function createProTestUser(prefix) {
+  const email = `${prefix}-${randomUUID()}@example.test`;
   const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password: `Test-${randomUUID()}-A1!`, email_confirm: true });
   if (createError || !created.user) throw new Error(`Could not create quota test user: ${createError?.message ?? "unknown error"}`);
-  userId = created.user.id;
+  const userId = created.user.id;
+  userIds.push(userId);
   const { error: subscriptionError } = await admin.from("subscriptions").insert({ user_id: userId, status: "active" });
   if (subscriptionError) throw new Error(`Could not create Pro subscription fixture: ${subscriptionError.message}`);
-  const { error: configureError } = await admin.from("tradeflow_app_settings").update({ ai_drafting_enabled: true, ai_daily_generation_limit: 7 }).eq("singleton", true);
+  return userId;
+}
+
+try {
+  const firstUserId = await createProTestUser("ai-quota-race-user-one");
+  const { error: configureError } = await admin.from("tradeflow_app_settings").update({ ai_drafting_enabled: true, ai_daily_generation_limit: 7, ai_global_daily_generation_limit: 11 }).eq("singleton", true);
   if (configureError) throw new Error(`Could not configure AI quota test: ${configureError.message}`);
 
   const reservations = await Promise.all(Array.from({ length: 30 }, () => admin.rpc("reserve_workcraft_ai_generation", {
-    p_user_id: userId,
+    p_user_id: firstUserId,
     p_prompt_characters: 120,
     p_model: "gemini-concurrency-test",
   })));
@@ -53,12 +61,32 @@ try {
   if (completionError) throw new Error(`Could not finalize test usage: ${completionError.message}`);
 
   const { data: usage, error: usageError } = await admin.from("tradeflow_ai_daily_usage")
-    .select("attempts_started, succeeded, failed").eq("user_id", userId).single();
+    .select("attempts_started, succeeded, failed").eq("user_id", firstUserId).single();
   if (usageError || usage?.attempts_started !== 7 || usage.succeeded !== 6 || usage.failed !== 1) {
     throw new Error(`Expected 7 total attempts (6 succeeded, 1 failed); got ${JSON.stringify(usage)}: ${usageError?.message ?? ""}`);
   }
-  console.log("AI quota concurrency test passed: 30 simultaneous reservations admitted exactly 7 attempts; all outcomes were recorded.");
+  const secondUserId = await createProTestUser("ai-quota-race-user-two");
+  const globalReservations = await Promise.all(Array.from({ length: 30 }, () => admin.rpc("reserve_workcraft_ai_generation", {
+    p_user_id: secondUserId,
+    p_prompt_characters: 120,
+    p_model: "gemini-global-concurrency-test",
+  })));
+  const globalResults = globalReservations.flatMap(({ data, error }) => {
+    if (error) throw new Error(`Concurrent platform quota reservation failed: ${error.message}`);
+    return Array.isArray(data) ? data : [];
+  });
+  const globalAllowed = globalResults.filter((row) => row.allowed);
+  const globalDenied = globalResults.filter((row) => row.reason === "global_daily_limit");
+  if (globalAllowed.length !== 4 || globalDenied.length !== 26) {
+    throw new Error(`Expected the platform cap to admit exactly 4 remaining reservations; got ${globalAllowed.length} allowed and ${globalDenied.length} platform-limited.`);
+  }
+  const { data: globalUsage, error: globalUsageError } = await admin.from("tradeflow_ai_global_daily_usage")
+    .select("attempts_started").eq("usage_date", new Date().toISOString().slice(0, 10)).single();
+  if (globalUsageError || globalUsage?.attempts_started !== 11) {
+    throw new Error(`Expected the platform-wide counter to stop at 11; got ${globalUsage?.attempts_started ?? "no counter"}: ${globalUsageError?.message ?? ""}`);
+  }
+  console.log("AI quota concurrency test passed: per-account requests stop at 7 and simultaneous requests across accounts stop at the platform cap of 11.");
 } finally {
   await admin.from("tradeflow_app_settings").update(settings).eq("singleton", true);
-  if (userId) await admin.auth.admin.deleteUser(userId);
+  await Promise.all(userIds.map((userId) => admin.auth.admin.deleteUser(userId)));
 }

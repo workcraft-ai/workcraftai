@@ -6,7 +6,10 @@ export interface OfflineEstimateDraft<T> {
 
 const DB_NAME = "tradeflow-field-drafts";
 const STORE_NAME = "drafts";
-const DRAFT_KEY = "unsent-estimate";
+function draftKey(userId: string) {
+  if (!userId) throw new Error("A signed-in user is required to access a device draft.");
+  return `user:${userId}:unsent-estimate`;
+}
 
 function openDraftDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -17,11 +20,11 @@ function openDraftDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveOfflineEstimateDraft<T>(fields: T, attachments: OfflineEstimateDraft<T>["attachments"]) {
+export async function saveOfflineEstimateDraft<T>(userId: string, fields: T, attachments: OfflineEstimateDraft<T>["attachments"]) {
   const db = await openDraftDb();
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put({ fields, attachments, savedAt: new Date().toISOString() }, DRAFT_KEY);
+    transaction.objectStore(STORE_NAME).put({ fields, attachments, savedAt: new Date().toISOString() }, draftKey(userId));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not save this draft."));
     transaction.onabort = () => reject(transaction.error ?? new Error("Draft save was interrupted."));
@@ -29,10 +32,10 @@ export async function saveOfflineEstimateDraft<T>(fields: T, attachments: Offlin
   db.close();
 }
 
-export async function loadOfflineEstimateDraft<T>(): Promise<OfflineEstimateDraft<T> | null> {
+export async function loadOfflineEstimateDraft<T>(userId: string): Promise<OfflineEstimateDraft<T> | null> {
   const db = await openDraftDb();
   const result = await new Promise<OfflineEstimateDraft<T> | null>((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(DRAFT_KEY);
+    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(draftKey(userId));
     request.onsuccess = () => resolve((request.result as OfflineEstimateDraft<T> | undefined) ?? null);
     request.onerror = () => reject(request.error ?? new Error("Could not read the saved draft."));
   });
@@ -40,11 +43,11 @@ export async function loadOfflineEstimateDraft<T>(): Promise<OfflineEstimateDraf
   return result;
 }
 
-export async function clearOfflineEstimateDraft() {
+export async function clearOfflineEstimateDraft(userId: string) {
   const db = await openDraftDb();
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).delete(DRAFT_KEY);
+    transaction.objectStore(STORE_NAME).delete(draftKey(userId));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not remove the saved draft."));
   });

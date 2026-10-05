@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 function localSupabaseEnvironment() {
-  const output = execFileSync("supabase", ["status", "-o", "env"], { encoding: "utf8" });
+  const args = ["status", "-o", "env"];
+  if (process.env.SUPABASE_WORKDIR) args.push("--workdir", process.env.SUPABASE_WORKDIR);
+  const output = execFileSync("supabase", args, { encoding: "utf8" });
   const values = Object.fromEntries(output.split(/\r?\n/).flatMap((line) => {
     const match = line.match(/^([A-Z_]+)=(.*)$/);
     if (!match) return [];

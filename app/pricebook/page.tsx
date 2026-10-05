@@ -62,7 +62,7 @@ export default function PriceBookPage() {
     const { error: insertError } = editingId
       ? await supabase.from("price_book_items").update(item).eq("id", editingId).eq("user_id", user.id)
       : await supabase.from("price_book_items").insert({ ...item, user_id: user.id });
-    if (insertError) setError(insertError.message);
+    if (insertError) setError("Could not save this Price Book item. Please check the details and try again.");
     else { setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null); setNotice(editingId ? "Price book item updated." : "Price book item added."); await loadData(); }
   };
 
@@ -72,7 +72,7 @@ export default function PriceBookPage() {
 
   const removeItem = async (id: string) => {
     const { error: deleteError } = await supabase.from("price_book_items").delete().eq("id", id);
-    if (deleteError) setError(deleteError.message); else setItems((current) => current.filter((item) => item.id !== id));
+    if (deleteError) setError("Could not delete this Price Book item. Please try again."); else setItems((current) => current.filter((item) => item.id !== id));
   };
 
   const selectImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +105,7 @@ export default function PriceBookPage() {
       const batch = importRows.slice(index, index + 100).map((item) => ({ ...item, user_id: user.id }));
       const { error: insertError } = await supabase.from("price_book_items").insert(batch);
       if (insertError) {
-        setError(imported ? `Imported ${imported} items. The rest failed: ${insertError.message}` : insertError.message);
+        setError(imported ? `Imported ${imported} items. The remaining rows could not be saved; check the file and try again.` : "Could not import these Price Book items. Check the file and try again.");
         setImporting(false);
         await loadData();
         return;
@@ -177,7 +177,7 @@ export default function PriceBookPage() {
             </section>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 p-5"><h2 className="font-semibold">Reusable templates</h2></div>
-              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading templates…</p> : templates.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No templates yet.</p> : <div className="divide-y divide-slate-100">{templates.map((template) => <div key={template.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{template.name}</p><p className="text-xs text-slate-500">{template.trade} · {template.line_items?.length ?? 0} starter line items</p></div><div className="flex gap-3"><button onClick={() => applyTemplate(template)} className="text-xs font-semibold text-blue-700 underline">Use template</button><button onClick={async () => { const { error: deleteError } = await supabase.from("estimate_templates").delete().eq("id", template.id); if (deleteError) setError(deleteError.message); else setTemplates((current) => current.filter((item) => item.id !== template.id)); }} className="text-xs font-semibold text-red-700 underline">Delete</button></div></div>)}</div>}
+              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading templates…</p> : templates.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">No templates yet.</p> : <div className="divide-y divide-slate-100">{templates.map((template) => <div key={template.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{template.name}</p><p className="text-xs text-slate-500">{template.trade} · {template.line_items?.length ?? 0} starter line items</p></div><div className="flex gap-3"><button onClick={() => applyTemplate(template)} className="text-xs font-semibold text-blue-700 underline">Use template</button><button onClick={async () => { const { error: deleteError } = await supabase.from("estimate_templates").delete().eq("id", template.id); if (deleteError) setError("Could not delete this estimate template. Please try again."); else setTemplates((current) => current.filter((item) => item.id !== template.id)); }} className="text-xs font-semibold text-red-700 underline">Delete</button></div></div>)}</div>}
             </section>
           </div>
         )}

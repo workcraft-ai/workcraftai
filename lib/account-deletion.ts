@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { finishAudit, startAudit } from "@/lib/admin-support";
 
-type DeletionTrigger = "admin_requested" | "user_requested" | "inactivity";
+type DeletionTrigger = "admin_requested" | "user_requested" | "inactivity" | "retry";
 
 export class AccountDeletionError extends Error {
   constructor(message: string) {
@@ -48,7 +48,6 @@ export async function deleteTradeFlowAccount(input: {
   const { admin, targetUserId, actorUserId, actorEmail, reason, trigger } = input;
   let auditId: string | null = null;
   let deletionStarted = Boolean(input.alreadyClaimed);
-  const keepPending = trigger === "inactivity";
   let stage = "account_lookup";
 
   try {
@@ -98,11 +97,11 @@ export async function deleteTradeFlowAccount(input: {
   } catch (cause) {
     if (auditId) await finishAudit(admin, auditId, "failed", { trigger, failed_stage: stage });
     if (deletionStarted) {
-      const { error } = await admin.rpc("workcraft_release_account_deletion", { p_user_id: targetUserId, p_keep_pending: keepPending });
-      if (error) console.error("Could not release failed account deletion claim:", error.message);
+      const { error } = await admin.rpc("workcraft_mark_account_deletion_retryable", { p_user_id: targetUserId });
+      if (error) console.error("Could not mark failed account deletion for retry:", error.message);
     }
     if (cause instanceof AccountDeletionError) throw cause;
     console.error("Account deletion failed at stage", stage, cause instanceof Error ? cause.message : "unknown error");
-    throw new AccountDeletionError("The account could not be deleted. No further steps will run until this is reviewed.");
+    throw new AccountDeletionError("Account deletion did not finish. It remains queued for a safe retry; contact support if it is still pending tomorrow.");
   }
 }

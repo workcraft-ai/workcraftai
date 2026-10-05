@@ -25,7 +25,7 @@ type AccountDetail = {
   questions: { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null }[];
   email_events: { id: string; estimate_id: string; recipient: string; event: string; created_at: string }[];
 };
-type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number } };
+type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number } };
 
 function date(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Never";
@@ -69,6 +69,7 @@ export default function AdminPage() {
   const [freeEstimateLimitLoading, setFreeEstimateLimitLoading] = useState(false);
   const [aiDraftingSettings, setAiDraftingSettings] = useState<AiDraftingSettings | null>(null);
   const [aiDailyLimitInput, setAiDailyLimitInput] = useState("");
+  const [aiGlobalDailyLimitInput, setAiGlobalDailyLimitInput] = useState("");
   const [aiSettingsReason, setAiSettingsReason] = useState("");
   const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
   const [deletionConfirmEmail, setDeletionConfirmEmail] = useState("");
@@ -132,6 +133,7 @@ export default function AdminPage() {
       if (cancelled) return;
       setAiDraftingSettings(result);
       setAiDailyLimitInput(String(result.ai_daily_generation_limit));
+      setAiGlobalDailyLimitInput(String(result.ai_global_daily_generation_limit));
     }).catch((cause) => {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load AI drafting settings.");
     }).finally(() => {
@@ -302,19 +304,21 @@ export default function AdminPage() {
 
   const saveAiDraftingSettings = async (event: FormEvent) => {
     event.preventDefault();
-    if (!aiDraftingSettings || !aiDailyLimitInput.trim()) return;
+    if (!aiDraftingSettings || !aiDailyLimitInput.trim() || !aiGlobalDailyLimitInput.trim()) return;
     const parsedLimit = Number(aiDailyLimitInput);
-    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000 || aiSettingsReason.trim().length < 8) return;
+    const parsedGlobalLimit = Number(aiGlobalDailyLimitInput);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000 || !Number.isInteger(parsedGlobalLimit) || parsedGlobalLimit < 1 || parsedGlobalLimit > 5000 || aiSettingsReason.trim().length < 8) return;
     setBusy("ai-drafting-settings");
     setError("");
     setNotice("");
     try {
       const result = await requestJson("/api/admin/ai-drafting-settings", {
         method: "POST",
-        body: JSON.stringify({ enabled: aiDraftingSettings.ai_drafting_enabled, daily_limit: parsedLimit, reason: aiSettingsReason }),
+        body: JSON.stringify({ enabled: aiDraftingSettings.ai_drafting_enabled, daily_limit: parsedLimit, global_daily_limit: parsedGlobalLimit, reason: aiSettingsReason }),
       });
-      setAiDraftingSettings((previous) => previous ? { ...previous, ai_drafting_enabled: result.enabled, ai_daily_generation_limit: result.daily_limit } : previous);
+      setAiDraftingSettings((previous) => previous ? { ...previous, ai_drafting_enabled: result.enabled, ai_daily_generation_limit: result.daily_limit, ai_global_daily_generation_limit: result.global_daily_limit } : previous);
       setAiDailyLimitInput(String(result.daily_limit));
+      setAiGlobalDailyLimitInput(String(result.global_daily_limit));
       setAiSettingsReason("");
       setNotice(result.message);
     } catch (cause) {
@@ -331,12 +335,13 @@ export default function AdminPage() {
     setNotice("");
     try {
       const limit = Number(aiDailyLimitInput);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("The daily AI generation limit must be between 1 and 1,000.");
+      const globalLimit = Number(aiGlobalDailyLimitInput);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 1000 || !Number.isInteger(globalLimit) || globalLimit < 1 || globalLimit > 5000) throw new Error("Check the per-account and platform-wide AI limits.");
       const result = await requestJson("/api/admin/ai-drafting-settings", {
         method: "POST",
-        body: JSON.stringify({ enabled, daily_limit: limit, reason: aiSettingsReason }),
+        body: JSON.stringify({ enabled, daily_limit: limit, global_daily_limit: globalLimit, reason: aiSettingsReason }),
       });
-      setAiDraftingSettings((previous) => previous ? { ...previous, ai_drafting_enabled: result.enabled, ai_daily_generation_limit: result.daily_limit } : previous);
+      setAiDraftingSettings((previous) => previous ? { ...previous, ai_drafting_enabled: result.enabled, ai_daily_generation_limit: result.daily_limit, ai_global_daily_generation_limit: result.global_daily_limit } : previous);
       setAiSettingsReason("");
       setNotice(result.message);
     } catch (cause) {
@@ -372,16 +377,17 @@ export default function AdminPage() {
       </section>}
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="text-lg font-bold text-slate-900">Cloud AI drafting cost controls</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">The default allowance is 20 cloud drafting attempts per Pro account per UTC calendar day. A valid attempt counts when it is admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.</p></div>
+        <div><h2 className="text-lg font-bold text-slate-900">Cloud AI drafting cost controls</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">The initial limits are 20 cloud drafting attempts per Pro account and 250 attempts across all accounts per UTC calendar day. The platform-wide ceiling bounds provider usage if signups or abuse increase. A valid attempt counts when admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.</p></div>
         {aiDraftingSettings && <>
-          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Status:</strong> {aiDraftingSettings.ai_drafting_enabled ? "Enabled" : "Paused"} · <strong>Allowance:</strong> {aiDraftingSettings.ai_daily_generation_limit} attempts per Pro account / UTC day</p><p className="mt-1"><strong>Today, all users:</strong> {aiDraftingSettings.today.attempts_started} <span>started</span> · {aiDraftingSettings.today.succeeded} <span>succeeded</span> · {aiDraftingSettings.today.failed} <span>failed</span></p></div>
-          <form onSubmit={saveAiDraftingSettings} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr_auto] sm:items-end">
+          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Status:</strong> {aiDraftingSettings.ai_drafting_enabled ? "Enabled" : "Paused"} · <strong>Per account:</strong> {aiDraftingSettings.ai_daily_generation_limit} / day · <strong>Platform:</strong> {aiDraftingSettings.ai_global_daily_generation_limit} / day</p><p className="mt-1"><strong>Today:</strong> {aiDraftingSettings.today.attempts_started} attempted ({aiDraftingSettings.today.succeeded} succeeded, {aiDraftingSettings.today.failed} failed) · {aiDraftingSettings.today.global_attempts_started} of {aiDraftingSettings.ai_global_daily_generation_limit} platform attempts used</p></div>
+          <form onSubmit={saveAiDraftingSettings} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_minmax(8rem,12rem)_1fr_auto] sm:items-end">
             <label className="block text-xs font-semibold text-slate-700">Draft attempts per day<input aria-label="AI drafting attempts per UTC day" type="number" min={1} max={1000} step={1} value={aiDailyLimitInput} onChange={(event) => setAiDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <label className="block text-xs font-semibold text-slate-700">Platform attempts per day<input aria-label="Platform AI drafting attempts per UTC day" type="number" min={1} max={5000} step={1} value={aiGlobalDailyLimitInput} onChange={(event) => setAiGlobalDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
             <label className="block text-xs font-semibold text-slate-700">Reason for change<input value={aiSettingsReason} onChange={(event) => setAiSettingsReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: reduce provider spend during testing" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
-            <button type="submit" disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings || !Number.isInteger(Number(aiDailyLimitInput)) || Number(aiDailyLimitInput) < 1 || Number(aiDailyLimitInput) > 1000 || aiSettingsReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "ai-drafting-settings" ? "Saving…" : "Save AI limit"}</button>
+            <button type="submit" disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings || !Number.isInteger(Number(aiDailyLimitInput)) || Number(aiDailyLimitInput) < 1 || Number(aiDailyLimitInput) > 1000 || !Number.isInteger(Number(aiGlobalDailyLimitInput)) || Number(aiGlobalDailyLimitInput) < 1 || Number(aiGlobalDailyLimitInput) > 5000 || aiSettingsReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "ai-drafting-settings" ? "Saving…" : "Save AI limits"}</button>
           </form>
           <div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => void setAiDraftingEnabled(false)} disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">Pause cloud drafting</button><button type="button" onClick={() => void setAiDraftingEnabled(true)} disabled={busy !== "" || aiSettingsLoading || aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">Resume cloud drafting</button></div>
-          <p className="mt-2 text-xs text-slate-500">Allowed range: 1–1,000 attempts per account per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward the daily attempt allowance.</p>
+          <p className="mt-2 text-xs text-slate-500">Allowed ranges: 1–1,000 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.</p>
         </>}
         {aiSettingsLoading && !aiDraftingSettings && <p className="mt-3 text-sm text-slate-500">Loading AI drafting settings…</p>}
       </section>}

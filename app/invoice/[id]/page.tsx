@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { amountToCents, calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 interface JobInvoice {
   id: string;
@@ -52,13 +53,14 @@ export default function InvoicePage() {
     return () => window.clearTimeout(task);
   }, [load]);
 
-  const lineItemTotal = lines.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0);
-  const subtotal = Number(job?.quoted_total || 0) || lineItemTotal;
+  const invoiceMoney = calculateEstimateMoney({}, lines);
+  const lineItemTotalCents = invoiceMoney.subtotalCents;
+  const subtotalCents = amountToCents(job?.quoted_total || 0) || lineItemTotalCents;
   const setStatus = async (invoice_status: JobInvoice["invoice_status"]) => {
     if (!job) return;
     setSaving(true);
     const { error: updateError } = await supabase.from("jobs").update({ invoice_status, updated_at: new Date().toISOString() }).eq("id", job.id);
-    if (updateError) setError(updateError.message); else setJob({ ...job, invoice_status });
+    if (updateError) setError("Could not update this invoice status. Please try again."); else setJob({ ...job, invoice_status });
     setSaving(false);
   };
 
@@ -75,8 +77,8 @@ export default function InvoicePage() {
           <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">WorkCraft AI · Invoice</p><h1 className="mt-1 text-3xl font-bold">Invoice</h1><p className="mt-2 text-sm text-slate-500">Invoice for {job.title}</p></div><div className="text-right"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-700">{job.invoice_status}</span><p className="mt-3 text-xs text-slate-500">Created {new Date(job.created_at).toLocaleDateString()}</p><p className="text-xs text-slate-500">Job status: {job.status.replaceAll("_", " ")}</p></div></header>
           <section className="grid gap-6 py-6 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Bill to</p><p className="mt-2 font-semibold">{job.client_name || "Customer"}</p><p className="text-sm text-slate-600">{job.client_email}</p><p className="text-sm text-slate-600">{job.job_address}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Job</p><p className="mt-2 font-semibold">{job.title}</p><p className="text-sm text-slate-600">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString() : "Date not scheduled"}</p></div></section>
           {selectedPackage && <p className="mb-3 text-xs text-slate-500">This invoice reflects the accepted {selectedPackage} package. The lines below show the original estimate scope.</p>}
-          <div className="overflow-hidden rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Description</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr></thead><tbody className="divide-y divide-slate-100">{lines.length ? lines.map((item) => <tr key={item.id}><td className="p-3">{item.description}</td><td className="p-3 text-center">{item.quantity}</td><td className="p-3 text-right">${Number(item.unit_price).toFixed(2)}</td><td className="p-3 text-right font-semibold">${(Number(item.quantity) * Number(item.unit_price)).toFixed(2)}</td></tr>) : <tr><td className="p-4 text-slate-500" colSpan={4}>No line items are attached. Invoice total uses the saved job amount.</td></tr>}</tbody></table></div>
-          <div className="ml-auto mt-5 max-w-xs border-t border-slate-200 pt-4"><div className="flex justify-between text-lg font-bold"><span>Total due</span><span>${subtotal.toFixed(2)}</span></div><p className="mt-2 text-xs text-slate-500">Customers can pay from the accepted estimate proposal link after you connect Stripe. Stripe sends payments directly to your connected account.</p>{job.estimate_id && <Link href={`/estimate/${encodeURIComponent(job.estimate_id)}`} className="mt-3 inline-block text-xs font-semibold text-blue-700 underline print:hidden">Open payment proposal</Link>}</div>
+          <div className="overflow-hidden rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Description</th><th className="p-3 text-center">Qty</th><th className="p-3 text-right">Rate</th><th className="p-3 text-right">Amount</th></tr></thead><tbody className="divide-y divide-slate-100">{lines.length ? lines.map((item, index) => <tr key={item.id}><td className="p-3">{item.description}</td><td className="p-3 text-center">{item.quantity}</td><td className="p-3 text-right">${Number(item.unit_price).toFixed(2)}</td><td className="p-3 text-right font-semibold">${(invoiceMoney.lineItemCents[index] / 100).toFixed(2)}</td></tr>) : <tr><td className="p-4 text-slate-500" colSpan={4}>No line items are attached. Invoice total uses the saved job amount.</td></tr>}</tbody></table></div>
+          <div className="ml-auto mt-5 max-w-xs border-t border-slate-200 pt-4"><div className="flex justify-between text-lg font-bold"><span>Total due</span><span>${(subtotalCents / 100).toFixed(2)}</span></div><p className="mt-2 text-xs text-slate-500">Customers can pay from the accepted estimate proposal link after you connect Stripe. Stripe sends payments directly to your connected account.</p>{job.estimate_id && <Link href={`/estimate/${encodeURIComponent(job.estimate_id)}`} className="mt-3 inline-block text-xs font-semibold text-blue-700 underline print:hidden">Open payment proposal</Link>}</div>
         </article>
       </div>
     </main>
