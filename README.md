@@ -4,7 +4,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 The marketing and social launch steps are in [`docs/WORKCRAFT-AI-MARKETING-GUIDE.md`](docs/WORKCRAFT-AI-MARKETING-GUIDE.md).
 
-The availability monitor and provider alert checklist are in [`docs/OPERATIONS-MONITORING.md`](docs/OPERATIONS-MONITORING.md). GitHub Actions checks the public marketing site and app/Supabase Auth health every 15 minutes after the workflow reaches the default branch.
+The availability monitor and provider alert checklist are in [`docs/OPERATIONS-MONITORING.md`](docs/OPERATIONS-MONITORING.md). GitHub Actions checks the public marketing site and app/Supabase Auth and database health every 15 minutes after the workflow reaches the default branch.
+
+The smoke and accessibility checks, test-account setup, safe cross-account RLS probe, and opt-in Stripe test webhook fixture procedure are documented in [`docs/PRODUCTION-READINESS-RELEASE.md`](docs/PRODUCTION-READINESS-RELEASE.md) and automated by `node scripts/production-readiness-smoke.mjs`.
 
 The free-tier estimate cap, accounting rules, database migration, and release/rollback steps are in [`docs/FREE-ESTIMATE-LIMIT.md`](docs/FREE-ESTIMATE-LIMIT.md). The initial limit is 10 saved estimates per free account per UTC day.
 
@@ -33,8 +35,11 @@ Billing support requires an active or trialing Stripe subscription and an existi
 Copy `.env.example` to `.env.local` and set the values for integrations you enable. Configure `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for new deployments; `NEXT_PUBLIC_SUPABASE_ANON_KEY` remains a temporary fallback during rollout:
 
 - Stripe Pro subscriptions and contractor payments: `STRIPE_SECRET_KEY`, `STRIPE_PRO_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and (for Connect customer payments) `STRIPE_CONNECT_WEBHOOK_SECRET`. The live WorkCraft AI Pro price is $9.99/month with no card-based trial; free features remain available. Configure two Stripe webhook endpoints at `https://app.workcraftai.com/api/webhooks/stripe`: one for **Your account** events using `STRIPE_WEBHOOK_SECRET`, with `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, and `invoice.payment_action_required`; one for **Connected accounts** events using `STRIPE_CONNECT_WEBHOOK_SECRET`, with `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`, `payment_intent.succeeded`, and `charge.refunded`. Each endpoint has its own signing secret. Configure the Stripe Customer Portal to allow payment-method updates, invoice history, and cancellation at period end. The app creates authenticated portal sessions at `/api/pro/portal`.
+- Also subscribe the **Connected accounts** endpoint to `checkout.session.async_payment_failed` and `payment_intent.payment_failed` so failed or delayed payment states are recorded promptly.
 - Enable Stripe Connect for the WorkCraft AI Stripe platform before exposing customer payment collection. The app creates v2 Express connected accounts with Stripe-hosted onboarding, direct charges, Stripe-collected processing fees, and Stripe-managed negative-balance risk where approved. Set optional `STRIPE_CONNECT_ACCOUNT_COUNTRY` (ISO 3166-1 country code; defaults to `US`) before onboarding the first contractor. Account country cannot be changed after account creation. Use Stripe's sandbox first, then complete the live Connect platform setup and account review. Contractors must complete Stripe verification and add payout details; Checkout sessions are created on their connected accounts. They manage refunds and disputes in Stripe. WorkCraft AI does not hold or transfer customer funds.
 - Cloud estimate drafts: `GEMINI_API_KEY` (optionally set `GEMINI_MODEL`). The Gemini key stays server-side.
+- Cloud drafting is limited to 20 attempts per Pro account and an initial platform-wide ceiling of 250 attempts per UTC day. The global ceiling can be lowered or raised up to 5,000 in Admin Support. Provider failures consume an attempt because they can still incur cost.
+- Branded estimate email is Pro-only and capped at 50 messages per account per UTC day. Public support remains rate-limited separately.
 - Branded email and follow-ups: `RESEND_API_KEY` and `RESEND_FROM_EMAIL`, using a sender domain verified with Resend.
 - Scheduled follow-ups: Vercel Cron calls `/api/cron/followups` daily at 09:00 UTC in production. Set `CRON_SECRET` as a private Vercel environment variable; the handler verifies the `Authorization: Bearer <CRON_SECRET>` header. The app schedules a follow-up seven days after sending an estimate email, and each run handles up to 100 due messages in small concurrent batches. Preview deployments do not run Vercel Cron jobs.
 - Set `SUPABASE_SERVICE_ROLE_KEY` for signed customer approvals, proposal view tracking, Stripe webhooks, and the follow-up worker. Keep this key private and server-side.
@@ -46,6 +51,10 @@ Copy `.env.example` to `.env.local` and set the values for integrations you enab
 The app reads subscription state from Stripe webhook updates. Pro tools stay locked until the webhook records an active or trialing subscription.
 
 Customer down payments and full payments are Pro-only. The app creates direct Stripe Checkout charges on a contractor's connected account and updates payment status from signed connected-account webhooks. Customer payment collection remains unavailable in production until Connect is enabled and approved, the webhook is configured for connected-account events, the migration is applied, and a complete sandbox-to-live verification is done. Stripe Pro subscriptions are a separate WorkCraft AI billing flow.
+
+### Production-readiness changes awaiting release
+
+Review the ordered migration and rollback steps in [`docs/PRODUCTION-READINESS-RELEASE.md`](docs/PRODUCTION-READINESS-RELEASE.md) before shipping changes that include the latest hardening migrations. Production database changes are not applied automatically by this repository.
 
 ## Getting Started
 

@@ -8,6 +8,7 @@ import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 import { isFreeEstimateLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 interface LineItemInput {
   description: string;
@@ -94,19 +95,29 @@ export default function CreateEstimatePage() {
 
   const [saving, setSaving] = useState(false);
 
-  const saveDraftOnDevice = () => {
+  const saveDraftOnDevice = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user.id) {
+      setDraftStorageMessage("Sign in before saving a private device draft.");
+      return;
+    }
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
       depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, savedAt: new Date().toISOString(),
     };
-    void saveOfflineEstimateDraft(draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
+    void saveOfflineEstimateDraft(session.user.id, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
       .then(() => setDraftStorageMessage("Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
       .catch(() => setDraftStorageMessage("This browser could not save the draft. Check available device storage."));
   };
 
   const restoreDraftFromDevice = async () => {
     try {
-      const stored = await loadOfflineEstimateDraft<LocalEstimateDraft>();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user.id) {
+        setDraftStorageMessage("Sign in to restore a device draft saved for your account.");
+        return;
+      }
+      const stored = await loadOfflineEstimateDraft<LocalEstimateDraft>(session.user.id);
       if (stored) {
         const draft = stored.fields;
         restoreFields(draft);
@@ -119,13 +130,7 @@ export default function CreateEstimatePage() {
         setDraftStorageMessage("No saved draft found in this browser.");
         return;
       }
-      const draft = JSON.parse(saved) as Partial<LocalEstimateDraft>;
-      if (!Array.isArray(draft.lineItems) || !draft.lineItems.every((item) =>
-        item && typeof item.description === "string" && Number.isFinite(Number(item.quantity)) && Number.isFinite(Number(item.unit_price)))) {
-        throw new Error("Saved draft data is invalid.");
-      }
-      restoreFields(draft);
-      setDraftStorageMessage(`Draft restored${draft.savedAt ? ` (saved ${new Date(draft.savedAt).toLocaleString()})` : ""}.`);
+      setDraftStorageMessage("An older device draft has no account owner recorded, so it was not restored. Remove it before using this shared device.");
     } catch {
       setDraftStorageMessage("Could not restore this saved draft. Save a new draft to replace it.");
     }
@@ -144,8 +149,18 @@ export default function CreateEstimatePage() {
     setProposalLanguage(draft.proposalLanguage === "es" ? "es" : "en");
   };
 
-  const deleteDraftFromDevice = () => {
-    void clearOfflineEstimateDraft().then(() => { localStorage.removeItem("tradeflow-unsent-estimate-v1"); setDraftStorageMessage("Saved device draft and attachments removed."); });
+  const deleteDraftFromDevice = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user.id) {
+      setDraftStorageMessage("Sign in to remove the device draft saved for your account.");
+      return;
+    }
+    void clearOfflineEstimateDraft(session.user.id).then(() => {
+      // This legacy localStorage entry has no owner marker; remove it only after the
+      // user explicitly chooses the device-draft removal action.
+      localStorage.removeItem("tradeflow-unsent-estimate-v1");
+      setDraftStorageMessage("Saved device draft and attachments removed.");
+    });
   };
 
   useEffect(() => {
@@ -279,14 +294,12 @@ export default function CreateEstimatePage() {
     setLineItems(updated);
   };
 
-  const subtotal = lineItems.reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-    0
-  );
-  const markupAmount = subtotal * markupPercentage / 100;
-  const taxAmount = (subtotal + markupAmount) * taxRate / 100;
-  const estimateTotal = subtotal + markupAmount + taxAmount;
-  const depositAmount = requireDeposit ? estimateTotal * (depositPercentage / 100) : 0;
+  const estimateMoney = calculateEstimateMoney({ markup_percentage: markupPercentage, tax_rate: taxRate, require_deposit: requireDeposit, deposit_percentage: depositPercentage }, lineItems);
+  const subtotal = estimateMoney.subtotalCents / 100;
+  const markupAmount = estimateMoney.markupCents / 100;
+  const taxAmount = estimateMoney.taxCents / 100;
+  const estimateTotal = estimateMoney.totalCents / 100;
+  const depositAmount = estimateMoney.depositCents / 100;
 
   const startVoiceNote = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setDraftMessage("Voice recording is not supported by this browser."); return; }
@@ -314,6 +327,15 @@ export default function CreateEstimatePage() {
       alert("Please fill in client name and email.");
       return;
     }
+    const nonEmptyLineItems = lineItems.filter((item) => item.description.trim());
+    if (!nonEmptyLineItems.length) {
+      alert("Add at least one line item with a description.");
+      return;
+    }
+    if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0)) {
+      alert("Line item quantities must be greater than zero and prices cannot be negative.");
+      return;
+    }
 
     setSaving(true);
     let createdEstimateId: string | null = null;
@@ -327,58 +349,41 @@ export default function CreateEstimatePage() {
         router.push("/login");
         throw new Error("Please sign in before creating an estimate.");
       }
-      // 1. Insert Estimate Record
-      const { data: est, error: estError } = await supabase
-        .from("estimates")
-        .insert([
-            {
-              client_name: clientName,
-              client_email: clientEmail,
-              client_phone: clientPhone,
-              job_address: jobAddress,
-              trade,
-              package_options: packageOptions,
-              tax_rate: taxRate,
-              markup_percentage: markupPercentage,
-              proposal_language: proposalLanguage,
-              user_id: user.id,
-            require_deposit: requireDeposit,
-            deposit_percentage: depositPercentage,
-            status: "pending",
-          },
-        ])
-        .select()
-        .single();
-
-      if (estError) throw estError;
-      createdEstimateId = est.id;
-
-      // 2. Insert Line Items
-      const formattedItems = lineItems.map((item) => ({
-        estimate_id: est.id,
-        description: item.description,
-        description_es: item.description_es?.trim() || null,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("line_items")
-        .insert(formattedItems);
-
-      if (itemsError) throw itemsError;
+      // Estimate and line items are validated and committed together on the server.
+      const createResponse = await fetch("/api/estimates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: clientName,
+          client_email: clientEmail,
+          client_phone: clientPhone,
+          job_address: jobAddress,
+          trade,
+          package_options: packageOptions,
+          tax_rate: taxRate,
+          markup_percentage: markupPercentage,
+          proposal_language: proposalLanguage,
+          require_deposit: requireDeposit,
+          deposit_percentage: depositPercentage,
+          lineItems: nonEmptyLineItems.map((item) => ({ ...item, description: item.description.trim(), description_es: item.description_es?.trim() || null })),
+        }),
+      });
+      const createResult = await createResponse.json();
+      if (!createResponse.ok || typeof createResult.id !== "string") {
+        throw new Error(typeof createResult.error === "string" ? createResult.error : "Unable to save this estimate.");
+      }
+      createdEstimateId = createResult.id;
 
       for (const attachment of attachments) {
-        const path = `${user.id}/${est.id}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const path = `${user.id}/${createdEstimateId}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { error: uploadError } = await supabase.storage.from("estimate-media").upload(path, attachment.file, { contentType: attachment.file.type, upsert: false });
         if (uploadError) throw new Error(`Estimate saved but attachment upload failed: ${uploadError.message}`);
-        const { error: metadataError } = await supabase.from("estimate_attachments").insert({ estimate_id: est.id, user_id: user.id, storage_path: path, media_type: attachment.mediaType, content_type: attachment.file.type });
+        const { error: metadataError } = await supabase.from("estimate_attachments").insert({ estimate_id: createdEstimateId, user_id: user.id, storage_path: path, media_type: attachment.mediaType, content_type: attachment.file.type });
         if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
       }
 
       // 3. Return to the dashboard so the contractor can review and share the proposal.
-      await clearOfflineEstimateDraft().catch(() => undefined);
-      localStorage.removeItem("tradeflow-unsent-estimate-v1");
+      await clearOfflineEstimateDraft(user.id).catch(() => undefined);
       router.push("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -401,7 +406,7 @@ export default function CreateEstimatePage() {
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-200">Mode:</span>
             <span className={isProSubscriber ? "text-purple-400 font-bold" : "text-blue-400 font-bold"}>
-              {isProSubscriber ? "✦ Pro Plan (Full Generative AI)" : "🌱 Free Plan (Smart Local Assistant)"}
+              {isProSubscriber ? "✦ Pro Plan (Cloud AI drafting)" : "Free Plan (Price Book + manual estimates)"}
             </span>
           </div>
           {isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <Link href="/profile" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:bg-slate-700">Upgrade to Pro</Link>}
@@ -578,7 +583,7 @@ export default function CreateEstimatePage() {
                     className="w-24 bg-white border border-slate-200 rounded-md p-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <div className="w-20 text-right text-xs font-semibold text-slate-700">
-                    ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                    ${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}
                   </div>
                   {lineItems.length > 1 && (
                     <button

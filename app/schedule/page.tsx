@@ -4,6 +4,7 @@ import { startTransition, useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { localDateTimeToIso, toLocalDateTimeInput } from "@/lib/localDateTime.mjs";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
@@ -37,6 +38,7 @@ const statusLabels: Record<JobStatus, string> = {
 };
 
 export default function SchedulePage() {
+  const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -65,7 +67,7 @@ export default function SchedulePage() {
       supabase.from("jobs").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
       supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").eq("status", "accepted").is("converted_job_id", null).order("created_at", { ascending: false }),
     ]);
-    if (jobsResult.error) setError(`${jobsResult.error.message}. Apply the WorkCraft AI operations migration if the jobs table is missing.`);
+    if (jobsResult.error) setError("Could not load jobs. Refresh the page or contact support if the problem continues.");
     else setJobs((jobsResult.data ?? []) as Job[]);
     if (!estimatesResult.error) setEstimates((estimatesResult.data ?? []) as Estimate[]);
     setLoading(false);
@@ -109,15 +111,19 @@ export default function SchedulePage() {
     setError("");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setError("Sign in to schedule jobs."); setSaving(false); return; }
+    const scheduledIso = localDateTimeToIso(scheduledAt);
+    if (scheduledAt && !scheduledIso) { setError("That local time does not exist because of the daylight-saving clock change. Choose a different time."); setSaving(false); return; }
 
     if (estimateId) {
       const { error: convertError } = await supabase.rpc("convert_accepted_estimate_to_job", {
         p_estimate_id: estimateId,
-        p_scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        p_scheduled_at: scheduledIso,
         p_title: title,
         p_notes: notes,
       });
-      if (convertError) setError(convertError.message);
+      if (convertError) setError(convertError.message.includes("ESTIMATE_NOT_APPROVED")
+        ? "Only an approved estimate can be scheduled as a job."
+        : "Could not create this job from the estimate. Please try again.");
       else {
         setShowForm(false);
         setEstimateId(""); setTitle(""); setClientName(""); setClientEmail(""); setJobAddress(""); setScheduledAt(""); setNotes("");
@@ -133,12 +139,12 @@ export default function SchedulePage() {
       client_name: clientName,
       client_email: clientEmail,
       job_address: jobAddress,
-      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduled_at: scheduledIso,
       notes,
       quoted_total: 0,
       status: "scheduled",
     });
-    if (insertError) setError(insertError.message);
+    if (insertError) setError("Could not create this job. Please check the details and try again.");
     else {
       setShowForm(false);
       setEstimateId(""); setTitle(""); setClientName(""); setClientEmail(""); setJobAddress(""); setScheduledAt(""); setNotes("");
@@ -149,27 +155,28 @@ export default function SchedulePage() {
 
   const updateStatus = async (id: string, status: JobStatus) => {
     const { error: updateError } = await supabase.from("jobs").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
-    if (updateError) setError(updateError.message);
+    if (updateError) setError("Could not update this job. Please try again.");
     else setJobs((current) => current.map((job) => job.id === id ? { ...job, status } : job));
   };
 
   const updateSchedule = async (id: string, localDate: string) => {
-    const scheduled_at = localDate ? new Date(localDate).toISOString() : null;
+    const scheduled_at = localDateTimeToIso(localDate);
+    if (localDate && !scheduled_at) { setError("That local time does not exist because of the daylight-saving clock change. Choose a different time."); return; }
     const { error: updateError } = await supabase.from("jobs").update({ scheduled_at, updated_at: new Date().toISOString() }).eq("id", id);
-    if (updateError) setError(updateError.message);
+    if (updateError) setError("Could not update this job. Please try again.");
     else setJobs((current) => current.map((job) => job.id === id ? { ...job, scheduled_at } : job).sort((a, b) => (a.scheduled_at || "9999").localeCompare(b.scheduled_at || "9999")));
   };
 
   const updateActualCost = async (id: string, rawCost: string) => {
     const actual_cost = Math.max(0, Number(rawCost) || 0);
     const { error: updateError } = await supabase.from("jobs").update({ actual_cost, updated_at: new Date().toISOString() }).eq("id", id);
-    if (updateError) setError(updateError.message);
+    if (updateError) setError("Could not update this job. Please try again.");
     else setJobs((current) => current.map((job) => job.id === id ? { ...job, actual_cost } : job));
   };
 
   const deleteJob = async (id: string) => {
     const { error: deleteError } = await supabase.from("jobs").delete().eq("id", id);
-    if (deleteError) setError(deleteError.message);
+    if (deleteError) setError("Could not delete this job. Please try again.");
     else setJobs((current) => current.filter((job) => job.id !== id));
   };
 
@@ -237,7 +244,7 @@ export default function SchedulePage() {
                     <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{job.title}</h3><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{statusLabels[job.status]}</span></div>
                     <p className="mt-1 text-sm text-slate-600">{job.client_name || "No customer"}{job.job_address ? ` · ${job.job_address}` : ""}</p>
                     <p className="mt-1 text-xs text-slate-500">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale) : "No date set"}{job.quoted_total ? ` · ${new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(Number(job.quoted_total))}` : ""}</p>
-                    <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Reschedule<input type="datetime-local" defaultValue={job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : ""} onBlur={(event) => { const value = event.target.value; if (value !== (job.scheduled_at ? new Date(job.scheduled_at).toISOString().slice(0, 16) : "")) void updateSchedule(job.id, value); }} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
+                    <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600" title={`Times use ${localTimeZone}`}>Reschedule ({localTimeZone})<input type="datetime-local" defaultValue={toLocalDateTimeInput(job.scheduled_at)} onBlur={(event) => { const value = event.target.value; if (value !== toLocalDateTimeInput(job.scheduled_at)) void updateSchedule(job.id, value); }} className="min-h-12 rounded-md border border-slate-300 bg-white px-2 py-2 text-xs" /></label>
                     {job.notes && <p className="mt-2 text-sm text-slate-600">{job.notes}</p>}
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Actual job cost<input type="number" min="0" step="0.01" defaultValue={Number(job.actual_cost || 0)} onBlur={(event) => { if (Number(event.target.value) !== Number(job.actual_cost || 0)) void updateActualCost(job.id, event.target.value); }} className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
                     {job.estimate_id && <Link href={`/estimate/${job.estimate_id}`} className="mt-2 inline-block text-xs font-semibold text-blue-700 underline">Open estimate</Link>}

@@ -2,6 +2,9 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
+import { readLimitedText } from "@/lib/read-limited-body.mjs";
+
+const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
 function getPeriodEnd(subscription: Stripe.Subscription) {
   const periodEnds = subscription.items.data.map((item) => item.current_period_end);
@@ -27,7 +30,9 @@ export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   if (!signature) return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
 
-  const payload = await request.text();
+  const body = await readLimitedText(request, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+  if (!body.ok) return NextResponse.json({ error: body.reason === "too_large" ? "Webhook request is too large." : "Invalid webhook request." }, { status: body.reason === "too_large" ? 413 : 400 });
+  const payload = body.value;
   let event: Stripe.Event | undefined;
   for (const secret of webhookSecrets) {
     try {
@@ -40,6 +45,15 @@ export async function POST(request: Request) {
   if (!event) return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
+  const { data: claimed, error: claimError } = await admin.rpc("workcraft_claim_stripe_webhook", {
+    p_event_id: event.id,
+    p_event_type: event.type,
+  });
+  if (claimError) {
+    console.error("Stripe webhook idempotency check failed:", claimError.message);
+    return NextResponse.json({ error: "Webhook processing is temporarily unavailable." }, { status: 503 });
+  }
+  if (claimed !== true) return NextResponse.json({ received: true, duplicate: true });
 
   async function syncCustomerPayment(paymentId: string, connectedAccountId: string, paymentIntentId?: string | null) {
     const { data: payment, error: lookupError } = await admin.from("customer_payments")
@@ -106,6 +120,7 @@ export async function POST(request: Request) {
     return true;
   }
 
+  try {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const paymentId = session.metadata?.payment_id;
@@ -124,7 +139,7 @@ export async function POST(request: Request) {
         current_period_end: getPeriodEnd(subscription),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) throw error;
     }
   }
 
@@ -141,7 +156,16 @@ export async function POST(request: Request) {
     if (session.metadata?.payment_id && event.account) {
       const { error } = await admin.from("customer_payments").update({ status: "expired", updated_at: new Date().toISOString() })
         .eq("id", session.metadata.payment_id).eq("stripe_account_id", event.account).eq("status", "pending");
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) throw error;
+    }
+  }
+
+  if (event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.metadata?.payment_id && event.account) {
+      const { error } = await admin.from("customer_payments").update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", session.metadata.payment_id).eq("stripe_account_id", event.account).eq("status", "pending");
+      if (error) throw error;
     }
   }
 
@@ -152,6 +176,15 @@ export async function POST(request: Request) {
     }
   }
 
+  if (event.type === "payment_intent.payment_failed") {
+    const intent = event.data.object as Stripe.PaymentIntent;
+    if (intent.metadata.payment_id && event.account) {
+      const { error } = await admin.from("customer_payments").update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", intent.metadata.payment_id).eq("stripe_account_id", event.account).eq("status", "pending");
+      if (error) throw error;
+    }
+  }
+
   if (event.type === "charge.refunded") {
     if (event.account) await syncRefund(event.data.object as Stripe.Charge, event.account);
   }
@@ -159,7 +192,10 @@ export async function POST(request: Request) {
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
     const synced = await syncSubscription(subscription.id);
-    if (!synced) return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+    if (!synced) {
+      await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+      return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+    }
   }
 
   if (event.type === "invoice.paid" || event.type === "invoice.payment_failed" || event.type === "invoice.payment_action_required") {
@@ -167,9 +203,20 @@ export async function POST(request: Request) {
     const subscriptionId = getInvoiceSubscriptionId(invoice);
     if (subscriptionId) {
       const synced = await syncSubscription(subscriptionId);
-      if (!synced) return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+      if (!synced) {
+        await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+        return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+      }
     }
   }
 
+  const { error: completeError } = await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+  if (completeError) throw completeError;
   return NextResponse.json({ received: true });
+  } catch (processingError) {
+    const message = processingError instanceof Error ? processingError.message : "unknown error";
+    await admin.rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
+    console.error("Stripe webhook business processing failed:", event.type, message);
+    return NextResponse.json({ error: "Webhook processing failed. Stripe may retry this event." }, { status: 500 });
+  }
 }

@@ -114,6 +114,9 @@ export async function POST(request: Request) {
     if (reservation?.reason === "daily_limit") {
       return NextResponse.json({ error: "You’ve reached today’s cloud drafting limit. Your allowance resets at UTC midnight." }, { status: 429 });
     }
+    if (reservation?.reason === "global_daily_limit") {
+      return NextResponse.json({ error: "WorkCraft AI has reached today’s cloud drafting capacity. Please try again after the UTC reset." }, { status: 429 });
+    }
     if (reservation?.reason === "paused") {
       return NextResponse.json({ error: "Cloud estimate drafting is temporarily paused. Please try again later." }, { status: 503 });
     }
@@ -156,7 +159,8 @@ export async function POST(request: Request) {
   }
   if (!response.ok) {
     await complete("failed", response.status, null);
-    return NextResponse.json({ error: generated.error?.message || "Cloud AI request failed." }, { status: 502 });
+    console.error("Cloud AI provider rejected request:", response.status);
+    return NextResponse.json({ error: "Cloud AI could not complete this draft. Try again later." }, { status: 502 });
   }
 
   const text = generated.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("");

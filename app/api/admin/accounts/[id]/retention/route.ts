@@ -18,7 +18,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     auditId = await startAudit(access.admin, access.user.id, id, "cancel_inactivity_deletion", body.reason.trim(), { action: body.action }, access.user.email);
   } catch (cause) {
-    return NextResponse.json({ error: cause instanceof Error ? cause.message : "Could not write the audit record." }, { status: 503 });
+    console.error("Could not start account retention audit:", cause instanceof Error ? cause.message : "unknown error");
+    return NextResponse.json({ error: "Could not record this action. Please try again." }, { status: 503 });
   }
   const { data, error } = await access.admin.from("tradeflow_account_lifecycle")
     .update({ deletion_status: "active", notice_claimed_at: null, notice_sent_at: null, deletion_due_at: null, deletion_claimed_at: null, deletion_reason: null, updated_at: new Date().toISOString() })

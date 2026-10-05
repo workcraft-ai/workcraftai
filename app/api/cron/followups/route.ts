@@ -15,18 +15,26 @@ export async function POST(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
-  const { data: due, error } = await admin.from("estimates").select("id, user_id, client_name, client_email").eq("status", "pending").not("followup_at", "is", null).lte("followup_at", new Date().toISOString()).is("followup_sent_at", null).limit(100);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { data: due, error } = await admin.rpc("workcraft_claim_estimate_followups", { p_limit: 100 });
+  if (error) {
+    console.error("Could not claim estimate follow-ups:", error.message);
+    return NextResponse.json({ error: "Could not prepare scheduled follow-ups." }, { status: 503 });
+  }
 
+  type FollowupCandidate = { id: string; user_id: string; client_name: string | null; client_email: string };
+  const candidates = (due ?? []) as FollowupCandidate[];
   let sent = 0;
   const batchSize = 10;
-  for (let offset = 0; offset < (due?.length ?? 0); offset += batchSize) {
-    const batch = due!.slice(offset, offset + batchSize);
+  for (let offset = 0; offset < candidates.length; offset += batchSize) {
+    const batch = candidates.slice(offset, offset + batchSize);
     const results = await Promise.all(batch.map(async (estimate) => {
       const link = `${appOrigin}/estimate/${encodeURIComponent(estimate.id)}`;
-      const result = await fetch("https://api.resend.com/emails", {
+      let result: Response;
+      try {
+        result = await fetch("https://api.resend.com/emails", {
         method: "POST",
-        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(10_000),
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json", "Idempotency-Key": `estimate-followup-${estimate.id}` },
         body: JSON.stringify({
           from: sender,
           to: [estimate.client_email],
@@ -34,15 +42,28 @@ export async function POST(request: Request) {
           text: `Hi ${estimate.client_name || "there"}, just checking whether you have any questions about your estimate. Review it here: ${link}`,
           html: `<p>Hi ${String(estimate.client_name || "there").replace(/[&<>]/g, "")},</p><p>Just checking whether you have any questions about your estimate.</p><p><a href="${link}">Review your estimate</a></p>`,
         }),
-      });
-      const responseData = await result.json();
-      if (!result.ok) return false;
-      const { error: updateError } = await admin.from("estimates").update({ followup_sent_at: new Date().toISOString() }).eq("id", estimate.id);
-      if (updateError) return false;
+        });
+      } catch (sendError) {
+        console.error("Follow-up email request failed:", sendError instanceof Error ? sendError.name : "unknown error");
+        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
+        return false;
+      }
+      const responseData = await result.json().catch(() => ({}));
+      if (!result.ok) {
+        console.error("Follow-up email provider rejected request:", result.status);
+        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
+        return false;
+      }
+      const { error: updateError } = await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: true });
+      if (updateError) {
+        console.error("Follow-up delivery state could not be recorded:", updateError.message);
+        return false;
+      }
       const { error: eventError } = await admin.from("estimate_email_events").insert({ user_id: estimate.user_id, estimate_id: estimate.id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "follow_up_sent" });
-      return !eventError;
+      if (eventError) console.error("Follow-up email event could not be recorded:", eventError.message);
+      return true;
     }));
     sent += results.filter(Boolean).length;
   }
-  return NextResponse.json({ sent, checked: due?.length ?? 0 });
+  return NextResponse.json({ sent, checked: candidates.length });
 }

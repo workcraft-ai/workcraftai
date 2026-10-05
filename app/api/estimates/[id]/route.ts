@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
+import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+
+const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
 type LineItemInput = {
   description: string;
@@ -13,10 +16,12 @@ function jsonError(message: string, status: number) {
 }
 
 function validLineItems(value: unknown): value is LineItemInput[] {
-  return Array.isArray(value) && value.length > 0 && value.length <= 100 && value.every((item) => {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) return false;
+  let subtotalCents = 0;
+  return value.every((item) => {
     if (!item || typeof item !== "object") return false;
     const candidate = item as Record<string, unknown>;
-    return typeof candidate.description === "string" &&
+    const valid = typeof candidate.description === "string" &&
       candidate.description.trim().length > 0 &&
       candidate.description.length <= 240 &&
       typeof candidate.quantity === "number" &&
@@ -28,6 +33,9 @@ function validLineItems(value: unknown): value is LineItemInput[] {
       candidate.unit_price >= 0 &&
       candidate.unit_price <= 100000000 &&
       (candidate.description_es === undefined || candidate.description_es === null || (typeof candidate.description_es === "string" && candidate.description_es.length <= 240));
+    if (!valid) return false;
+    subtotalCents += Math.round(Number(candidate.quantity) * Number(candidate.unit_price) * 100);
+    return subtotalCents <= 100_000_000_000;
   });
 }
 
@@ -84,16 +92,14 @@ export async function PUT(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return jsonError("Sign in to edit this estimate.", 401);
 
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = await request.json();
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return jsonError("Invalid estimate details.", 400);
-    }
-    body = parsed as Record<string, unknown>;
-  } catch {
-    return jsonError("Invalid request body.", 400);
+  const parsedBody = await readLimitedJsonObject(request, MAX_ESTIMATE_BODY_BYTES);
+  if (!parsedBody.ok) {
+    return jsonError(
+      parsedBody.reason === "too_large" ? "Estimate details exceed the request size limit." : "Invalid request body.",
+      parsedBody.reason === "too_large" ? 413 : 400,
+    );
   }
+  const body = parsedBody.value;
 
   const clientName = typeof body.client_name === "string" ? body.client_name.trim() : "";
   const clientEmail = typeof body.client_email === "string" ? body.client_email.trim() : "";
@@ -124,11 +130,20 @@ export async function PUT(
     return jsonError("Unable to update this estimate.", 500);
   }
   if (!existing) return jsonError("Estimate not found.", 404);
-  if (["accepted", "paid"].includes(existing.status)) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
+  if (["accepted", "paid"].includes(String(existing.status).toLowerCase())) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
 
   const { data: subscription } = await supabase.from("subscriptions").select("status").eq("user_id", user.id).maybeSingle();
   const isPro = subscription?.status === "active" || subscription?.status === "trialing";
   const requestedPackages = Array.isArray(body.package_options) ? body.package_options : [];
+  const validPackages = requestedPackages.length <= 3 && requestedPackages.every((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const option = value as Record<string, unknown>;
+    return ["Good", "Better", "Best"].includes(String(option.name))
+      && typeof option.description === "string" && option.description.length <= 500
+      && (option.description_es === undefined || typeof option.description_es === "string" && option.description_es.length <= 500)
+      && typeof option.total === "number" && Number.isFinite(option.total) && option.total >= 0 && option.total <= 100000000;
+  });
+  if (!validPackages) return jsonError("Proposal package details are invalid.", 400);
   const isEnablingProOptions = (body.require_deposit === true && existing.require_deposit !== true)
     || (existing.require_deposit === true && depositPercentage !== Number(existing.deposit_percentage))
     || (requestedPackages.length > 0 && JSON.stringify(requestedPackages) !== JSON.stringify(existing.package_options ?? []));
@@ -145,44 +160,24 @@ export async function PUT(
     deposit_percentage: isPro ? depositPercentage : existing.deposit_percentage,
     package_options: isPro ? requestedPackages : existing.package_options ?? [],
     proposal_language: proposalLanguage,
-    status: "pending",
-    updated_at: new Date().toISOString(),
   };
   if (body.tax_rate !== undefined) estimateUpdate.tax_rate = taxRate;
   if (body.markup_percentage !== undefined) estimateUpdate.markup_percentage = markupPercentage;
   if (typeof body.trade === "string") estimateUpdate.trade = body.trade.slice(0, 80);
 
-  const { error: updateError } = await supabase
-    .from("estimates")
-    .update(estimateUpdate)
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error: updateError } = await supabase.rpc("workcraft_replace_estimate_with_items", {
+    p_estimate_id: id,
+    p_estimate: estimateUpdate,
+    p_line_items: body.lineItems,
+  });
   if (updateError) {
-    console.error("Estimate update failed:", updateError.message);
+    if (updateError.code === "P0002" || updateError.message.includes("ESTIMATE_NOT_FOUND")) return jsonError("Estimate not found.", 404);
+    if (updateError.message.includes("ESTIMATE_NOT_EDITABLE")) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
+    if (updateError.message.includes("WORKCRAFT_PRO_REQUIRED")) return jsonError("Deposit terms and proposal packages require an active WorkCraft AI Pro subscription.", 403);
+    if (updateError.message.includes("ESTIMATE_TOTAL_TOO_LARGE")) return jsonError("Estimate line-item subtotal cannot exceed $1,000,000,000.", 400);
+    if (updateError.message.includes("INVALID_LINE_ITEMS") || updateError.message.includes("INVALID_ESTIMATE")) return jsonError("Check the estimate details and line items.", 400);
+    console.error("Atomic estimate update failed:", updateError.message);
     return jsonError("Unable to update this estimate.", 500);
-  }
-
-  const { error: deleteError } = await supabase
-    .from("line_items")
-    .delete()
-    .eq("estimate_id", id);
-  if (deleteError) {
-    console.error("Estimate line item replacement failed:", deleteError.message);
-    return jsonError("Estimate details were saved, but its line items could not be updated.", 500);
-  }
-
-  const { error: insertError } = await supabase.from("line_items").insert(
-    body.lineItems.map((item) => ({
-      estimate_id: id,
-      description: item.description.trim(),
-      description_es: item.description_es?.trim() || null,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-    }))
-  );
-  if (insertError) {
-    console.error("Estimate line item insert failed:", insertError.message);
-    return jsonError("Estimate details were saved, but its line items could not be updated.", 500);
   }
 
   return NextResponse.json({ success: true }, {

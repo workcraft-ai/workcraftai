@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 interface LineItemInput {
   description: string;
@@ -113,15 +114,21 @@ export default function EditEstimatePage() {
     setLineItems(updated);
   };
 
-  const subtotal = lineItems.reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
-    0
-  );
-
-  const depositAmount = requireDeposit ? subtotal * (depositPercentage / 100) : 0;
+  const estimateMoney = calculateEstimateMoney({ require_deposit: requireDeposit, deposit_percentage: depositPercentage }, lineItems);
+  const subtotal = estimateMoney.subtotalCents / 100;
+  const depositAmount = estimateMoney.depositCents / 100;
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const nonEmptyLineItems = lineItems.filter((item) => item.description.trim());
+    if (!nonEmptyLineItems.length) {
+      alert("Add at least one line item with a description.");
+      return;
+    }
+    if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0)) {
+      alert("Line item quantities must be greater than zero and prices cannot be negative.");
+      return;
+    }
     setSaving(true);
 
     try {
@@ -139,7 +146,7 @@ export default function EditEstimatePage() {
           markup_percentage: markupPercentage,
           proposal_language: proposalLanguage,
           package_options: isPro ? packageOptions : [],
-          lineItems,
+          lineItems: nonEmptyLineItems.map((item) => ({ ...item, description: item.description.trim(), description_es: item.description_es?.trim() || null })),
         }),
       });
 
@@ -312,7 +319,7 @@ export default function EditEstimatePage() {
                     className="w-24 bg-white border border-slate-200 rounded-md p-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <div className="w-20 text-right text-xs font-semibold text-slate-700">
-                    ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                    ${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}
                   </div>
                   <button
                     type="button"

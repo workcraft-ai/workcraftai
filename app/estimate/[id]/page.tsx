@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 interface LineItem {
   id: string;
@@ -113,18 +114,13 @@ export default function ClientEstimatePage() {
     fetchEstimateDetails();
   }, [id]);
 
-  const lineItemTotal = lineItems.reduce(
-    (sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0),
-    0
-  );
-  const subtotal = selectedPackage !== null && estimate?.package_options?.[selectedPackage]
-    ? Number(estimate.package_options[selectedPackage].total)
-    : lineItemTotal;
-  const markupAmount = selectedPackage === null ? subtotal * Number(estimate?.markup_percentage || 0) / 100 : 0;
-  const taxAmount = (subtotal + markupAmount) * Number(estimate?.tax_rate || 0) / 100;
-  const total = subtotal + markupAmount + taxAmount;
-
-  const depositAmount = estimate?.require_deposit ? total * ((estimate.deposit_percentage || 0) / 100) : 0;
+  const selectedPackageName = selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name ?? null;
+  const estimateMoney = calculateEstimateMoney(estimate ?? {}, lineItems, selectedPackageName);
+  const subtotal = estimateMoney.subtotalCents / 100;
+  const markupAmount = estimateMoney.markupCents / 100;
+  const taxAmount = estimateMoney.taxCents / 100;
+  const total = estimateMoney.totalCents / 100;
+  const depositAmount = estimateMoney.depositCents / 100;
 
   const sendQuestion = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSendingQuestion(true); setQuestionStatus("");
@@ -333,7 +329,7 @@ export default function ClientEstimatePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {lineItems.map((item) => (
+                  {lineItems.map((item, index) => (
                     <tr key={item.id} className="hover:bg-slate-50/50">
                       <td className="p-3 font-medium text-slate-800">
                         {estimate.proposal_language === "es" ? item.description_es || item.description : item.description}
@@ -345,7 +341,7 @@ export default function ClientEstimatePage() {
                         ${Number(item.unit_price).toFixed(2)}
                       </td>
                       <td className="p-3 text-right font-semibold text-slate-900">
-                        ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                        ${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -423,7 +419,7 @@ export default function ClientEstimatePage() {
                 ? "Recording Approval..."
                 : estimate.require_deposit
                 ? `Approve Estimate · Deposit Due Later ($${depositAmount.toFixed(2)})`
-                : `Approve Proposal ($${subtotal.toFixed(2)})`}
+                : `Approve Proposal ($${total.toFixed(2)})`}
             </button>
             </>
           ))}

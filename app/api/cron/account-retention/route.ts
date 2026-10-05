@@ -74,14 +74,24 @@ export async function GET(request: Request) {
     console.error("Could not claim due account deletions:", deletionClaimError.message);
     return NextResponse.json({ warned, warningFailures, error: "Could not process due account deletions." }, { status: 503 });
   }
+  const { data: retryAccounts, error: retryClaimError } = await admin.rpc("workcraft_claim_failed_account_deletions", { p_limit: 10 });
+  if (retryClaimError) {
+    console.error("Could not claim failed account deletions:", retryClaimError.message);
+    return NextResponse.json({ warned, warningFailures, error: "Could not retry account deletions." }, { status: 503 });
+  }
   let deleted = 0;
   let deletionFailures = 0;
-  for (const account of dueAccounts ?? []) {
+  type DeletionCandidate = { user_id: string; reason: string | null };
+  const deletionTasks = [
+    ...((dueAccounts ?? []) as DeletionCandidate[]).map((account) => ({ ...account, trigger: "inactivity" as const })),
+    ...((retryAccounts ?? []) as DeletionCandidate[]).map((account) => ({ ...account, trigger: "retry" as const })),
+  ];
+  for (const account of deletionTasks) {
     try {
       await deleteTradeFlowAccount({
         admin, targetUserId: account.user_id, actorUserId: null, actorEmail: "WorkCraft AI retention service",
         reason: account.reason || "No authenticated app activity for 12 months; 30-day warning period elapsed.",
-        trigger: "inactivity", alreadyClaimed: true,
+        trigger: account.trigger, alreadyClaimed: true,
       });
       deleted += 1;
     } catch {
@@ -89,5 +99,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ warned, warningFailures, deleted, deletionFailures, noticeCandidates: warnings?.length ?? 0, deletionCandidates: dueAccounts?.length ?? 0 });
+  return NextResponse.json({ warned, warningFailures, deleted, deletionFailures, noticeCandidates: warnings?.length ?? 0, deletionCandidates: dueAccounts?.length ?? 0, deletionRetryCandidates: retryAccounts?.length ?? 0 });
 }

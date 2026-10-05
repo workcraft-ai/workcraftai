@@ -21,7 +21,7 @@
   --color-slate-100: #eeece4;
   --color-slate-200: #deddd4;
   --color-slate-300: #c8c8bd;
-  --color-slate-400: #92978e;
+  --color-slate-400: #68736b;
   --color-slate-500: #6e766f;
   --color-slate-600: #56615a;
   --color-slate-700: #3d4a43;
@@ -34,11 +34,11 @@
   --color-blue-200: #ebc0a2;
   --color-blue-300: #e59f78;
   --color-blue-400: #df8252;
-  --color-blue-500: #d96b36;
-  --color-blue-600: #c85b2d;
-  --color-blue-700: #a94727;
-  --color-blue-800: #873c27;
-  --color-blue-900: #6f3425;
+  --color-blue-500: #a94727;
+  --color-blue-600: #983e22;
+  --color-blue-700: #873c27;
+  --color-blue-800: #6f3425;
+  --color-blue-900: #5a2c20;
 
   --color-purple-50: #edf3ee;
   --color-purple-100: #d9e7dc;
@@ -66,6 +66,28 @@ body {
 ::selection {
   background: #f2c6a9;
   color: #1d2925;
+}
+
+@media (max-width: 640px) {
+  button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 48px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px;
+    min-width: 20px;
+    min-height: 20px;
+  }
+
+  label:has(input[type="checkbox"]),
+  label:has(input[type="radio"]) {
+    min-height: 44px;
+    padding-block: 6px;
+  }
 }
 
 @media print {

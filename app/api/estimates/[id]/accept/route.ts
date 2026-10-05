@@ -5,20 +5,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Proposal approval is not configured." }, { status: 503 });
   const { id } = await params;
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return NextResponse.json({ error: "Enter your approval details." }, { status: 400 });
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Enter your approval details." }, { status: 400 });
+  }
   const signatureName = typeof body.signatureName === "string" ? body.signatureName.trim().slice(0, 120) : "";
-  const selectedPackage = typeof body.selectedPackage === "string" ? body.selectedPackage.slice(0, 40) : null;
+  const selectedPackage = typeof body.selectedPackage === "string" && body.selectedPackage.trim() ? body.selectedPackage.trim().slice(0, 40) : null;
   if (signatureName.length < 2) return NextResponse.json({ error: "Enter your full name to approve this estimate." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
-  const { data: estimate, error: getError } = await admin.from("estimates").select("id, status, package_options").eq("id", id).single();
-  if (getError || !estimate) return NextResponse.json({ error: "Estimate not found." }, { status: 404 });
-  if (["paid", "declined"].includes(String(estimate.status).toLowerCase())) return NextResponse.json({ error: "This estimate is no longer open for approval." }, { status: 409 });
-  const options = Array.isArray(estimate.package_options) ? estimate.package_options as Array<{ name: string }> : [];
-  if (options.length && !selectedPackage) return NextResponse.json({ error: "Choose a proposal option before approval." }, { status: 400 });
-  if (selectedPackage && !options.some((option) => option.name === selectedPackage)) return NextResponse.json({ error: "The selected proposal option is not available." }, { status: 400 });
-
-  const { error: updateError } = await admin.from("estimates").update({ signature_name: signatureName, selected_package: selectedPackage, accepted_at: new Date().toISOString(), status: "accepted" }).eq("id", id);
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  const { data: acceptedTotalCents, error } = await admin.rpc("workcraft_accept_estimate_once", {
+    p_estimate_id: id,
+    p_signature_name: signatureName,
+    p_selected_package: selectedPackage,
+  });
+  if (error) {
+    if (error.code === "P0002" || error.message.includes("ESTIMATE_NOT_FOUND")) return NextResponse.json({ error: "Estimate not found." }, { status: 404 });
+    if (error.message.includes("ESTIMATE_NOT_OPEN")) return NextResponse.json({ error: "This estimate has already been approved or is no longer open." }, { status: 409 });
+    if (["INVALID_SIGNATURE_NAME", "PACKAGE_SELECTION_REQUIRED", "INVALID_PACKAGE_SELECTION", "INVALID_PACKAGE_OPTIONS"].some((message) => error.message.includes(message))) {
+      return NextResponse.json({ error: "Review the proposal option and approval name, then try again." }, { status: 400 });
+    }
+    console.error("Atomic proposal approval failed:", error.message);
+    return NextResponse.json({ error: "This proposal could not be approved. Please try again." }, { status: 500 });
+  }
+  return NextResponse.json({ success: true, acceptedTotalCents });
 }
