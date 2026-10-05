@@ -215,8 +215,8 @@ export default function ClientEstimatePage() {
     <LocalizedTree languageOverride={estimate.proposal_language}>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
-        {/* Contractor Admin Bar (Edit & Navigation Controls) */}
-        <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
+        {/* Contractor-only status and navigation controls */}
+        {isOwner && <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-300">Status:</span>
             <span
@@ -247,7 +247,7 @@ export default function ClientEstimatePage() {
               Dashboard
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Client Proposal Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
@@ -259,7 +259,7 @@ export default function ClientEstimatePage() {
                 <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Created on {new Date(estimate.created_at).toLocaleDateString()}
+                <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(estimate.proposal_language === "es" ? "es-ES" : "en-US")}
               </p>
             </div>
             <div className="text-left sm:text-right">
