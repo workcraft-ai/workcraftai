@@ -212,7 +212,7 @@ export default function ClientEstimatePage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Contractor-only status and navigation controls */}
-        {isOwner && <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
+        {isOwner && <div className="print:hidden bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-300">Status:</span>
             <span
