@@ -29,6 +29,9 @@ interface Estimate {
   proposal_viewed_at: string | null;
 }
 
+type EstimateStatus = "pending" | "accepted" | "paid" | "declined";
+const estimateStatuses: EstimateStatus[] = ["pending", "accepted", "paid", "declined"];
+
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 
 function estimateEmailEventLabel(event: string) {
@@ -52,6 +55,7 @@ export default function DashboardPage() {
   const [currentTab, setCurrentTab] = useState<"active" | "archived">("active");
   const [isPro, setIsPro] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
   const [sendMessage, setSendMessage] = useState("");
   const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
@@ -118,6 +122,29 @@ export default function DashboardPage() {
     } catch (error) {
       setSendMessage(error instanceof Error ? error.message : "Email could not be sent.");
     } finally { setSendingId(null); }
+  };
+
+  const updateEstimateStatus = async (id: string, status: EstimateStatus) => {
+    setStatusSavingId(id);
+    setSendMessage("");
+    try {
+      const { error } = await supabase.rpc("workcraft_update_estimate_status", {
+        p_estimate_id: id,
+        p_status: status,
+      });
+      if (error) {
+        setSendMessage(error.message.includes("SIGNED_APPROVAL_STATUS_LOCKED")
+          ? "A customer-approved estimate can only stay accepted or be marked paid."
+          : "Could not update estimate status. Please try again.");
+      } else {
+        setEstimates((current) => current.map((estimate) => estimate.id === id ? { ...estimate, status } : estimate));
+        setSendMessage("Estimate status updated.");
+      }
+    } catch {
+      setSendMessage("Could not update estimate status. Please try again.");
+    } finally {
+      setStatusSavingId(null);
+    }
   };
 
   const toggleArchiveStatus = async (id: string, shouldArchive: boolean) => {
@@ -281,8 +308,20 @@ export default function DashboardPage() {
                               : "bg-yellow-100 text-yellow-800 border border-yellow-200"
                           }`}
                         >
-                          {est.status}
+                          {translate(language, est.status)}
                         </span>
+                        <label className="mt-2 block">
+                          <span className="sr-only">Change estimate status</span>
+                          <select
+                            aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`}
+                            value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"}
+                            disabled={statusSavingId !== null}
+                            onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)}
+                            className="min-h-10 max-w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
+                          >
+                            {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
+                          </select>
+                        </label>
                       </td>
                       <td className="p-3.5 text-right space-x-3">
                         <Link
@@ -325,6 +364,9 @@ export default function DashboardPage() {
               </table>
             </div>
           )}
+          <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+            Status changes are for your records and reports. They do not create a customer signature or process a payment.
+          </p>
         </div>
       </div>
     </div>
