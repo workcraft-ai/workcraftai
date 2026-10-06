@@ -30,14 +30,21 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900">3. Estimate Email Tracking</h2>
+          <h2 className="text-lg font-semibold text-slate-900">3. Backups and Retention</h2>
+          <p className="text-sm leading-7 text-slate-700">
+            When disaster-recovery backups are enabled, we create daily encrypted database backups and weekly backups that also include private estimate photos and voice notes. Backups are encrypted before they are uploaded to a restricted Google Drive folder and are retained for up to 30 days. Because backups are not used for normal app operation, deleted account data may remain in encrypted backups until those snapshots expire.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900">4. Estimate Email Tracking</h2>
           <p className="text-sm leading-7 text-slate-700">
             WorkCraft AI records when an estimate email is sent and when its proposal link is first viewed. This supports your estimate activity history and scheduled follow-ups.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="4. Data Deletion" /></h2>
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="5. Data Deletion" /></h2>
           <p className="text-sm leading-7 text-slate-700">
             <LocalizedText text="You may request full deletion of your account and associated data at any time through your account settings or by contacting support." />
           </p>

@@ -1,0 +1,136 @@
+name: Encrypted off-site backup
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      include_storage:
+        description: "Include private estimate photos and voice notes in this snapshot"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workcraftai-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
+
+      - name: Install backup tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes restic rclone
+
+      - name: Install Storage backup dependency
+        run: npm ci --omit=dev
+
+      - name: Check backup credentials
+        env:
+          PROD_SUPABASE_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          PROD_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+          RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+        run: |
+          for name in PROD_SUPABASE_DB_URL PROD_SUPABASE_URL PROD_SUPABASE_SERVICE_ROLE_KEY RCLONE_CONFIG_B64 RESTIC_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required repository secret: ${name}"
+              exit 1
+            fi
+          done
+
+      - name: Prepare encrypted repository access
+        env:
+          RCLONE_CONFIG_B64: ${{ secrets.RCLONE_CONFIG_B64 }}
+          RESTIC_PASSWORD: ${{ secrets.RESTIC_PASSWORD }}
+        run: |
+          printf '%s' "$RCLONE_CONFIG_B64" | base64 --decode > "$RUNNER_TEMP/rclone.conf"
+          chmod 600 "$RUNNER_TEMP/rclone.conf"
+          printf '%s' "$RESTIC_PASSWORD" > "$RUNNER_TEMP/restic-password"
+          chmod 600 "$RUNNER_TEMP/restic-password"
+          echo "RCLONE_CONFIG=$RUNNER_TEMP/rclone.conf" >> "$GITHUB_ENV"
+          echo "RESTIC_PASSWORD_FILE=$RUNNER_TEMP/restic-password" >> "$GITHUB_ENV"
+          echo "RESTIC_REPOSITORY=rclone:drive:WorkCraftAI-Backups/production" >> "$GITHUB_ENV"
+          echo "RESTIC_CACHE_DIR=$RUNNER_TEMP/restic-cache" >> "$GITHUB_ENV"
+
+      - name: Create database dump
+        env:
+          PROD_SUPABASE_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+          BACKUP_ROOT: ${{ runner.temp }}/workcraftai-backup
+        run: |
+          set -euo pipefail
+          mkdir -p "$BACKUP_ROOT/database"
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/roles.sql" --role-only
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/schema.sql"
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/data.sql" --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-schema.sql" --schema supabase_migrations
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-data.sql" --use-copy --data-only --schema supabase_migrations
+
+      - name: Select weekly or manually requested media backup
+        id: media
+        env:
+          INCLUDE_STORAGE: ${{ inputs.include_storage }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            include_storage="${INCLUDE_STORAGE:-false}"
+          elif [[ "$(date -u +%u)" == "7" ]]; then
+            include_storage="true"
+          else
+            include_storage="false"
+          fi
+          echo "include_storage=$include_storage" >> "$GITHUB_OUTPUT"
+
+      - name: Download private estimate media
+        if: steps.media.outputs.include_storage == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_STORAGE_DIR: ${{ runner.temp }}/workcraftai-backup/storage
+        run: npm run backup:storage
+
+      - name: Initialize repository if needed and save encrypted snapshot
+        env:
+          BACKUP_ROOT: ${{ runner.temp }}/workcraftai-backup
+          INCLUDE_STORAGE: ${{ steps.media.outputs.include_storage }}
+        run: |
+          set -euo pipefail
+          if ! restic cat config >/dev/null 2>&1; then
+            restic init
+          fi
+          if [[ "$INCLUDE_STORAGE" == "true" ]]; then
+            restic backup "$BACKUP_ROOT" --host workcraftai-production --tag workcraftai-production --tag full-media
+          else
+            restic backup "$BACKUP_ROOT" --host workcraftai-production --tag workcraftai-production
+          fi
+          restic forget --host workcraftai-production --tag workcraftai-production --keep-daily 30 --prune
+          {
+            echo "## Encrypted backup completed"
+            echo "- Database snapshot: daily"
+            echo "- Private estimate media included: $INCLUDE_STORAGE"
+            echo "- Retention: 30 daily snapshots"
+            echo "- Repository: restricted Google Drive folder; Restic client-side encryption"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove temporary credentials and unencrypted backup files
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/workcraftai-backup" "$RUNNER_TEMP/restic-cache"
+          rm -f "$RUNNER_TEMP/rclone.conf" "$RUNNER_TEMP/restic-password"

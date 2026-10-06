@@ -7,7 +7,7 @@ Last verified: 2026-10-05 after production commit `12459feb2b8a1aab9a2d1073d9b99
 | Area | Verified state | Still to verify |
 | --- | --- | --- |
 | Production availability | `https://workcraftai.com/` returned HTTP 200. `https://app.workcraftai.com/api/health` returned HTTP 200 with app, Supabase Auth, and Supabase database checks all `ok`. | Add an external monitor that sends an alert when either URL fails. |
-| Database deployments | Production and staging have the same 19 migration names applied, through `admin_managed_pro_access`. The health endpoint confirms the production database responds. | Confirm a recent restorable production backup or PITR in Supabase. |
+| Database deployments | Production and staging have the same 19 migration names applied, through `admin_managed_pro_access`. The health endpoint confirms the production database responds. | Configure and verify the off-site backups described in [the backup runbook](OPERATIONS-BACKUPS.md), including a restore drill. |
 | GitHub CI | GitHub Actions CI run 94 passed for the merged change, including audit, lint, unit tests, typecheck, build, database security tests, and concurrency checks. | No CI action remains for this release. |
 | Stripe | Stripe Live has enabled `@self` and `@accounts` destinations targeting `https://app.workcraftai.com/api/webhooks/stripe`. The dashboard showed zero Live deliveries over the last 7 days; no test-mode destination is configured. | Configure a dedicated test destination/account and verify synthetic event deliveries. No live payment was created. |
 | Email | `workcraftai.com` was reported verified by Resend. An owner-controlled Gmail inbox received an earlier estimate email in Inbox immediately (per screenshot); Resend logs were not inspected. The dedicated estimate sender and contractor Reply-To are now deployed. | Send a new estimate to an owner-controlled inbox and confirm both sender and Reply-To, then inspect the Resend delivery event. |
@@ -35,6 +35,10 @@ GitHub Actions failure emails go to the GitHub account’s configured notificati
 | Stripe | Live webhook delivery failures, subscription lifecycle events, disputes/refunds, and account notices. | Inspect the relevant event destination’s delivery history; keep the endpoint signing secrets server-only. |
 | Resend | Daily/monthly quota, failed/suppressed sends, bounces, and complaints. | Alert before the account reaches its limits and review individual delivery events for user-reported missing mail. |
 | Gemini | Generation usage and provider quota. | The app enforces per-user and global daily generation limits; review provider consumption as the friends-and-family cohort grows. |
+
+### Backup capacity and failures
+
+The encrypted backup workflow writes to the owner's Google Drive account, whose quota is shared with other Drive, Gmail, and Photos content. Check available Drive storage periodically. A full quota or expired Google authorization will fail the GitHub Actions workflow; enable GitHub notifications for workflow failures and investigate before the last successful backup ages out. Restic retains 30 daily snapshots, while private estimate media is included weekly. Do not shorten retention or remove the Restic password without verifying a separate recovery copy.
 
 Provider notification availability and thresholds can vary by plan. Check the current dashboard before relying on any alert; do not upgrade a paid plan or enable automatic pausing without deciding the budget.
 

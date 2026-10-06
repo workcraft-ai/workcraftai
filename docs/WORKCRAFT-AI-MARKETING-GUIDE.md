@@ -1,6 +1,6 @@
 # WorkCraft AI launch and low-cost marketing guide
 
-This guide assumes the public brand is **WorkCraft AI**, the marketing site is `https://workcraftai.com`, and the app is `https://app.workcraftai.com`. Domain registration and DNS still need to be completed before those addresses will work.
+This guide assumes the public brand is **WorkCraft AI**, the marketing site is `https://workcraftai.com`, and the app is `https://app.workcraftai.com`. The Vercel projects are named `workcraftai-company-site` and `workcraftai-app`; custom domains remain attached to those projects.
 
 ## Keep the first month simple
 
@@ -10,7 +10,7 @@ Publish useful, specific product education before spending on ads. A realistic f
 
 ## Step 1: Set up the company identity
 
-1. Register `workcraftai.com` with a registrar. The current Vercel domain search showed it available for **$11.25 for the first year and $11.25 renewal**; confirm the checkout price and renewal terms before paying because availability and pricing can change.
+1. The company domain is registered as `workcraftai.com` and attached to Vercel. Keep its renewal active and manage DNS from the provider currently hosting the domain's DNS records.
 2. Use the same display name, short description, logo, and handle everywhere where available. Suggested handle: `@WorkCraftAI`. If that is taken, use one consistent variation such as `@WorkCraftAIApp`.
 3. Use an owner-controlled email for account creation. A free mailbox is adequate to start; switch to an address on the new domain once business email is configured.
 4. Enable two-factor authentication on every account. Save backup codes privately. Add a second trusted administrator only when needed.
@@ -99,17 +99,14 @@ Do not use browser bots to imitate people posting or liking content, auto-commen
 5. Review site visits, signups, and feedback weekly. Improve the onboarding and first estimate workflow before spending on Google or Meta ads.
 6. When ready for a small ad test, choose one audience, one landing page, and one measurable action. Set a hard daily and total spend limit before launching. Ads are not part of the free plan.
 
-## Domain and app cutover checklist
+## Current domain and Vercel project mapping
 
-Once `workcraftai.com` is registered and Vercel shows the required DNS records:
+The domain cutover is complete. The verified production mappings are:
 
-1. Attach `workcraftai.com` (and optionally `www.workcraftai.com` as a redirect) to the Vercel `tradeflowai-company-site` project.
-2. Attach `app.workcraftai.com` to the Vercel `tradeflow-app` project.
-3. Add the Vercel-provided DNS records at the registrar and wait for Vercel to verify both hosts and issue TLS certificates.
-4. Set the app's Vercel Production `NEXT_PUBLIC_APP_URL` to `https://app.workcraftai.com` and `NEXT_PUBLIC_SITE_URL` to `https://app.workcraftai.com`, then redeploy Production.
-5. In Supabase Auth URL Configuration, set Site URL to `https://app.workcraftai.com` and allow `https://app.workcraftai.com/auth/confirm`. Keep any needed preview callback patterns for test deployments.
-6. Open the marketing site, the app, login, signup, and an email confirmation link using the new domains. Confirm HTTPS, redirects, and email links before announcing the domain.
-7. Verify `https://workcraftai.com/robots.txt` and `/sitemap.xml` load, then verify the Search Console Domain property and submit the sitemap.
+1. `workcraftai.com` and `www.workcraftai.com` → Vercel project `workcraftai-company-site`.
+2. `app.workcraftai.com` → Vercel project `workcraftai-app`.
+
+The project rename did not change the custom domains or DNS records. If you change a domain later, verify the Vercel project assignment and TLS status, the Supabase Auth Site URL and allowed redirect URLs, app email links, `robots.txt`, and `sitemap.xml` before announcing the change.
 
 ## Ready-to-use weekly content prompt
 

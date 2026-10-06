@@ -1,4 +1,4 @@
-project_id = "tradeflow-app"
+project_id = "workcraftai-app"
 
 [api]
 enabled = true
