@@ -28,6 +28,7 @@ type AccountDetail = {
 };
 type ProGrant = { id: string; grant_type: "temporary" | "permanent"; reason: string; created_at: string; starts_at: string; expires_at: string | null; revoked_at: string | null; is_expired: boolean };
 type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number } };
+type AppEmailSettings = { daily_limit: number; today: { emails_started: number } };
 
 function date(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Never";
@@ -86,6 +87,10 @@ export default function AdminPage() {
   const [aiGlobalDailyLimitInput, setAiGlobalDailyLimitInput] = useState("");
   const [aiSettingsReason, setAiSettingsReason] = useState("");
   const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
+  const [appEmailSettings, setAppEmailSettings] = useState<AppEmailSettings | null>(null);
+  const [appEmailLimitInput, setAppEmailLimitInput] = useState("");
+  const [appEmailLimitReason, setAppEmailLimitReason] = useState("");
+  const [appEmailSettingsLoading, setAppEmailSettingsLoading] = useState(true);
   const [deletionConfirmEmail, setDeletionConfirmEmail] = useState("");
   const [deletionReason, setDeletionReason] = useState("");
   const [retentionReason, setRetentionReason] = useState("");
@@ -152,6 +157,21 @@ export default function AdminPage() {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load AI drafting settings.");
     }).finally(() => {
       if (!cancelled) setAiSettingsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "super_admin") return;
+    let cancelled = false;
+    void requestJson("/api/admin/email-daily-limit").then((result) => {
+      if (cancelled) return;
+      setAppEmailSettings(result);
+      setAppEmailLimitInput(String(result.daily_limit));
+    }).catch((cause) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load the app email limit.");
+    }).finally(() => {
+      if (!cancelled) setAppEmailSettingsLoading(false);
     });
     return () => { cancelled = true; };
   }, [role]);
@@ -389,6 +409,29 @@ export default function AdminPage() {
     }
   };
 
+  const saveAppEmailLimit = async (event: FormEvent) => {
+    event.preventDefault();
+    const limit = Number(appEmailLimitInput);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 90 || appEmailLimitReason.trim().length < 8) return;
+    setBusy("app-email-limit");
+    setError("");
+    setNotice("");
+    try {
+      const result = await requestJson("/api/admin/email-daily-limit", {
+        method: "POST",
+        body: JSON.stringify({ limit, reason: appEmailLimitReason }),
+      });
+      setAppEmailSettings((previous) => previous ? { ...previous, daily_limit: result.daily_limit } : previous);
+      setAppEmailLimitInput(String(result.daily_limit));
+      setAppEmailLimitReason("");
+      setNotice(result.message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update the app email limit.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   if (accessState === "loading") return <LocalizedTree><main className="mx-auto max-w-6xl px-4 py-14"><p className="text-slate-600">Checking administrator access…</p></main></LocalizedTree>;
   if (accessState !== "ready") return <LocalizedTree><main className="mx-auto max-w-3xl px-4 py-14"><section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold text-slate-900">Admin support</h1><p className="mt-3 text-slate-600">{accessState === "denied" ? "This account does not have support-console access." : error}</p></section></main></LocalizedTree>;
 
@@ -428,6 +471,20 @@ export default function AdminPage() {
           <p className="mt-2 text-xs text-slate-500">Allowed ranges: 1–1,000 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.</p>
         </>}
         {aiSettingsLoading && !aiDraftingSettings && <p className="mt-3 text-sm text-slate-500">Loading AI drafting settings…</p>}
+      </section>}
+
+      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Limit all WorkCraft AI app emails together, including estimate emails, follow-ups, support requests, proposal-question notices, and account-retention notices. The initial cap is 75 per UTC day. Resend currently allows 100 emails per day; the admin maximum is 90 to leave room for operational messages. Accepted or ambiguous provider requests count; definite provider rejections release their reservation.</p></div>
+        {appEmailSettings && <>
+          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Current cap:</strong> {appEmailSettings.daily_limit} / day</p><p className="mt-1"><strong>Today:</strong> {appEmailSettings.today.emails_started} app email reservations used (UTC)</p></div>
+          <form onSubmit={saveAppEmailLimit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr_auto] sm:items-end">
+            <label className="block text-xs font-semibold text-slate-700">App emails per day<input aria-label="App emails per UTC day" type="number" min={1} max={90} step={1} value={appEmailLimitInput} onChange={(event) => setAppEmailLimitInput(event.target.value)} disabled={appEmailSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <label className="block text-xs font-semibold text-slate-700">Reason for change<input value={appEmailLimitReason} onChange={(event) => setAppEmailLimitReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: reduce email volume during testing" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <button type="submit" disabled={busy !== "" || appEmailSettingsLoading || !appEmailSettings || !Number.isInteger(Number(appEmailLimitInput)) || Number(appEmailLimitInput) < 1 || Number(appEmailLimitInput) > 90 || appEmailLimitReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "app-email-limit" ? "Saving…" : "Save email limit"}</button>
+          </form>
+          <p className="mt-2 text-xs text-slate-500">Allowed range: 1–90 app emails per UTC day. Changes are recorded in the admin audit log. If the limit is reached, email sending pauses until 00:00 UTC; estimate data and saved support questions remain available.</p>
+        </>}
+        {appEmailSettingsLoading && !appEmailSettings && <p className="mt-3 text-sm text-slate-500">Loading email capacity…</p>}
       </section>}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

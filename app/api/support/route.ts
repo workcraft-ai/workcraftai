@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/admin-support";
 import { emailAddressFromConfig } from "@/lib/email-address";
+import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -91,6 +92,16 @@ export async function POST(request: Request) {
   }
   if (!allowed) return NextResponse.json({ error: "Please wait until tomorrow before sending another support request." }, { status: 429 });
 
+  const { reservation, error: quotaError } = await reserveAppEmail(admin, "support");
+  if (quotaError) {
+    console.error("Support email quota reservation failed:", quotaError.message);
+    return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+  }
+  if (!reservation) return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+  if (!reservation.allowed || !reservation.reservation_id) {
+    return NextResponse.json({ error: "Our support inbox has reached today’s message capacity. Please try again tomorrow or email support@workcraftai.com." }, { status: 429 });
+  }
+
   const safeName = escapeHtml(name);
   const safeEmail = escapeHtml(email);
   const safeTopic = escapeHtml(topic);
@@ -110,6 +121,7 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) {
+      if (response.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
       console.error("Support form email delivery failed with status:", response.status);
       return NextResponse.json({ error: "We could not send your message just now. Please email support@workcraftai.com." }, { status: 502 });
     }

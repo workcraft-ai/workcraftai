@@ -25,7 +25,7 @@ function ConfirmResetLink() {
           <form action="/auth/confirm" method="post">
             <input type="hidden" name="token_hash" value={tokenHash} />
             <input type="hidden" name="type" value="recovery" />
-            <button type="submit" className="block w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-500">
+        <button type="submit" className="block w-full rounded-lg bg-orange-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-800">
               Verify email and continue
             </button>
           </form>

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { deleteTradeFlowAccount } from "@/lib/account-deletion";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
+import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 export const maxDuration = 60;
 
@@ -49,24 +50,49 @@ export async function GET(request: Request) {
       await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
       continue;
     }
+    const { reservation, error: quotaError } = await reserveAppEmail(admin, "account_retention");
+    if (quotaError || !reservation) {
+      warningFailures += 1;
+      console.error("Could not reserve account retention email quota:", quotaError?.message ?? "invalid reservation response");
+      await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
+      continue;
+    }
+    if (!reservation.allowed || !reservation.reservation_id) {
+      warningFailures += 1;
+      await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
+      continue;
+    }
+
+    let sent: Response;
     try {
       const message = warningEmail(entry.language, appOrigin, supportEmail);
-      const sent = await fetch("https://api.resend.com/emails", {
+      sent = await fetch("https://api.resend.com/emails", {
         method: "POST",
+        signal: AbortSignal.timeout(10_000),
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json", "Idempotency-Key": `account-inactivity-notice-${entry.user_id}` },
         body: JSON.stringify({ from: sender, to: [entry.email], reply_to: supportEmail, ...message }),
       });
-      if (!sent.ok) throw new Error(`Resend returned ${sent.status}`);
-      const { data: completed, error: finishError } = await admin.rpc("workcraft_finish_inactivity_notice", {
-        p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: true,
-      });
-      if (finishError) throw finishError;
-      if (completed) warned += 1;
     } catch (cause) {
       warningFailures += 1;
       console.error("Inactivity notice failed for account", entry.user_id, cause instanceof Error ? cause.message : "unknown error");
       await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
+      continue;
     }
+    if (!sent.ok) {
+      if (sent.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
+      warningFailures += 1;
+      console.error("Inactivity notice provider rejected request:", sent.status);
+      await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
+      continue;
+    }
+
+    const { data: completed, error: finishError } = await admin.rpc("workcraft_finish_inactivity_notice", {
+      p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: true,
+    });
+    if (finishError) {
+      warningFailures += 1;
+      console.error("Accepted inactivity email delivery could not be recorded:", finishError.message);
+    } else if (completed) warned += 1;
   }
 
   const { data: dueAccounts, error: deletionClaimError } = await admin.rpc("workcraft_claim_due_account_deletions", { p_limit: 10 });

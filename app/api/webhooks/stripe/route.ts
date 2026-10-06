@@ -130,10 +130,19 @@ export async function POST(request: Request) {
     }
     const userId = session.client_reference_id || session.metadata?.user_id;
     if (session.mode === "subscription" && userId && session.subscription) {
+      if (session.metadata?.checkout_attempt_id) {
+        const { error: attemptError } = await admin.from("pro_checkout_attempts").update({
+          status: "completed",
+          stripe_checkout_session_id: session.id,
+          checkout_url: null,
+          updated_at: new Date().toISOString(),
+        }).eq("user_id", userId).eq("id", session.metadata.checkout_attempt_id);
+        if (attemptError) throw attemptError;
+      }
       const subscription = await stripe.subscriptions.retrieve(String(session.subscription));
       const { error } = await admin.from("subscriptions").upsert({
         user_id: userId,
-        stripe_customer_id: String(session.customer),
+        stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
         stripe_subscription_id: subscription.id,
         status: subscription.status,
         current_period_end: getPeriodEnd(subscription),
@@ -153,6 +162,11 @@ export async function POST(request: Request) {
 
   if (event.type === "checkout.session.expired") {
     const session = event.data.object as Stripe.Checkout.Session;
+    if (session.mode === "subscription" && session.metadata?.user_id && session.metadata?.checkout_attempt_id) {
+      const { error } = await admin.from("pro_checkout_attempts").update({ status: "expired", updated_at: new Date().toISOString() })
+        .eq("id", session.metadata.checkout_attempt_id).eq("user_id", session.metadata.user_id).in("status", ["creating", "open"]);
+      if (error) throw error;
+    }
     if (session.metadata?.payment_id && event.account) {
       const { error } = await admin.from("customer_payments").update({ status: "expired", updated_at: new Date().toISOString() })
         .eq("id", session.metadata.payment_id).eq("stripe_account_id", event.account).eq("status", "pending");

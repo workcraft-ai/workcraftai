@@ -11,6 +11,8 @@
     "test": "node --test",
     "test:db:quota-concurrency": "node scripts/free-estimate-concurrency.mjs",
     "test:db:ai-quota-concurrency": "node scripts/ai-generation-concurrency.mjs",
+    "test:db:pro-checkout-concurrency": "node scripts/pro-checkout-concurrency.mjs",
+    "test:db:email-quota-concurrency": "node scripts/email-quota-concurrency.mjs",
     "backup:storage": "node scripts/backup-storage.mjs",
     "restore:storage": "node scripts/restore-storage.mjs"
   },

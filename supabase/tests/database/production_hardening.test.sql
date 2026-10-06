@@ -237,9 +237,9 @@ select throws_ok(
 );
 reset role;
 set local role service_role;
-select throws_ok(
-  $$select public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003')$$,
-  'P0001', 'ESTIMATE_EMAIL_DAILY_LIMIT', 'the fifty-first estimate email is rejected'
+select is(
+  (select allowed from public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003')),
+  false, 'the fifty-first estimate email is rejected'
 );
 
 select * from finish();

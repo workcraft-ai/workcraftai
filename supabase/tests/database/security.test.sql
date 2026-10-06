@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(23);
+select plan(26);
 
 -- The browser's anonymous role must have no direct data or function access.
 select ok(
@@ -15,7 +15,8 @@ select ok(
       'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
       'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
       'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-      'estimate_email_daily_usage', 'estimate_acceptances'
+      'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
+      'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
     ]) as tables(table_name)
     cross join unnest(array[
       'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
@@ -37,7 +38,8 @@ select ok(
         'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
         'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
         'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-        'estimate_email_daily_usage', 'estimate_acceptances'
+        'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
+        'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
       ])
       and roles && array['anon'::name, 'public'::name]
   ),
@@ -54,7 +56,8 @@ select ok(
       'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
       'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
       'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-      'estimate_email_daily_usage', 'estimate_acceptances'
+      'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
+      'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
     ]) as tables(table_name)
     where not (
       select c.relrowsecurity
@@ -82,6 +85,13 @@ select ok(
   ),
   'authenticated users can execute the estimate conversion RPC'
 );
+select ok(
+  not has_function_privilege('anon', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.workcraft_release_app_email(uuid)', 'EXECUTE'),
+  'only the trusted server can reserve or release app email capacity'
+);
 
 -- Least-privilege table grants used by the application.
 select ok(
@@ -90,9 +100,17 @@ select ok(
   'authenticated users can only read subscriptions'
 );
 select ok(
-  has_table_privilege('authenticated', 'public.estimate_email_events', 'SELECT,INSERT')
-  and not has_table_privilege('authenticated', 'public.estimate_email_events', 'UPDATE,DELETE,TRUNCATE'),
-  'authenticated users can read and record estimate email events'
+  has_table_privilege('authenticated', 'public.estimate_email_events', 'SELECT')
+  and not has_table_privilege('authenticated', 'public.estimate_email_events', 'INSERT,UPDATE,DELETE,TRUNCATE'),
+  'authenticated users can read but cannot forge estimate email events'
+);
+select ok(
+  exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'estimate_email_events' and column_name = 'provider_event_id'
+  )
+  and to_regclass('public.estimate_email_events_provider_event_id_uidx') is not null,
+  'Resend events have a unique provider ID for idempotent ingestion'
 );
 select ok(
   has_table_privilege('authenticated', 'public.price_book_items', 'SELECT,INSERT,UPDATE,DELETE')
@@ -123,6 +141,13 @@ select ok(
   has_table_privilege('authenticated', 'public.estimates', 'SELECT,INSERT,UPDATE,DELETE')
   and not has_table_privilege('authenticated', 'public.estimates', 'TRUNCATE'),
   'authenticated users can manage estimates without table-wide truncate'
+);
+select ok(
+  (select pg_get_expr(d.adbin, d.adrelid) = 'auth.uid()'
+   from pg_attrdef d
+   join pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
+   where d.adrelid = 'public.estimates'::regclass and a.attname = 'user_id'),
+  'estimates default user_id to the authenticated user'
 );
 select ok(
   has_table_privilege('authenticated', 'public.line_items', 'SELECT,INSERT,UPDATE,DELETE')

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, paidCents, retrieveOpenSession } from "@/lib/customer-payments";
+import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
 import { getAppOrigin, getServiceSupabase } from "@/lib/stripe-server";
 import { getProAccess } from "@/lib/pro-access";
 
@@ -37,31 +37,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return errorResponse("The contractor has not finished Stripe payment setup yet. Contact them to arrange payment.", 409);
     }
 
-    const alreadyPaid = paidCents(data.payments);
-    if (kind === "deposit" && (!estimate.require_deposit || alreadyPaid > 0)) {
-      return errorResponse("A deposit is not available for this estimate.", 409);
-    }
-    const dueCents = Math.max(0, data.totalCents - alreadyPaid);
-    const amountCents = kind === "deposit"
-      ? Math.min(dueCents, Math.round(data.totalCents * Number(estimate.deposit_percentage || 0) / 100))
-      : dueCents;
-    if (amountCents < 1) return errorResponse("There is no remaining balance to pay.", 409);
-
     const { data: preparedRows, error: prepareError } = await admin.rpc("workcraft_prepare_customer_payment", {
       p_user_id: estimate.user_id,
       p_estimate_id: estimate.id,
       p_payment_kind: kind,
-      p_amount_cents: amountCents,
       p_stripe_account_id: account.stripe_account_id,
     });
     if (prepareError) {
-      const message = prepareError.message.includes("WORKCRAFT_PRO_REQUIRED")
-        ? "Online customer payments require an active WorkCraft AI Pro plan."
-        : "Could not prepare this payment. Please try again.";
-      return errorResponse(message, prepareError.code === "42501" ? 403 : 502);
+      const message = prepareError.message;
+      if (message.includes("WORKCRAFT_PRO_REQUIRED")) return errorResponse("Online customer payments require an active WorkCraft AI Pro plan.", 403);
+      if (message.includes("PAYMENT_CHECKOUT_ALREADY_OPEN")) return errorResponse("Another payment checkout is already open for this estimate. Finish or close it before starting a different payment.", 409);
+      if (["DEPOSIT_NOT_AVAILABLE", "NO_REMAINING_BALANCE", "PAYMENT_AMOUNT_LIMIT_EXCEEDED"].some((code) => message.includes(code))) {
+        if (message.includes("DEPOSIT_NOT_AVAILABLE")) return errorResponse("A deposit is not available for this estimate.", 409);
+        if (message.includes("PAYMENT_AMOUNT_LIMIT_EXCEEDED")) return errorResponse("This estimate is above Stripe’s online checkout limit. Arrange payment directly with the contractor.", 409);
+        return errorResponse("There is no remaining balance available to pay through Stripe.", 409);
+      }
+      if (message.includes("CHECKOUT_RATE_LIMITED")) return errorResponse("Too many checkout attempts. Please try again later.", 429);
+      return errorResponse(message.includes("ESTIMATE_NOT_PAYABLE") ? "Approve this estimate before making a payment." : "Could not prepare this payment. Please try again.", prepareError.code === "42501" ? 403 : 502);
     }
-    const prepared = Array.isArray(preparedRows) ? preparedRows[0] as { payment_id?: string; reused?: boolean } | undefined : undefined;
+    const prepared = Array.isArray(preparedRows) ? preparedRows[0] as { payment_id?: string; payment_kind?: string; amount_cents?: number; reused?: boolean } | undefined : undefined;
     if (!prepared?.payment_id) return errorResponse("Could not prepare this payment. Please try again.", 502);
+    const amountCents = Number(prepared.amount_cents);
+    if (prepared.payment_kind !== kind || !Number.isSafeInteger(amountCents) || amountCents < 1) {
+      return errorResponse("Could not prepare this payment. Please try again.", 502);
+    }
 
     const { data: payment, error: paymentError } = await admin.from("customer_payments")
       .select("id, payment_kind, amount_cents, status, stripe_checkout_session_id, checkout_url")
@@ -76,7 +75,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         return NextResponse.json({ url: payment.checkout_url }, { headers: { "Cache-Control": "no-store" } });
       }
       if (session.status === "complete") return errorResponse("Your payment is processing. Refresh this proposal in a moment.", 409);
-      await admin.from("customer_payments").update({ status: "expired", updated_at: new Date().toISOString() }).eq("id", payment.id);
+      const { error: expireError } = await admin.from("customer_payments").update({ status: "expired", updated_at: new Date().toISOString() })
+        .eq("id", payment.id).eq("status", "pending");
+      if (expireError) throw expireError;
       return errorResponse("This checkout link expired. Please start the payment again.", 409);
     }
 

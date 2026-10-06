@@ -99,11 +99,15 @@ export async function getEstimatePaymentData(admin: ReturnType<typeof getService
   const { data: estimate, error } = await admin.from("estimates")
     .select("id, user_id, status, client_email, require_deposit, deposit_percentage, tax_rate, markup_percentage, package_options, selected_package")
     .eq("id", estimateId).maybeSingle();
-  if (error || !estimate) return { estimate: null, lines: [], totalCents: 0, payments: [] as PaymentRow[] };
-  const { data: lines } = await admin.from("line_items").select("quantity, unit_price").eq("estimate_id", estimateId);
-  const { data: payments } = await admin.from("customer_payments")
+  if (error) throw new Error("Could not load estimate payment data.");
+  if (!estimate) return { estimate: null, lines: [], totalCents: 0, payments: [] as PaymentRow[] };
+  const [{ data: lines, error: lineError }, { data: payments, error: paymentError }] = await Promise.all([
+    admin.from("line_items").select("quantity, unit_price").eq("estimate_id", estimateId),
+    admin.from("customer_payments")
     .select("id, payment_kind, amount_cents, status, amount_refunded_cents, stripe_checkout_session_id, checkout_url")
-    .eq("estimate_id", estimateId).order("created_at", { ascending: true });
+      .eq("estimate_id", estimateId).order("created_at", { ascending: true }),
+  ]);
+  if (lineError || paymentError) throw new Error("Could not load estimate payment data.");
   const typedEstimate = estimate as EstimateRow;
   const typedLines = (lines ?? []) as LineRow[];
   const typedPayments = (payments ?? []) as PaymentRow[];

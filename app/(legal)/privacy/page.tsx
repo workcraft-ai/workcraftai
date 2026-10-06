@@ -17,6 +17,7 @@ export default function PrivacyPage() {
           <p className="text-sm leading-7 text-slate-700">
             We collect account and business profile details, customer contact information, estimate line items and prices, job addresses, schedules, notes, and approval details that you enter. For cloud AI cost controls, we also record your generation count, model, prompt length, outcome, and provider response status for cost controls, and we delete records older than 90 days the next time a cloud drafting request is processed; if the feature is idle or paused, those records may remain longer. We do not store your prompt or generated text in this usage log. If you contact support, we send the name, email address, topic, and message you provide to our email provider so our support team can reply. To limit spam, we use a keyed hash of the request IP address to enforce a daily submission limit. Expired hashes are pruned the next time a support request is processed after 30 days. Supabase provides account authentication and data storage. Payment card details are handled by Stripe Checkout and are not stored by WorkCraft AI.
           </p>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="To manage email sending limits, we record app email counts by UTC day and message category. Estimate-email quota records include the account ID and are pruned when email processing runs after 90 days. If a provider request times out and delivery is uncertain, its quota reservation may remain counted." /></p>
         </section>
 
         <section className="space-y-3">
@@ -39,7 +40,7 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">4. Estimate Email Tracking</h2>
           <p className="text-sm leading-7 text-slate-700">
-            WorkCraft AI records when an estimate email is sent and when its proposal link is first viewed. This supports your estimate activity history and scheduled follow-ups.
+            WorkCraft AI records when an estimate email is accepted by Resend, delivery status events such as delivered, delayed, bounced, or reported as spam, and when its proposal link is first viewed. This supports your estimate activity history and scheduled follow-ups.
           </p>
         </section>
 

@@ -34,6 +34,10 @@ interface ProposalQuestion { id: string; estimate_id: string; customer_name: str
 function estimateEmailEventLabel(event: string) {
   switch (event) {
     case "sent": return "Email sent";
+    case "delivered": return "Email delivered";
+    case "delivery_delayed": return "Email delivery delayed";
+    case "bounced": return "Email bounced";
+    case "complained": return "Email marked as spam";
     case "follow_up_sent": return "Follow-up sent";
     case "proposal_viewed": return "Proposal viewed";
     default: return event.replaceAll("_", " ");
