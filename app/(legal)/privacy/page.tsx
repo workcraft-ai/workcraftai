@@ -6,9 +6,14 @@ import LocalizedText from "@/app/components/LocalizedText";
 export const metadata: Metadata = {
   title: "Privacy Policy | WorkCraft AI",
   description: "Learn how WorkCraft AI collects, uses, and protects account, customer, and business information.",
+  alternates: { canonical: "https://app.workcraftai.com/privacy" },
+  robots: { index: true, follow: true },
   openGraph: {
+    type: "website",
+    siteName: "WorkCraft AI",
     title: "Privacy Policy | WorkCraft AI",
     description: "Learn how WorkCraft AI collects, uses, and protects account, customer, and business information.",
+    url: "https://app.workcraftai.com/privacy",
   },
 };
 

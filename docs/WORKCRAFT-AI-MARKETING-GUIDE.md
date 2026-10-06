@@ -39,9 +39,11 @@ LinkedIn says a Company Page can be created for free and documents the Page crea
 
 1. Sign in to [Google Search Console](https://search.google.com/search-console/) with the company's Google account.
 2. Add a **Domain property** for `workcraftai.com` and verify it by adding Google's TXT record at the domain's DNS provider.
-3. After the site is attached and reachable, submit `https://workcraftai.com/sitemap.xml` in Search Console's **Sitemaps** report.
-4. Check the Pages/Indexing and Performance reports monthly. Search Console can report crawl or indexing issues; sitemap submission is a hint and does not guarantee indexing. [Google's sitemap guide](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)
-5. Do not create a Google Business Profile just to get a listing. Google's eligibility rules require in-person customer contact; online-only brands are ineligible. [Google Business Profile eligibility](https://support.google.com/business/answer/13763036?hl=en-en)
+3. After the domains resolve, submit both `https://workcraftai.com/sitemap.xml` and `https://app.workcraftai.com/sitemap.xml` in Search Console's **Sitemaps** report. The marketing sitemap lists its single canonical landing page; the app sitemap lists only its public support and legal pages.
+4. Use **URL Inspection** on the marketing home page and the app's support and legal pages. Confirm the selected canonical matches each page's declared canonical. App tools and customer-specific pages should remain excluded from results.
+5. Check the Sitemaps, Pages/Indexing, and Performance reports monthly. Sitemap submission is a discovery hint, not a guarantee of indexing. [Google's sitemap guide](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) · [Google's canonical guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
+6. The marketing site's English/Spanish toggle currently changes content on the same URL. It does not create a separately indexable Spanish page or `hreflang` alternate. If Spanish search visibility becomes a priority, publish a stable Spanish URL with its own translated metadata and reciprocal language alternates.
+7. Do not create a Google Business Profile just to get a listing. Google's eligibility rules require in-person customer contact; online-only brands are ineligible. [Google Business Profile eligibility](https://support.google.com/business/answer/13763036?hl=en-en)
 
 ## Step 5: Make a small, reusable content library
 

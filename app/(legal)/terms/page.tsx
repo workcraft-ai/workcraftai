@@ -5,9 +5,14 @@ import { LocalizedTree } from "@/app/components/LanguageProvider";
 export const metadata: Metadata = {
   title: "Terms of Service | WorkCraft AI",
   description: "Review the WorkCraft AI terms for using the contractor estimates and job management service.",
+  alternates: { canonical: "https://app.workcraftai.com/terms" },
+  robots: { index: true, follow: true },
   openGraph: {
+    type: "website",
+    siteName: "WorkCraft AI",
     title: "Terms of Service | WorkCraft AI",
     description: "Review the WorkCraft AI terms for using the contractor estimates and job management service.",
+    url: "https://app.workcraftai.com/terms",
   },
 };
 
