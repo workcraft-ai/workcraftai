@@ -15,13 +15,28 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[character]!);
 
+function supportResponse(request: Request, payload: { success?: boolean; error?: string }, status = 200) {
+  const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  const acceptsHtml = request.headers.get("accept")?.toLowerCase().includes("text/html");
+  if (contentType === "application/x-www-form-urlencoded" && acceptsHtml) {
+    const destination = new URL("/support", request.url);
+    destination.searchParams.set("form", payload.success ? "sent" : "error");
+    destination.hash = "contact-support";
+    return NextResponse.redirect(destination, 303);
+  }
+  return NextResponse.json(payload, { status });
+}
+
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "This request could not be verified." }, { status: 403 });
-  if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
-    return NextResponse.json({ error: "Submit the form using the support page." }, { status: 415 });
+  if (!sameOrigin(request)) return supportResponse(request, { error: "This request could not be verified." }, 403);
+  const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+  const isJson = contentType === "application/json";
+  const isForm = contentType === "application/x-www-form-urlencoded";
+  if (!isJson && !isForm) {
+    return supportResponse(request, { error: "Submit the form using the support page." }, 415);
   }
   const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_BODY_BYTES) return NextResponse.json({ error: "Your message is too large." }, { status: 413 });
+  if (contentLength > MAX_BODY_BYTES) return supportResponse(request, { error: "Your message is too large." }, 413);
 
   let payload: Record<string, unknown>;
   try {
@@ -35,7 +50,7 @@ export async function POST(request: Request) {
       totalBytes += value.byteLength;
       if (totalBytes > MAX_BODY_BYTES) {
         await reader.cancel();
-        return NextResponse.json({ error: "Your message is too large." }, { status: 413 });
+        return supportResponse(request, { error: "Your message is too large." }, 413);
       }
       chunks.push(value);
     }
@@ -45,16 +60,19 @@ export async function POST(request: Request) {
       body.set(chunk, offset);
       offset += chunk.byteLength;
     }
-    const parsed: unknown = JSON.parse(new TextDecoder().decode(body));
+    const decoded = new TextDecoder().decode(body);
+    const parsed: unknown = isJson
+      ? JSON.parse(decoded)
+      : Object.fromEntries(new URLSearchParams(decoded));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
     payload = parsed as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "Enter your name, email, topic, and message." }, { status: 400 });
+    return supportResponse(request, { error: "Enter your name, email, topic, and message." }, 400);
   }
 
   // Bots that fill this hidden field receive a successful response without any email being sent.
   if (typeof payload.company_website === "string" && payload.company_website.trim()) {
-    return NextResponse.json({ success: true });
+    return supportResponse(request, { success: true });
   }
 
   const name = typeof payload.name === "string" ? payload.name.trim() : "";
@@ -63,7 +81,7 @@ export async function POST(request: Request) {
   const message = typeof payload.message === "string" ? payload.message.trim() : "";
   if (name.length < 2 || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
     !topics.has(topic) || message.length < 10 || message.length > 4000) {
-    return NextResponse.json({ error: "Check the fields and keep your message under 4,000 characters." }, { status: 400 });
+    return supportResponse(request, { error: "Check the fields and keep your message under 4,000 characters." }, 400);
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -72,13 +90,13 @@ export async function POST(request: Request) {
   const sender = process.env.RESEND_FROM_EMAIL;
   const recipient = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL);
   if (!supabaseUrl || !serviceKey || !apiKey || !sender || !recipient) {
-    return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+    return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   }
 
   const forwardedIp = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
   const requesterIp = request.headers.get("x-real-ip")?.trim() || forwardedIp;
   if (!requesterIp || !isIP(requesterIp)) {
-    return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+    return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   }
 
   const requesterHash = createHmac("sha256", serviceKey).update(requesterIp).digest("hex");
@@ -88,18 +106,18 @@ export async function POST(request: Request) {
   });
   if (limitError) {
     console.error("Support form rate limit is unavailable:", limitError.message);
-    return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+    return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   }
-  if (!allowed) return NextResponse.json({ error: "Please wait until tomorrow before sending another support request." }, { status: 429 });
+  if (!allowed) return supportResponse(request, { error: "Please wait until tomorrow before sending another support request." }, 429);
 
   const { reservation, error: quotaError } = await reserveAppEmail(admin, "support");
   if (quotaError) {
     console.error("Support email quota reservation failed:", quotaError.message);
-    return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+    return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   }
-  if (!reservation) return NextResponse.json({ error: "The support form is temporarily unavailable. Please try again later." }, { status: 503 });
+  if (!reservation) return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   if (!reservation.allowed || !reservation.reservation_id) {
-    return NextResponse.json({ error: "Our support inbox has reached today’s message capacity. Please try again tomorrow or email support@workcraftai.com." }, { status: 429 });
+    return supportResponse(request, { error: "Our support inbox has reached today’s message capacity. Please try again tomorrow or email support@workcraftai.com." }, 429);
   }
 
   const safeName = escapeHtml(name);
@@ -123,12 +141,12 @@ export async function POST(request: Request) {
     if (!response.ok) {
       if (response.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
       console.error("Support form email delivery failed with status:", response.status);
-      return NextResponse.json({ error: "We could not send your message just now. Please email support@workcraftai.com." }, { status: 502 });
+      return supportResponse(request, { error: "We could not send your message just now. Please email support@workcraftai.com." }, 502);
     }
   } catch {
     console.error("Support form email delivery request failed.");
-    return NextResponse.json({ error: "We could not send your message just now. Please email support@workcraftai.com." }, { status: 502 });
+    return supportResponse(request, { error: "We could not send your message just now. Please email support@workcraftai.com." }, 502);
   }
 
-  return NextResponse.json({ success: true });
+  return supportResponse(request, { success: true });
 }

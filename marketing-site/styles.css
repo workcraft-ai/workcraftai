@@ -71,3 +71,8 @@
 .language-toggle:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
 @media(max-width:650px){.site-header .brand-image{width:145px}.language-toggle{min-width:48px;min-height:48px;padding:8px}}
 @media(min-width:651px) and (max-width:900px){.site-header .brand-image{width:185px}.main-nav{gap:16px;font-size:12px}}
+
+/* Keep the secondary hero action easy to tap and the mockup caption readable. */
+.hero-actions .text-link{min-height:48px;padding:12px 4px}
+.art-caption{color:#56615a;font-size:10px}
+@media(max-width:650px){.art-caption{font-size:9px}}
