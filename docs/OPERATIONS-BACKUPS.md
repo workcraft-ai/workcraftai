@@ -16,14 +16,14 @@ The workflow uses a GitHub-hosted runner. Its temporary unencrypted dump and med
 
 ### 1. Authorize a dedicated Google Drive remote
 
-Use a Google account you control and keep two-step verification enabled. On a trusted computer, install rclone, then create a remote named exactly `drive` with the narrow `drive.file` scope:
+Use a Google account you control and keep two-step verification enabled. The OAuth app and Google Drive API can be set up without a Google Workspace subscription. Create your own OAuth client: rclone's shared Google client is being retired during 2026, and Google OAuth apps left in Testing mode expire their grants after seven days. Rclone's setup guide has current screenshots and details: [Google Drive backend setup](https://rclone.org/drive/#making-your-own-client-id).
 
-```sh
-rclone config create drive drive scope drive.file
-rclone lsd drive:
-```
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and enable **Google Drive API**.
+2. Configure the OAuth consent screen as **External**, give it a recognizable name such as `WorkCraft AI Backups`, add only your Google account as a test user, and add `https://www.googleapis.com/auth/drive.file` under **Data access**. Create a **Desktop app** OAuth client and keep its client ID and secret private.
+3. On the OAuth app's Audience page, publish it for personal use so refresh grants do not expire after a week. Google may show an unverified-app warning when you authorize it; this is a single-user backup tool, so do not request public access or add other users. If Google will not let you publish yet, follow the homepage/privacy-policy steps in rclone's guide. You can use `https://workcraftai.com/` and `https://workcraftai.com/privacy` as those URLs.
+4. On a trusted computer, install rclone, then run `rclone config`. Create a remote named exactly `drive`, choose Google Drive, enter the OAuth client ID and secret, select the narrow `drive.file` scope, leave the service-account path blank, and answer **Yes** to browser authentication. Complete the Google authorization in your browser, select **No** for Shared Drive, and save the remote.
 
-Complete the browser authorization. The workflow creates `WorkCraftAI-Backups/production` in that Drive account. The rclone configuration includes a refresh token, so treat the file as a password. To copy its Base64 form directly to the clipboard on macOS:
+The `drive.file` scope lets rclone access files and folders it creates; those files remain visible in the Google Drive website. The workflow creates `WorkCraftAI-Backups/production` in that account. The rclone configuration includes the OAuth client secret and a refresh token, so treat the file as a password. To copy its Base64 form directly to the clipboard on macOS:
 
 ```sh
 base64 < "$HOME/.config/rclone/rclone.conf" | tr -d '\n' | pbcopy

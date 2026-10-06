@@ -23,6 +23,15 @@ interface Estimate {
 
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 
+function estimateEmailEventLabel(event: string) {
+  switch (event) {
+    case "sent": return "Email sent";
+    case "follow_up_sent": return "Follow-up sent";
+    case "proposal_viewed": return "Proposal viewed";
+    default: return event.replaceAll("_", " ");
+  }
+}
+
 export default function DashboardPage() {
   const { language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
@@ -254,7 +263,7 @@ export default function DashboardPage() {
                           View Link
                         </Link>
                         {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-600 underline" aria-label="Email client is a Pro feature">Email client <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 no-underline">Pro</span></Link>}
-                        {emailEvents[est.id] && <span className="text-[10px] font-semibold uppercase text-slate-500">{emailEvents[est.id]}</span>}
+                        {emailEvents[est.id] && <span className="text-[10px] font-semibold uppercase text-slate-500">{estimateEmailEventLabel(emailEvents[est.id])}</span>}
                         {est.followup_at && <span className="text-[10px] text-slate-500">{est.followup_sent_at ? "Follow-up sent" : `Follow-up ${new Date(est.followup_at).toLocaleDateString(locale)}`}</span>}
                         {est.proposal_viewed_at && <span className="text-[10px] font-semibold text-green-700">Viewed</span>}
 
