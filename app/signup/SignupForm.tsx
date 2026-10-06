@@ -70,6 +70,7 @@ export default function SignupForm() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-slate-900 py-8 px-4 shadow-xl border border-slate-800 sm:rounded-xl sm:px-10">
           <form
+            method="post"
             className="space-y-6"
             onSubmit={handleSignup}
           >

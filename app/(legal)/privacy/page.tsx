@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import LocalizedText from "@/app/components/LocalizedText";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | WorkCraft AI",
+  description: "Learn how WorkCraft AI collects, uses, and protects account, customer, and business information.",
+  openGraph: {
+    title: "Privacy Policy | WorkCraft AI",
+    description: "Learn how WorkCraft AI collects, uses, and protects account, customer, and business information.",
+  },
+};
 
 export default function PrivacyPage() {
   return (
