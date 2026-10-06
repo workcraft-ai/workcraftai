@@ -51,7 +51,10 @@ select throws_ok(
 reset role;
 
 set local role authenticated;
-select is((select count(*) from public.pro_checkout_attempts), 0::bigint, 'browser users cannot inspect Pro checkout attempts');
+select throws_ok(
+  $$select count(*) from public.pro_checkout_attempts$$,
+  '42501', null, 'browser users cannot inspect Pro checkout attempts'
+);
 reset role;
 
 select * from finish();
