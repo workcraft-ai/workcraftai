@@ -1,6 +1,6 @@
 # WorkCraft AI monitoring and incident checklist
 
-Last verified: 2026-10-05. The status table is a snapshot from before the dedicated estimate-sender release; refresh it after deployment. This runbook contains no credentials or customer data.
+Last verified: 2026-10-05 after production commit `12459feb2b8a1aab9a2d1073d9b999e0b48ff5ce`. This runbook contains no credentials or customer data.
 
 ## Current verified state
 
@@ -8,14 +8,14 @@ Last verified: 2026-10-05. The status table is a snapshot from before the dedica
 | --- | --- | --- |
 | Production availability | `https://workcraftai.com/` returned HTTP 200. `https://app.workcraftai.com/api/health` returned HTTP 200 with app, Supabase Auth, and Supabase database checks all `ok`. | Add an external monitor that sends an alert when either URL fails. |
 | Database deployments | Production and staging have the same 19 migration names applied, through `admin_managed_pro_access`. The health endpoint confirms the production database responds. | Confirm a recent restorable production backup or PITR in Supabase. |
-| GitHub CI | The current production commit is `61d2c500d2cbbbcb7646ded63dcabd2b7580b5b8`. Local lint, tests, typecheck, build, production dependency audit, pgTAP, and both quota concurrency checks passed. | GitHub Actions attempt 2 was cancelled before any step ran because GitHub did not allocate hosted runners after 15 minutes. A hosted green run is still required. |
+| GitHub CI | GitHub Actions CI run 94 passed for the merged change, including audit, lint, unit tests, typecheck, build, database security tests, and concurrency checks. | No CI action remains for this release. |
 | Stripe | Stripe Live has enabled `@self` and `@accounts` destinations targeting `https://app.workcraftai.com/api/webhooks/stripe`. The dashboard showed zero Live deliveries over the last 7 days; no test-mode destination is configured. | Configure a dedicated test destination/account and verify synthetic event deliveries. No live payment was created. |
-| Email | `workcraftai.com` was reported verified by Resend. An owner-controlled Gmail inbox received the controlled estimate email in Inbox immediately (per screenshot); Resend logs were not inspected. | Estimate and follow-up code now use `RESEND_ESTIMATE_FROM_EMAIL`; Vercel Production has `WorkCraft AI <estimates@workcraftai.com>`. Deploy the code, send a new owner-controlled estimate, and confirm the provider delivery event. |
+| Email | `workcraftai.com` was reported verified by Resend. An owner-controlled Gmail inbox received an earlier estimate email in Inbox immediately (per screenshot); Resend logs were not inspected. The dedicated estimate sender and contractor Reply-To are now deployed. | Send a new estimate to an owner-controlled inbox and confirm both sender and Reply-To, then inspect the Resend delivery event. |
 | UptimeRobot | Signup magic link sent to `support@workcraftai.com`. | Owner must click the link; then add the public-site and app-health monitors and verify notification delivery. |
 
 ## Uptime checks and alerts
 
-The repository includes `.github/workflows/availability.yml`, scheduled every 15 minutes and manually runnable. It checks the marketing home page and the app health endpoint. The latest scheduled run was cancelled before its HTTP checks because GitHub could not allocate a hosted runner; the latest CI retry hit the same runner problem. GitHub’s [Actions status page](https://www.githubstatus.com/) currently reports hosted-runner assignment delays. Treat this workflow as a useful backstop, not as the only paging channel.
+The repository includes `.github/workflows/availability.yml`, scheduled every 15 minutes and manually runnable. It checks the marketing home page and the app health endpoint. A previous scheduled run was cancelled before its HTTP checks because GitHub did not allocate a hosted runner. The latest CI run succeeded after retrying its database job. Treat the workflow as a useful backstop, not as the only paging channel.
 
 Recommended no-cost external layer: [UptimeRobot's free plan](https://uptimerobot.com/pricing/) supports up to 50 monitors, five-minute checks, and email notifications. Signup is pending email verification. After verification, create HTTP monitors for:
 
@@ -66,7 +66,7 @@ Use a dedicated Stripe test-mode destination and connected-account test fixture 
 
 ## Email verification
 
-Resend domain verification and recent password-reset/support deliveries were confirmed in the previous provider check. An owner-controlled inbox received an estimate email immediately, but its Resend event was not inspected. Estimate messages now have a dedicated sender configured as `WorkCraft AI <estimates@workcraftai.com>` and set Reply-To to the contractor’s account email; the change will take effect after deployment. Do not use a real customer address for smoke tests. Setting `NEXT_PUBLIC_SUPPORT_EMAIL` only changes the public support contact; it does not route provider alerts.
+Resend domain verification and recent password-reset/support deliveries were confirmed in the previous provider check. An owner-controlled inbox received an earlier estimate email immediately, but its Resend event was not inspected. Production estimate messages now use `WorkCraft AI <estimates@workcraftai.com>` and set Reply-To to the contractor’s account email. Send a new test estimate to an owner-controlled inbox and inspect its Resend event and headers. Do not use a real customer address for smoke tests. Setting `NEXT_PUBLIC_SUPPORT_EMAIL` only changes the public support contact; it does not route provider alerts.
 
 ## Abuse and cost controls
 
