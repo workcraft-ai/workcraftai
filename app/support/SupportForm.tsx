@@ -5,9 +5,21 @@ import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 type SubmissionState = { kind: "success" | "error"; message: string } | null;
 
-export default function SupportForm() {
+export default function SupportForm({
+  fallbackResult,
+}: {
+  fallbackResult?: "sent" | "error";
+}) {
   const [pending, setPending] = useState(false);
-  const [state, setState] = useState<SubmissionState>(null);
+  const [state, setState] = useState<SubmissionState>(() => {
+    if (fallbackResult === "sent") {
+      return { kind: "success", message: "Thanks for reaching out. Your message is on its way to our support team." };
+    }
+    if (fallbackResult === "error") {
+      return { kind: "error", message: "We could not send your message. Please try again." };
+    }
+    return null;
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +47,7 @@ export default function SupportForm() {
 
   return (
     <LocalizedTree>
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form method="post" action="/api/support" onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="block text-sm font-semibold text-slate-800">
           Your name

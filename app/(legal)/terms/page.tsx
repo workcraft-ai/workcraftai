@@ -1,5 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
+
+export const metadata: Metadata = {
+  title: "Terms of Service | WorkCraft AI",
+  description: "Review the WorkCraft AI terms for using the contractor estimates and job management service.",
+  openGraph: {
+    title: "Terms of Service | WorkCraft AI",
+    description: "Review the WorkCraft AI terms for using the contractor estimates and job management service.",
+  },
+};
 
 export default function TermsPage() {
   return (

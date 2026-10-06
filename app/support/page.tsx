@@ -11,7 +11,13 @@ export const metadata: Metadata = {
   description: "Find answers to common WorkCraft AI questions or send a message to our support team.",
 };
 
-export default function SupportPage() {
+export default async function SupportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ form?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const formResult = Array.isArray(params.form) ? params.form[0] : params.form;
   const supportEmail = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL) || "support@workcraftai.com";
 
   return (
@@ -41,7 +47,7 @@ export default function SupportPage() {
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-800"><LocalizedText text="Still need help?" /></p>
             <h2 id="contact-heading" className="mt-2 text-2xl font-bold tracking-tight text-slate-900"><LocalizedText text="Send us a message" /></h2>
             <p className="mt-2 mb-6 text-sm leading-6 text-slate-600"><LocalizedText text="Share a few details and our support team will reply to the email address you provide." /></p>
-            <SupportForm />
+            <SupportForm fallbackResult={formResult === "sent" || formResult === "error" ? formResult : undefined} />
             <p className="mt-6 border-t border-slate-100 pt-5 text-sm text-slate-600">Prefer email? <a href={`mailto:${supportEmail}`} className="font-semibold text-orange-800 underline underline-offset-2">{supportEmail}</a></p>
           </section>
         </div>

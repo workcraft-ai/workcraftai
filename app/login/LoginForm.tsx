@@ -51,7 +51,7 @@ export default function LoginForm() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-slate-900 py-8 px-4 shadow border border-slate-800 sm:rounded-xl sm:px-10">
-          <form className="space-y-6" onSubmit={handleSignIn}>
+          <form method="post" className="space-y-6" onSubmit={handleSignIn}>
             {error && (
               <div
                 role="alert"
