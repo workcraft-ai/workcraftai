@@ -16,14 +16,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: { getAll: () => cookieStore.getAll() } });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sign in to send estimates." }, { status: 401 });
+  const contractorReplyEmail = user.email?.trim();
+  if (!contractorReplyEmail) return NextResponse.json({ error: "Add an email address to your account before sending an estimate." }, { status: 400 });
   let hasPro = false;
   try { hasPro = (await getServerProAccess(user.id)).hasPro; }
   catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 }); }
   if (!hasPro) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
 
   const apiKey = process.env.RESEND_API_KEY;
-  const sender = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !sender) return NextResponse.json({ error: "Email sending is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL." }, { status: 503 });
+  const sender = process.env.RESEND_ESTIMATE_FROM_EMAIL;
+  if (!apiKey || !sender) return NextResponse.json({ error: "Estimate email sending is not configured. Set RESEND_API_KEY and RESEND_ESTIMATE_FROM_EMAIL." }, { status: 503 });
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Email sending is temporarily unavailable." }, { status: 503 });
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
@@ -69,6 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `estimate-send-${id}-${new Date(estimate.updated_at).getTime()}` },
       body: JSON.stringify({
       from: sender,
+      reply_to: contractorReplyEmail,
       to: [estimate.client_email],
       subject: spanish ? `Tu cotización de ${businessName}` : `Your estimate from ${businessName}`,
       text: spanish ? `Hola ${estimate.client_name}, tu cotización está lista. Revísala aquí: ${link}` : `Hi ${estimate.client_name}, your estimate is ready. View it here: ${link}`,

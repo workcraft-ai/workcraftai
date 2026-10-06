@@ -1,17 +1,30 @@
-# Production-readiness hardening release
+# Production readiness status and remaining release gates
 
-This release adds atomic estimate/line-item writes, immutable proposal acceptance records, stricter pending-estimate write policies, durable Stripe webhook idempotency, bounded Pro email and global AI usage, atomic customer-question/follow-up handling, an estimate-media storage quota, and a database-backed health probe.
+Last full readiness audit: 2026-10-05, before the dedicated estimate-sender release. This is an operational status snapshot, not a claim that every provider delivery or backup has been tested.
 
-## Before release
+## Current verified state
 
-1. Confirm a current Supabase backup exists and apply the changes to a non-production Supabase project first.
-2. Review the SQL diffs in order:
-   - `20261005010742_secure_proposal_estimate_integrity.sql`
-   - `20261005010758_durable_webhook_email_limits.sql`
-3. Run `npm run lint`, `npm run typecheck`, `npm test`, and all `supabase/tests/database` pgTAP tests against the staging database.
-4. Confirm Vercel Production has the required server-only keys: `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `GEMINI_API_KEY`, and `CRON_SECRET` where each feature is enabled. Public-prefixed variables must contain no secrets.
-5. In Stripe, ensure the Connect webhook listens for `checkout.session.async_payment_failed` and `payment_intent.payment_failed` in addition to the events documented in the README. Verify the endpoint is a Connected accounts destination and that its signing secret is set as `STRIPE_CONNECT_WEBHOOK_SECRET`.
-6. Confirm the target production Supabase project is the intended live project, then schedule the database change before deploying the application code that depends on it.
+- Production commit: `61d2c500d2cbbbcb7646ded63dcabd2b7580b5b8`.
+- `https://workcraftai.com/` returned HTTP 200. `https://app.workcraftai.com/api/health` returned HTTP 200 with app, Supabase Auth, and Supabase database checks all `ok`.
+- Production and staging have the same 19 migration names applied through `admin_managed_pro_access`. The latest migration was already present in Production and was applied to Staging; no Production migration was applied as part of this verification pass.
+- Local checks against the same source tree as Production passed: lint, 23 unit tests, TypeScript, and Next.js build. `npm audit --omit=dev --audit-level=high` found zero production dependency vulnerabilities.
+- On a new disposable local Supabase project, all 6 pgTAP files / 143 assertions passed. Both database concurrency scripts passed: the free estimate cap admitted exactly 5 of 20 simultaneous inserts; AI per-account and global caps admitted exactly the configured 7 and 11 reservations.
+- GitHub Actions CI attempt 2 did not run any steps. Both jobs were cancelled after 15 minutes because GitHub could not allocate hosted runners. The latest scheduled availability workflow was also cancelled before checking URLs for the same runner-allocation reason. A hosted green CI run remains outstanding; these runs did not report test failures.
+- Stripe Live has two enabled event destinations pointing at `https://app.workcraftai.com/api/webhooks/stripe`: a connected-account destination with payment success/failure/expiration/refund events, and a platform destination with subscription and invoice lifecycle events. Code verifies raw-body signatures and uses durable event-ID idempotency. The Stripe dashboard showed zero Live deliveries in the last seven days, and no test-mode event destinations are configured; no Live payment was created.
+- An owner-controlled Gmail inbox received a controlled estimate email in Inbox immediately (per the supplied screenshot). Resend’s message log was not independently checked. Estimate and follow-up messages now use `RESEND_ESTIMATE_FROM_EMAIL` and set Reply-To to the contractor’s account email; the sender value is configured in Vercel Production, but the code change still needs a deployment before production uses it. Support and other operational mail keep using `RESEND_FROM_EMAIL`.
+- Supabase Free does not provide automatic backups or PITR. A manual/scheduled logical database export and separate Storage-object backup are possible, but a successful restore has not been verified. Confirm a restorable backup strategy before launch.
+- External uptime monitoring is not configured yet. UptimeRobot sent a signup magic link to `support@workcraftai.com`; account verification and monitor creation are waiting on the owner. The repository’s 15-minute GitHub Actions monitor is currently unreliable because GitHub could not assign hosted runners.
+- The Supabase security advisor reports the previously accepted leaked-password protection warning. Private service-only tables with RLS enabled and no client policies are default-deny INFO notices; they are not missing public access controls.
+
+## Remaining production gates
+
+1. **Hosted CI:** obtain a successful GitHub Actions run for the current production commit after hosted runners are available. Local lint, typecheck, build, audit, pgTAP, and concurrency checks already passed.
+2. **Stripe delivery:** inspect Live event delivery history again after a real customer event occurs. Configure a test-mode destination and connected-account test fixture, then verify success, failure, expiration, and refund processing. Never create a Live charge as a test.
+3. **Proposal email:** after the estimate-sender release is live, send one estimate to an owner-controlled test inbox and confirm delivery in Resend from `estimates@workcraftai.com`. Do not use customer addresses.
+4. **Monitoring:** click the UptimeRobot signup link sent to `support@workcraftai.com`, then create HTTP monitors for `https://workcraftai.com/` and `https://app.workcraftai.com/api/health`, route outage notifications to a monitored inbox, and configure provider-native usage/error alerts in Vercel, Supabase, Stripe, and Resend. See [the monitoring runbook](OPERATIONS-MONITORING.md).
+5. **Backup:** choose and verify a restorable backup strategy. Supabase Free requires owner-managed database exports and separate Storage-object backups; paid Pro provides managed daily backups. Record retention and perform a restore drill before relying on recovery.
+
+These remaining gates need access to GitHub’s runner service, Stripe’s delivery/test UI, Resend’s message log, Vercel/Supabase notification settings, and Supabase backup settings. Close each gate only after recording fresh evidence.
 
 ## Automated smoke script
 
@@ -19,30 +32,8 @@ Run `node scripts/production-readiness-smoke.mjs` against localhost or a Vercel 
 
 For authenticated checks, provide dedicated Free and Pro test-account credentials through `WORKCRAFT_E2E_FREE_EMAIL`, `WORKCRAFT_E2E_FREE_PASSWORD`, `WORKCRAFT_E2E_PRO_EMAIL`, and `WORKCRAFT_E2E_PRO_PASSWORD`. Set `WORKCRAFT_E2E_CROSS_ACCOUNT_ESTIMATE_ID` to a test estimate and `WORKCRAFT_E2E_ESTIMATE_OWNER` to `free` or `pro` to verify the owner can read it and the other account cannot.
 
-The Stripe webhook checks mutate a payment fixture, so they are disabled by default. To run them, use a localhost or `-git-` Vercel branch-preview URL, Stripe **test-mode** credentials, `WORKCRAFT_E2E_ALLOW_FIXTURE_MUTATIONS=1`, and a dedicated pending test payment identified by `WORKCRAFT_E2E_PAYMENT_ID` and `WORKCRAFT_E2E_CONNECT_ACCOUNT_ID`. The script sends signed failure and success events to that fixture; never point this at production or a real payment.
-
-## Apply and deploy
-
-Apply both SQL migrations to the intended Supabase project in timestamp order, confirm they complete, then deploy the application. Do not deploy the code first: the health route and API paths expect the new database functions and tables. After deployment:
-
-- check `/api/health` for `status: "ok"`, including `supabaseAuth` and `supabaseDatabase`;
-- sign in with a Free and a Pro test account;
-- verify Free users receive a server-side denial for Pro cloud drafting and estimate email;
-- create, edit, share, approve, and (in Stripe test mode) pay a test estimate;
-- deliver test connected-account success, failure, expiration, and refund events;
-- verify estimate ownership isolation with two test accounts;
-- confirm the AI platform counter and per-account email counter increment as expected.
-
-Use dedicated test accounts and synthetic customer data. Do not test payment or destructive account flows against real customer records.
+The Stripe webhook checks mutate a payment fixture, so they are disabled by default. Run only against localhost or a `-git-` Vercel branch preview with Stripe **test-mode** credentials, `WORKCRAFT_E2E_ALLOW_FIXTURE_MUTATIONS=1`, and a dedicated pending test payment identified by `WORKCRAFT_E2E_PAYMENT_ID` and `WORKCRAFT_E2E_CONNECT_ACCOUNT_ID`. The script sends signed failure and success events to that fixture; never point this at production or a real payment.
 
 ## Rollback
 
-The migrations are additive or replace function/policy definitions and do not delete estimate, customer, subscription, or payment rows. If the application deployment must be rolled back, roll back the application while leaving the additive database objects in place; the older application version can ignore them. Prefer a forward fix for SQL/function issues. Do not drop usage ledgers, acceptance snapshots, webhook idempotency records, or newly added columns as an ad hoc rollback. Restore a database backup only if a verified data-integrity incident requires it.
-
-## Items requiring owner action
-
-- Apply and verify the SQL migrations against production; the code agent has not applied them.
-- Verify Vercel Production environment values and the linked Supabase project in the dashboard.
-- Add the two payment-failure events to the Stripe Connected accounts endpoint and confirm webhook delivery.
-- Complete production smoke tests with dedicated test accounts and Stripe test-mode fixtures.
-- Zoho currently has no application integration code; it needs a separate product/integration decision before credentials are configured.
+The production hardening migrations are additive or replace function/policy definitions; they do not delete estimate, customer, subscription, or payment rows. If an application deployment must be rolled back, roll back the application while leaving additive database objects in place; the older application can ignore them. Prefer a forward fix for SQL/function issues. Do not drop usage ledgers, acceptance snapshots, webhook idempotency records, or new columns as an ad hoc rollback. Restore a backup only for a verified data-integrity incident, and verify the backup can be restored before depending on it.
