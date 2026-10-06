@@ -1,54 +1,84 @@
 # WorkCraft AI monitoring and incident checklist
 
-This guide records the monitoring baseline and the low-cost setup to complete. The chosen alert/contact address is `support@workcraftai.com`. It is intentionally read-only: it does not change provider billing, production settings, or customer data.
+Last verified: 2026-10-05. The status table is a snapshot from before the dedicated estimate-sender release; refresh it after deployment. This runbook contains no credentials or customer data.
 
-## Health checks
+## Current verified state
 
-- App availability and Supabase Auth readiness: `https://app.workcraftai.com/api/health`. HTTP 200 means the app handler and Supabase Auth health endpoint responded; HTTP 503 means Supabase Auth is missing configuration or did not respond successfully. The response contains no credentials or provider error text.
-- Marketing site availability: monitor `https://workcraftai.com/` for HTTP 200. The marketing site is a separate static Vercel project, so the app's `/api/health` cannot report on it.
-- A GitHub Actions workflow checks both endpoints every 15 minutes and can also be run manually. Scheduled runs only begin after the workflow reaches the repository's default branch. GitHub may delay or drop scheduled runs during high load, so treat this as a low-cost first layer rather than a guaranteed paging service.
-- These checks do not verify login, database queries/RLS, Stripe checkout/webhooks, or sending email. Keep the existing manual smoke check for those flows.
-
-## Provider notifications to enable
-
-| Provider | Watch | Where / action |
+| Area | Verified state | Still to verify |
 | --- | --- | --- |
-| Vercel | Failed production deploys, function error anomalies, usage increases and limit thresholds | Team notification settings and project usage page. Configure usage thresholds if the plan exposes them; do not enable automatic project pausing without a deliberate decision. |
-| Supabase Production | Database size, storage, egress, Auth/API health, and billing/usage | Project Usage and Billing pages; set project spend cap if the current plan offers it. Review database/storage usage weekly while testing. |
-| Stripe | Failed webhook deliveries, payment/subscription events, and account notices | WorkCraft AI Stripe Dashboard → Developers → Webhooks and Workbench/Events. **Production currently has no live webhook endpoint**, though the app relies on `/api/webhooks/stripe` to synchronize subscription state. Add and verify it before relying on automatic subscription updates. |
-| Resend | Daily/monthly email quota, sending errors, bounces and complaints | Account Usage and email logs. Domain `workcraftai.com` is verified. Two old 403 send attempts predate verification; the latest usage snapshot showed no current sends, so verify with a real, controlled test email after a monitored sender is configured. |
+| Production availability | `https://workcraftai.com/` returned HTTP 200. `https://app.workcraftai.com/api/health` returned HTTP 200 with app, Supabase Auth, and Supabase database checks all `ok`. | Add an external monitor that sends an alert when either URL fails. |
+| Database deployments | Production and staging have the same 19 migration names applied, through `admin_managed_pro_access`. The health endpoint confirms the production database responds. | Confirm a recent restorable production backup or PITR in Supabase. |
+| GitHub CI | The current production commit is `61d2c500d2cbbbcb7646ded63dcabd2b7580b5b8`. Local lint, tests, typecheck, build, production dependency audit, pgTAP, and both quota concurrency checks passed. | GitHub Actions attempt 2 was cancelled before any step ran because GitHub did not allocate hosted runners after 15 minutes. A hosted green run is still required. |
+| Stripe | Stripe Live has enabled `@self` and `@accounts` destinations targeting `https://app.workcraftai.com/api/webhooks/stripe`. The dashboard showed zero Live deliveries over the last 7 days; no test-mode destination is configured. | Configure a dedicated test destination/account and verify synthetic event deliveries. No live payment was created. |
+| Email | `workcraftai.com` was reported verified by Resend. An owner-controlled Gmail inbox received the controlled estimate email in Inbox immediately (per screenshot); Resend logs were not inspected. | Estimate and follow-up code now use `RESEND_ESTIMATE_FROM_EMAIL`; Vercel Production has `WorkCraft AI <estimates@workcraftai.com>`. Deploy the code, send a new owner-controlled estimate, and confirm the provider delivery event. |
+| UptimeRobot | Signup magic link sent to `support@workcraftai.com`. | Owner must click the link; then add the public-site and app-health monitors and verify notification delivery. |
 
-Provider alert features and thresholds depend on the account plan. Review the current plan screens before relying on a threshold; do not enable paid upgrades or spend controls without deciding the budget first.
+## Uptime checks and alerts
+
+The repository includes `.github/workflows/availability.yml`, scheduled every 15 minutes and manually runnable. It checks the marketing home page and the app health endpoint. The latest scheduled run was cancelled before its HTTP checks because GitHub could not allocate a hosted runner; the latest CI retry hit the same runner problem. GitHub’s [Actions status page](https://www.githubstatus.com/) currently reports hosted-runner assignment delays. Treat this workflow as a useful backstop, not as the only paging channel.
+
+Recommended no-cost external layer: [UptimeRobot's free plan](https://uptimerobot.com/pricing/) supports up to 50 monitors, five-minute checks, and email notifications. Signup is pending email verification. After verification, create HTTP monitors for:
+
+1. `https://workcraftai.com/`
+2. `https://app.workcraftai.com/api/health`
+
+Route notifications to `support@workcraftai.com` or the owner’s actively monitored inbox. The health endpoint also checks Supabase Auth and the production database, so a database outage should fail the second monitor. Uptime monitoring will not detect a bad Stripe webhook secret, Resend quota exhaustion, or billing-limit warnings.
+
+GitHub Actions failure emails go to the GitHub account’s configured notification address; the workflow does not currently send email to the support inbox. Configure GitHub Actions notifications on the repository owner account. Configure provider-native usage/error alerts separately in Vercel, Supabase, Stripe, and Resend, and confirm each destination.
+
+### Provider thresholds to watch
+
+| Provider | Review | Alert/response |
+| --- | --- | --- |
+| Vercel | Production deployment failures, function errors, invocations, and bandwidth/usage limits. | Enable available notifications at the team/project level; investigate error spikes and unexpected usage before increasing limits. |
+| Supabase | Production database size, egress, storage, Auth/API usage, backup/PITR availability, and project health. | Enable available usage notifications and check backup retention. The free-estimate and Gemini quotas do not replace provider-level spend/usage alerts. |
+| Stripe | Live webhook delivery failures, subscription lifecycle events, disputes/refunds, and account notices. | Inspect the relevant event destination’s delivery history; keep the endpoint signing secrets server-only. |
+| Resend | Daily/monthly quota, failed/suppressed sends, bounces, and complaints. | Alert before the account reaches its limits and review individual delivery events for user-reported missing mail. |
+| Gemini | Generation usage and provider quota. | The app enforces per-user and global daily generation limits; review provider consumption as the friends-and-family cohort grows. |
+
+Provider notification availability and thresholds can vary by plan. Check the current dashboard before relying on any alert; do not upgrade a paid plan or enable automatic pausing without deciding the budget.
+
+## Stripe event coverage
+
+The Live `@accounts` destination includes:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.expired`
+- `checkout.session.async_payment_failed`
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+- `charge.refunded`
+
+The Live `@self` destination includes:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+- `invoice.payment_action_required`
+
+The webhook handler verifies Stripe signatures against the raw request body, supports the separate platform and connected-account signing secrets, and claims/completes event IDs through the database idempotency RPC. Event-destination configuration is verified; successful delivery and test-mode lifecycle handling still need a test event and delivery-history review.
+
+Use a dedicated Stripe test-mode destination and connected-account test fixture for synthetic events. Do not point a test destination at production unless the production endpoint is deliberately configured to accept that test signing secret; never create a live charge just to test delivery.
+
+## Email verification
+
+Resend domain verification and recent password-reset/support deliveries were confirmed in the previous provider check. An owner-controlled inbox received an estimate email immediately, but its Resend event was not inspected. Estimate messages now have a dedicated sender configured as `WorkCraft AI <estimates@workcraftai.com>` and set Reply-To to the contractor’s account email; the change will take effect after deployment. Do not use a real customer address for smoke tests. Setting `NEXT_PUBLIC_SUPPORT_EMAIL` only changes the public support contact; it does not route provider alerts.
 
 ## Abuse and cost controls
 
-The highest direct variable-cost route found is authenticated Pro cloud estimate generation (`POST /api/generate-estimate`), which calls Gemini. It caps prompt length and output line count but has no durable per-user usage quota or rate limiter. The current logs show too little traffic to make anomaly monitoring meaningful.
+- Free users have a durable, atomic 10-saved-estimates-per-UTC-day limit, adjustable by an authorized administrator.
+- Pro cloud estimate generation has durable per-user and global daily limits; monitor Gemini usage as account volume grows.
+- Support submissions are rate limited. Hosting, database, email, and AI provider quotas still need provider-level usage notifications.
+- Review aggregate Vercel function counts/errors, Supabase Auth/API activity, Resend delivery status, and Gemini consumption weekly while onboarding test users. Investigate sudden request/usage increases, repeated 401/403/429 responses, high function duration, or elevated database connections. Keep customer content, email addresses, access tokens, and keys out of incident notes.
 
-The app now has a prepared database-backed, atomic daily estimate-creation cap for free accounts, initially 10 saved estimates per UTC day. It is separate from the Pro Gemini request allowance and from provider spend limits. The implementation, tests, and migration/release steps are documented in `docs/FREE-ESTIMATE-LIMIT.md`; the migration still needs review and a deliberate deployment before enforcement is active.
+## First response
 
-Review Vercel function invocations and errors, Supabase Auth/API logs, and Gemini usage at least weekly during the friends-and-family test. Investigate sudden traffic spikes, repeated 401/403/429 responses, high function duration, elevated database connections, or an unexpected jump in Gemini usage. Never put prompts, email addresses, access tokens, or API keys in monitoring logs.
-
-## Current baseline (2026-10-03)
-
-- Vercel Production app and both Supabase projects reported healthy during the audit; the app had no runtime errors in the preceding seven days. Traffic was very low, so this is not a useful abuse baseline yet.
-- Resend reports the production domain verified and sending enabled; current usage was 0/100 daily and 0/3,000 monthly at the audit. Two older 403 attempts were logged before domain verification.
-- Stripe Live had no webhook endpoint configured. Subscription synchronization is therefore an operational gap and must be corrected before trusting subscription state changes.
-- The repository is public; the GitHub Actions checks use standard public runners and no secrets. No dedicated external uptime provider or alert destination has been configured.
-
-## First-response checklist
-
-1. Confirm the alert by opening the relevant public URL and provider status page.
-2. For app health failures, check Vercel Production deployment/runtime logs, then Supabase project status and Auth/API logs.
-3. For email problems, check Resend domain status, account usage, and the specific email's delivery event.
-4. For billing/subscription problems, check Stripe Live event delivery and the `/api/webhooks/stripe` response before changing subscription records.
-5. If abuse is suspected, preserve timestamps and aggregate request counts, restrict the affected integration through its own provider controls, and rotate a credential only if exposure is indicated. Do not export customer content into incident notes.
-
-## Setup still needed
-
-- Configure provider notifications to reach `support@workcraftai.com` where the provider supports a custom recipient. `NEXT_PUBLIC_SUPPORT_EMAIL` controls the app's public support link only; setting it does not route Vercel, Supabase, GitHub, or Resend alerts to that inbox.
-- Enable GitHub Actions notifications for failed workflow runs (Profile → Settings → Notifications → Actions). GitHub sends these to the notification email configured on the GitHub account that owns the workflow; the workflow itself cannot route them to `support@workcraftai.com` without a configured mail integration/secret. GitHub documents that scheduled workflows can be delayed or dropped during high load.
-- Configure a commercial-use uptime provider if faster or more reliable paging is needed.
-- Enable provider-native usage/error notifications and confirm they reach the chosen destination.
-- Configure the live Stripe webhook and validate a test-mode flow and a production event delivery.
-- Decide whether a separate Gemini per-user allowance is needed; the estimate-creation cap does not meter Pro AI requests.
-- After setup, trigger a controlled test alert and confirm end-to-end delivery to the chosen channel.
+1. Confirm an uptime alert by opening the affected public URL and the provider status page.
+2. For app health failures, inspect Vercel Production function logs, then Supabase project health and Auth/API logs.
+3. For email issues, inspect Resend domain status, usage, and the message’s delivery event.
+4. For subscription/payment issues, inspect the matching Stripe event destination and delivery attempt before changing subscription or payment records.
+5. For suspected abuse, preserve timestamps and aggregate counts, restrict the affected integration using its provider controls, and rotate credentials only when exposure is indicated. Do not export customer content into incident notes.
