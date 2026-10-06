@@ -7,8 +7,17 @@ import LocalizedText from "@/app/components/LocalizedText";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export const metadata: Metadata = {
-  title: "Support | WorkCraft AI",
-  description: "Find answers to common WorkCraft AI questions or send a message to our support team.",
+  title: "WorkCraft AI Support | Help and FAQs",
+  description: "Find answers about WorkCraft AI estimates, proposals, billing, and accounts, or contact our support team.",
+  alternates: { canonical: "https://app.workcraftai.com/support" },
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    siteName: "WorkCraft AI",
+    title: "WorkCraft AI Support | Help and FAQs",
+    description: "Find answers about WorkCraft AI estimates, proposals, billing, and accounts, or contact our support team.",
+    url: "https://app.workcraftai.com/support",
+  },
 };
 
 export default async function SupportPage({

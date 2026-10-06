@@ -1,6 +1,6 @@
 # Production readiness status and remaining release gates
 
-Last full readiness audit: 2026-10-05. Updated after the estimate-sender release; this is not a claim that every provider delivery or backup has been tested.
+Last full readiness audit: 2026-10-05. SEO metadata and sitemap work was prepared on 2026-10-06; Search Console verification and submission remain owner actions below. This is not a claim that every provider delivery or backup has been tested.
 
 ## Current verified state
 
@@ -24,8 +24,9 @@ Last full readiness audit: 2026-10-05. Updated after the estimate-sender release
 4. **Backup:** add the five GitHub Actions secrets in [the backup runbook](OPERATIONS-BACKUPS.md), run a full database-and-media backup, and complete a restore drill into a new Supabase project. Supabase Free does not include managed daily backups or PITR; this owner-managed workflow is not active until its secrets are set.
 5. **Resend delivery events:** apply the prepared migration, deploy the signed webhook endpoint, add `RESEND_WEBHOOK_SECRET` to Vercel Production, configure the four delivery events listed in [the monitoring runbook](OPERATIONS-MONITORING.md), and verify a test event on an estimate.
 6. **Resend volume cap:** coordinate deployment of the matching app changes and `20261006160000_global_resend_email_ceiling.sql` with the reviewed migration-history procedure. After activation, confirm the admin support screen reports the 75/day default. For the first UTC day, check Resend's current usage and lower the app cap to no more than `100 - current usage`; alternatively activate just after 00:00 UTC. The application then atomically caps all app-originated messages at the selected UTC-day limit (super-admin adjustable up to 90), below Resend's currently reported 100/day allowance.
+7. **Search discovery:** after the SEO files are deployed, verify `workcraftai.com` as a Domain property in Google Search Console, submit `https://workcraftai.com/sitemap.xml` and `https://app.workcraftai.com/sitemap.xml`, and inspect the canonical/indexing results for the marketing home, support, privacy, and terms pages. This requires the owner-controlled Google account and DNS verification; sitemap submission does not guarantee indexing. See [the marketing guide](WORKCRAFT-AI-MARKETING-GUIDE.md#step-4-set-up-google-discovery-for-free).
 
-These remaining gates need access to GitHub’s runner service, Stripe’s delivery/test UI, Resend’s message log, Vercel/Supabase notification settings, and Supabase backup settings. Close each gate only after recording fresh evidence.
+These remaining gates need access to GitHub’s runner service, Stripe’s delivery/test UI, Resend’s message log, Vercel/Supabase notification settings, Supabase backup settings, and the owner-controlled Google Search Console account/domain DNS. Close each gate only after recording fresh evidence.
 
 ## Automated smoke script
 

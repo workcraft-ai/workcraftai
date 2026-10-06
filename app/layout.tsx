@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: "WorkCraft AI — Keep good work moving",
   applicationName: "WorkCraft AI",
   description: "For the people who get the work done. WorkCraft AI helps independent trade and service businesses prepare estimates, share proposals, and manage jobs and invoices.",
+  // The app is a customer workspace. Public help and legal pages opt back in
+  // individually; customer records, account flows, and tools stay out of search.
+  robots: { index: false, follow: true },
   openGraph: {
     type: "website",
     siteName: "WorkCraft AI",
