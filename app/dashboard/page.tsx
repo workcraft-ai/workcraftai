@@ -3,8 +3,16 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+
+type GreetingKey = "Good morning" | "Good afternoon" | "Good evening";
+
+function getGreetingKey(hour: number): GreetingKey {
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 interface Estimate {
   id: string;
@@ -43,6 +51,8 @@ export default function DashboardPage() {
   const [sendMessage, setSendMessage] = useState("");
   const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
+  const [firstName, setFirstName] = useState("");
+  const [greetingKey, setGreetingKey] = useState<GreetingKey | null>(null);
 
   async function fetchEstimates() {
     try {
@@ -55,8 +65,12 @@ export default function DashboardPage() {
       setEstimates(data || []);
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const fullName = user.user_metadata?.full_name;
+        setFirstName(typeof fullName === "string" ? fullName.trim().split(/\s+/)[0] ?? "" : "");
         const entitlement = await getClientProEntitlement();
         setIsPro(entitlement?.has_pro === true);
+      } else {
+        setFirstName("");
       }
       const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, event, created_at").order("created_at", { ascending: false });
       const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").order("created_at", { ascending: false }).limit(20);
@@ -73,6 +87,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const task = window.setTimeout(() => { void fetchEstimates(); }, 0);
+    return () => window.clearTimeout(task);
+  }, []);
+
+  useEffect(() => {
+    const task = window.setTimeout(() => {
+      setGreetingKey(getGreetingKey(new Date().getHours()));
+    }, 0);
     return () => window.clearTimeout(task);
   }, []);
 
@@ -153,7 +174,11 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">WorkCraft AI Dashboard</h1>
+            <h1 className="text-xl font-bold text-slate-900">
+              {greetingKey
+                ? `${translate(language, greetingKey)}${firstName ? `, ${firstName}` : ""}`
+                : "WorkCraft AI Dashboard"}
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Manage estimates, tracking, and payments
             </p>
