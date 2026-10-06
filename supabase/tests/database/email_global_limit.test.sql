@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(21);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.tradeflow_app_email_daily_usage'::regclass)
@@ -25,6 +25,15 @@ select is(
   (select app_email_daily_limit from public.tradeflow_app_settings where singleton = true),
   75,
   'the default platform email cap is 75 per UTC day'
+);
+select ok(
+  exists (
+    select 1 from pg_indexes
+    where schemaname = 'public'
+      and tablename = 'tradeflow_app_email_reservations'
+      and indexname = 'tradeflow_app_email_reservations_user_id_idx'
+  ),
+  'email reservation user foreign key has a supporting index'
 );
 
 insert into auth.users (id, email, raw_user_meta_data)
