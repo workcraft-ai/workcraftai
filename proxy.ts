@@ -1,4 +1,4 @@
-// proxy.ts (located in tradesman-app/proxy.ts)
+// proxy.ts (located in workcraftai-app/proxy.ts)
 import { type NextRequest } from "next/server";
 import { updateSession } from "@/app/utils/supabase/middleware";
 
