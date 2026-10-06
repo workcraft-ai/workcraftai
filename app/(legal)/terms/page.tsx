@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 
 export default function TermsPage() {
   return (
     <LocalizedTree>
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
+      <Link href="https://workcraftai.com/" className="mb-5 inline-flex min-h-10 items-center text-sm font-semibold text-slate-600 transition hover:text-orange-800">
+        ← WorkCraft AI home
+      </Link>
       <article className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">WorkCraft AI · Legal</p>

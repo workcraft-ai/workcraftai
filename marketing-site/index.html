@@ -42,6 +42,7 @@
         <a href="#about">About</a>
         <a href="#contact">Contact</a>
       </nav>
+      <button class="language-toggle" id="language-toggle" type="button" aria-label="Switch to Spanish">ES</button>
       <button class="menu-toggle" type="button" aria-controls="mobile-navigation" aria-expanded="false" aria-label="Open navigation menu">Menu</button>
       <nav class="mobile-nav" id="mobile-navigation" aria-label="Mobile navigation" hidden>
         <a href="#how-it-works">How it works</a>
@@ -146,24 +147,218 @@
       <div class="footer-bottom section-wrap"><span>© <span id="year">2026</span> WorkCraft AI. All rights reserved.</span><nav class="footer-links" aria-label="Legal and support"><a href="https://app.workcraftai.com/privacy">Privacy</a><a href="https://app.workcraftai.com/terms">Terms</a><a href="https://app.workcraftai.com/support">Support</a></nav><span>Built for the work that keeps things moving.</span></div>
     </footer>
     <script>
+      const spanishTranslations = {
+        "Skip to content": "Saltar al contenido",
+        "How it works": "Cómo funciona",
+        "Plans": "Planes",
+        "About": "Acerca de",
+        "Contact": "Contacto",
+        "Menu": "Menú",
+        "Sign in": "Iniciar sesión",
+        "Estimates and job tools for contractors": "Cotizaciones y herramientas de trabajo para contratistas",
+        "Keep good work": "Mantén el buen trabajo",
+        "moving.": "en marcha.",
+        "Create and share clear estimates for free. Pro adds AI drafting, job scheduling, invoice tools, and customer payments through Stripe.": "Crea y comparte cotizaciones claras gratis. Pro incluye borradores con IA, programación de trabajos, herramientas de facturación y pagos de clientes mediante Stripe.",
+        "Start free": "Empieza gratis",
+        "See how it works": "Descubre cómo funciona",
+        "Free to start · No credit card required": "Empieza gratis · No se requiere tarjeta de crédito",
+        "ESTIMATES": "COTIZACIONES",
+        "Ready to share": "Listo para compartir",
+        "For the people who get the work done.": "Para quienes hacen el trabajo.",
+        "Keep good work moving.": "Mantén el buen trabajo en marcha.",
+        "Estimates": "Cotizaciones",
+        "Schedule & jobs": "Agenda y trabajos",
+        "Price book": "Lista de precios",
+        "Reports": "Informes",
+        "+ New estimate": "+ Nueva cotización",
+        "Good morning, Alex": "Buenos días, Alex",
+        "Manage estimates, tracking, and payments": "Administra cotizaciones, seguimiento y pagos",
+        "+ New Estimate": "+ Nueva cotización",
+        "Plan work and track job progress": "Planifica el trabajo y sigue su progreso",
+        "Price book & templates": "Lista de precios y plantillas",
+        "Save rates and reusable scopes": "Guarda tarifas y alcances reutilizables",
+        "See estimate pipeline and job totals": "Consulta las cotizaciones y los totales de trabajos",
+        "Active Estimates (3)": "Cotizaciones activas (3)",
+        "Archived (0)": "Archivadas (0)",
+        "Today": "Hoy",
+        "Yesterday": "Ayer",
+        "This week": "Esta semana",
+        "CLIENT": "CLIENTE",
+        "JOB LOCATION": "LUGAR DEL TRABAJO",
+        "CREATED": "CREADA",
+        "STATUS": "ESTADO",
+        "ACTIONS": "ACCIONES",
+        "PENDING": "PENDIENTE",
+        "View Link Archive Delete": "Ver enlace Archivar Eliminar",
+        "Illustrative dashboard · fictional sample data": "Panel ilustrativo · datos ficticios de ejemplo",
+        "The whole job, in view": "Todo el trabajo, a la vista",
+        "From the first estimate": "Desde la primera cotización",
+        "to the final payment.": "hasta el pago final.",
+        "Create an estimate": "Crear una cotización",
+        "Set the scope, quantities, and your prices in one place.": "Define el alcance, las cantidades y tus precios en un solo lugar.",
+        "Share a proposal": "Comparte una propuesta",
+        "Send your customer a clear link to review the work.": "Envía a tu cliente un enlace claro para revisar el trabajo.",
+        "Get approval": "Obtén la aprobación",
+        "Customers can review and approve without an account.": "Los clientes pueden revisar y aprobar sin crear una cuenta.",
+        "Schedule the job": "Programa el trabajo",
+        "Pro helps you plan work and track job progress.": "Pro te ayuda a planificar el trabajo y dar seguimiento al progreso.",
+        "Track the work": "Da seguimiento al trabajo",
+        "Keep job notes, costs, and next steps together.": "Mantén juntas las notas, los costos y los próximos pasos de cada trabajo.",
+        "Invoice and collect": "Factura y cobra",
+        "Pro connects customer payments to your Stripe account.": "Pro conecta los pagos de clientes con tu cuenta de Stripe.",
+        "Take a look around": "Echa un vistazo",
+        "See WorkCraft AI in action.": "Mira WorkCraft AI en acción.",
+        "Watch how estimates, proposals, and job details come together in one clear workspace.": "Mira cómo se reúnen las cotizaciones, propuestas y detalles de trabajo en un espacio claro.",
+        "Your browser can’t play embedded video.": "Tu navegador no puede reproducir el video integrado.",
+        "Open the WorkCraft AI demo.": "Abre la demostración de WorkCraft AI.",
+        "A quick product walkthrough. Dashboard records shown in the preview are fictional sample data.": "Un breve recorrido por el producto. Los registros del panel que aparecen en la vista previa son ficticios.",
+        "Simple plans": "Planes sencillos",
+        "Start free. Upgrade when you’re ready.": "Empieza gratis. Mejora el plan cuando quieras.",
+        "Keep your essential estimating tools free. Pro adds cloud-powered drafting and the tools for managing work after a customer says yes.": "Conserva gratis tus herramientas esenciales para cotizar. Pro añade redacción con IA en la nube y herramientas para administrar el trabajo después de que un cliente acepta.",
+        "WORKCRAFT AI FREE": "WORKCRAFT AI GRATIS",
+        "always": "siempre",
+        "A practical place to build estimates and organize your pricing.": "Un espacio práctico para crear cotizaciones y organizar tus precios.",
+        "Up to 10 saved estimates per day (UTC)": "Hasta 10 cotizaciones guardadas por día (UTC)",
+        "Create estimates from your price book and built-in local guidance": "Crea cotizaciones con tu lista de precios y las guías locales integradas",
+        "Save and reuse price book items and estimate templates": "Guarda y reutiliza artículos de la lista de precios y plantillas de cotización",
+        "Share proposals for customer review and approval": "Comparte propuestas para que tus clientes las revisen y aprueben",
+        "Estimate pipeline and acceptance reports": "Informes de cotizaciones y aprobaciones",
+        "Profile, tax, markup, and proposal language settings": "Configuración de perfil, impuestos, recargos e idioma de las propuestas",
+        "WORKCRAFT AI PRO": "WORKCRAFT AI PRO",
+        "/ month": "/ mes",
+        "More help building proposals and managing the work that follows.": "Más ayuda para preparar propuestas y administrar el trabajo posterior.",
+        "Unlimited saved estimates": "Cotizaciones guardadas ilimitadas",
+        "Cloud AI estimate drafting matched to your price book": "Redacción de cotizaciones con IA en la nube, vinculada a tu lista de precios",
+        "Send proposals by branded email and automated follow-ups": "Envía propuestas con correos de marca y seguimientos automáticos",
+        "Private estimate photos and voice notes": "Fotos privadas de cotizaciones y notas de voz",
+        "Schedule jobs, track actual costs, and manage invoice status": "Programa trabajos, registra costos reales y administra el estado de las facturas",
+        "Job value and gross profit reporting": "Informes del valor de los trabajos y las ganancias brutas",
+        "Good / Better / Best packages and proposal deposit terms": "Paquetes Bueno / Mejor / Óptimo y condiciones de anticipo en las propuestas",
+        "Explore Pro in the app": "Explora Pro en la aplicación",
+        "Start Free without a trial or payment method. Pro is $9.99 per month. With Pro and completed Stripe setup, customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Payments go directly to the contractor’s connected Stripe account. The invoice page links to the proposal for payment; WorkCraft AI does not hold customer funds.": "Empieza gratis sin período de prueba ni método de pago. Pro cuesta $9.99 al mes. Con Pro y la configuración de Stripe completa, los clientes pueden pagar anticipos o saldos mediante Stripe Checkout desde una propuesta aceptada. Los pagos llegan directamente a la cuenta conectada de Stripe del contratista. La página de factura enlaza a la propuesta para realizar el pago; WorkCraft AI no retiene fondos de clientes.",
+        "Good work deserves a smoother way to run the business around it.": "El buen trabajo merece una forma más sencilla de administrar el negocio.",
+        "THE IDEA BEHIND WORKCRAFT AI": "LA IDEA DETRÁS DE WORKCRAFT AI",
+        "About WorkCraft AI": "Acerca de WorkCraft AI",
+        "Built around the work.": "Centrado en el trabajo.",
+        "Designed for real life.": "Diseñado para la vida real.",
+        "Running a trade or service business means juggling customer details, estimates, changing plans, and getting paid. WorkCraft AI brings those everyday steps into one straightforward workspace.": "Dirigir un negocio de oficios o servicios implica organizar datos de clientes, cotizaciones, cambios de planes y pagos. WorkCraft AI reúne esas tareas diarias en un espacio de trabajo sencillo.",
+        "We’re building tools to help independent businesses spend less time keeping track of the work—and more time doing it.": "Creamos herramientas para que los negocios independientes dediquen menos tiempo a organizar el trabajo y más tiempo a realizarlo.",
+        "WorkCraft AI is a veteran-owned company, built to support the people who get the work done.": "WorkCraft AI es una empresa propiedad de un veterano, creada para apoyar a quienes hacen el trabajo.",
+        "Meet WorkCraft AI": "Conoce WorkCraft AI",
+        "Let’s talk": "Hablemos",
+        "Questions about": "¿Tienes preguntas sobre",
+        "Need help with the app or have a question about WorkCraft AI? Visit our Support Center for quick answers or send us a message.": "¿Necesitas ayuda con la aplicación o tienes una pregunta sobre WorkCraft AI? Visita nuestro Centro de soporte para ver respuestas rápidas o enviarnos un mensaje.",
+        "FOLLOW WORKCRAFT AI": "SIGUE A WORKCRAFT AI",
+        "Follow us on Facebook": "Síguenos en Facebook",
+        "Follow us on LinkedIn": "Síguenos en LinkedIn",
+        "SUPPORT CENTER": "CENTRO DE SOPORTE",
+        "Visit WorkCraft AI Support": "Visita el soporte de WorkCraft AI",
+        "Browse common questions or send our team a message.": "Consulta las preguntas frecuentes o envía un mensaje a nuestro equipo.",
+        "Go to the app": "Ir a la aplicación",
+        "WorkCraft AI. All rights reserved.": "WorkCraft AI. Todos los derechos reservados.",
+        "Privacy": "Privacidad",
+        "Terms": "Términos",
+        "Support": "Soporte",
+        "Built for the work that keeps things moving.": "Hecho para el trabajo que mantiene todo en marcha.",
+      };
+      const originalText = new WeakMap();
+      const languageButton = document.querySelector("#language-toggle");
       const menuButton = document.querySelector(".menu-toggle");
       const mobileNavigation = document.querySelector("#mobile-navigation");
+
+      const localizedMetadata = {
+        en: {
+          title: "Contractor Estimates and Job Tools | WorkCraft AI",
+          description: "WorkCraft AI helps independent contractors create and share estimates for free. Pro adds AI drafting, job scheduling, invoice tools, and customer payments through Stripe.",
+          socialTitle: "WorkCraft AI | Estimates and job tools for contractors",
+          socialDescription: "Create and share estimates for free. Upgrade for AI drafting, job scheduling, invoice tools, and customer payments through Stripe.",
+        },
+        es: {
+          title: "Cotizaciones y herramientas para contratistas | WorkCraft AI",
+          description: "WorkCraft AI ayuda a contratistas independientes a crear y compartir cotizaciones gratis. Pro añade redacción con IA, programación de trabajos, facturas y pagos de clientes mediante Stripe.",
+          socialTitle: "WorkCraft AI | Cotizaciones y herramientas para contratistas",
+          socialDescription: "Crea y comparte cotizaciones gratis. Mejora a Pro para usar redacción con IA, programar trabajos, gestionar facturas y recibir pagos de clientes mediante Stripe.",
+        },
+      };
+
+      function translatePage(language) {
+        document.documentElement.lang = language;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          if (!originalText.has(node)) originalText.set(node, node.nodeValue ?? "");
+          const source = originalText.get(node) ?? "";
+          const content = source.trim().replace(/\s+/g, " ");
+          if (!content) continue;
+          const leading = source.match(/^\s*/)?.[0] ?? "";
+          const trailing = source.match(/\s*$/)?.[0] ?? "";
+          const translated = language === "es" ? spanishTranslations[content] : undefined;
+          node.nodeValue = translated ? `${leading}${translated}${trailing}` : source;
+        }
+
+        const metadata = localizedMetadata[language];
+        document.title = metadata.title;
+        document.querySelector('meta[name="description"]')?.setAttribute("content", metadata.description);
+        document.querySelector('meta[property="og:title"]')?.setAttribute("content", metadata.socialTitle);
+        document.querySelector('meta[property="og:description"]')?.setAttribute("content", metadata.socialDescription);
+        document.querySelector('meta[name="twitter:title"]')?.setAttribute("content", metadata.socialTitle);
+        document.querySelector('meta[name="twitter:description"]')?.setAttribute("content", metadata.socialDescription);
+        document.querySelector(".brand")?.setAttribute("aria-label", language === "es" ? "Inicio de WorkCraft AI" : "WorkCraft AI home");
+        document.querySelector(".skip-link")?.setAttribute("href", "#main");
+        document.querySelector(".main-nav")?.setAttribute("aria-label", language === "es" ? "Navegación principal" : "Main navigation");
+        mobileNavigation?.setAttribute("aria-label", language === "es" ? "Navegación móvil" : "Mobile navigation");
+        document.querySelector(".hero-art")?.setAttribute("aria-label", language === "es" ? "Panel ilustrativo de WorkCraft AI con cotizaciones, trabajos, lista de precios e informes ficticios" : "Illustrative WorkCraft AI dashboard with fictional sample estimates, schedule, price book, and reports");
+        document.querySelector(".demo-video")?.setAttribute("aria-label", language === "es" ? "Demostración del producto WorkCraft AI" : "WorkCraft AI product demonstration");
+        document.querySelectorAll(".brand-image").forEach((image) => image.setAttribute("alt", language === "es" ? "WorkCraft AI, para quienes hacen el trabajo. Mantén el buen trabajo en marcha." : "WorkCraft AI, for the people who get the work done. Keep good work moving."));
+        if (languageButton) {
+          languageButton.textContent = language === "en" ? "ES" : "EN";
+          languageButton.setAttribute("aria-label", language === "en" ? "Switch to Spanish" : "Cambiar a inglés");
+        }
+        const mockLanguageButton = document.querySelector(".mock-language");
+        if (mockLanguageButton) mockLanguageButton.textContent = language === "en" ? "ES" : "EN";
+        if (menuButton) {
+          const isOpen = menuButton.getAttribute("aria-expanded") === "true";
+          menuButton.setAttribute("aria-label", menuLabel(language, isOpen));
+        }
+      }
+
+      function menuLabel(language, isOpen) {
+        if (language === "es") return isOpen ? "Cerrar menú de navegación" : "Abrir menú de navegación";
+        return isOpen ? "Close navigation menu" : "Open navigation menu";
+      }
+
+      let currentLanguage = "en";
+      try {
+        const savedLanguage = localStorage.getItem("workcraftai-marketing-language");
+        currentLanguage = savedLanguage === "es" || savedLanguage === "en"
+          ? savedLanguage
+          : navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+      } catch {
+        currentLanguage = navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
+      }
+      translatePage(currentLanguage);
+      languageButton?.addEventListener("click", () => {
+        currentLanguage = currentLanguage === "en" ? "es" : "en";
+        try { localStorage.setItem("workcraftai-marketing-language", currentLanguage); } catch {}
+        translatePage(currentLanguage);
+      });
+
       menuButton?.addEventListener("click", () => {
         const isOpen = menuButton.getAttribute("aria-expanded") === "true";
         menuButton.setAttribute("aria-expanded", String(!isOpen));
-        menuButton.setAttribute("aria-label", isOpen ? "Open navigation menu" : "Close navigation menu");
+        menuButton.setAttribute("aria-label", menuLabel(currentLanguage, !isOpen));
         mobileNavigation.hidden = isOpen;
       });
       mobileNavigation?.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => {
         mobileNavigation.hidden = true;
         menuButton?.setAttribute("aria-expanded", "false");
-        menuButton?.setAttribute("aria-label", "Open navigation menu");
+        if (menuButton) menuButton.setAttribute("aria-label", menuLabel(currentLanguage, false));
       }));
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && mobileNavigation && menuButton) {
           mobileNavigation.hidden = true;
           menuButton.setAttribute("aria-expanded", "false");
-          menuButton.setAttribute("aria-label", "Open navigation menu");
+          menuButton.setAttribute("aria-label", menuLabel(currentLanguage, false));
         }
       });
     </script>
