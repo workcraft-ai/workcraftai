@@ -190,8 +190,56 @@ Object.assign(spanish, {
   "Temporary Pro access granted. It will expire automatically.": "Se otorgó acceso Pro temporal. Vencerá automáticamente.",
 });
 
+Object.assign(spanish, {
+  // Dashboard estimate activity and persisted event/status values.
+  "Resend email": "Reenviar correo",
+  "Email sent": "Correo enviado",
+  "Proposal viewed": "Propuesta vista",
+  "Follow-up sent": "Seguimiento enviado",
+  "sent": "enviado",
+  "proposal_viewed": "propuesta vista",
+  "follow_up_sent": "seguimiento enviado",
+  "draft": "Borrador",
+  "archived": "Archivada",
+  "Estimate email sent.": "Correo de cotización enviado.",
+
+  // Estimate builder plan and network states.
+  "✦ Pro Plan (Cloud AI drafting)": "✦ Plan Pro (redacción con IA en la nube)",
+  "Free Plan (Price Book + manual estimates)": "Plan Gratis (lista de precios y cotizaciones manuales)",
+  "Online · You can create estimates and upload field notes.": "En línea · Puedes crear cotizaciones y adjuntar notas de campo.",
+  "Offline · You can edit and save drafts with photos and voice notes on this device. Reconnect to create the estimate.": "Sin conexión · Puedes editar y guardar borradores con fotos y notas de voz en este dispositivo. Reconéctate para crear la cotización.",
+  "Photo": "Foto",
+  "Voice note": "Nota de voz",
+
+  // Current admin support controls and usage summary.
+  "super admin": "superadministrador",
+  "billing": "facturación",
+  "support": "soporte",
+  "Save limit": "Guardar límite",
+  "Search accounts": "Buscar cuentas",
+  "Save AI limits": "Guardar límites de IA",
+  "Platform attempts per day": "Intentos de la plataforma por día",
+  "Per account:": "Por cuenta:",
+  "Platform:": "Plataforma:",
+  "Today:": "Hoy:",
+  "of": "de",
+  "attempted (": "intentos (",
+  "succeeded,": "correctos,",
+  "failed) ·": "fallidos) ·",
+  "platform attempts used": "intentos de plataforma usados",
+  "Searching…": "Buscando…",
+  "For example: reduce provider spend during testing": "Por ejemplo: reducir el gasto del proveedor durante las pruebas",
+  "The initial limits are 20 cloud drafting attempts per Pro account and 250 attempts across all accounts per UTC calendar day. The platform-wide ceiling bounds provider usage if signups or abuse increase. A valid attempt counts when admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.": "Los límites iniciales son 20 intentos diarios de redacción en la nube por cuenta Pro y 250 intentos diarios entre todas las cuentas, según el calendario UTC. El límite general controla el uso del proveedor si aumentan los registros o el abuso. Un intento válido se cuenta cuando se admite para el procesamiento del proveedor, incluso si este falla. Registramos cantidades, modelo, longitud del texto, resultado y estado de respuesta; el registro no guarda instrucciones ni contenido generado. Al procesar solicitudes de redacción, se eliminan los registros de más de 90 días. Los datos de uso son privados y solo están disponibles para administradores autorizados.",
+  "Allowed ranges: 1–1,000 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.": "Rangos permitidos: 1–1.000 intentos diarios por cuenta y 1–5.000 intentos diarios en la plataforma (UTC). Los cambios y las acciones de pausa y reanudación se registran en el historial de auditoría. Las llamadas fallidas al proveedor cuentan para ambos límites.",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
+  const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";
+  const trailingWhitespace = text.match(/\s*$/)?.[0] ?? "";
+  const content = text.slice(leadingWhitespace.length, text.length - trailingWhitespace.length);
+  if (!content) return text;
+  if (content !== text) return `${leadingWhitespace}${translate(language, content)}${trailingWhitespace}`;
   if (spanish[text]) return spanish[text];
   const dynamicTranslations: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
     [/^Pay down payment · \$(\d+\.\d{2})$/, ([, amount]) => `Pagar anticipo · $${amount}`],
@@ -204,6 +252,7 @@ export function translate(language: Language, text: string): string {
     [/^(\d+) completed jobs$/, ([, count]) => `${count} trabajos completados`],
     [/^(\d+)% margin · costs entered$/, ([, rate]) => `Margen del ${rate}% · costos registrados`],
     [/^Follow-up (.+)$/, ([, date]) => `Seguimiento ${date}`],
+    [/^(\d+) of (\d+) platform attempts used$/, ([, used, limit]) => `Se usaron ${used} de ${limit} intentos de plataforma`],
     [/^Delete (.+)$/, ([, item]) => `Eliminar ${item}`],
     [/^(\d+) rows ready to import\.$/, ([, count]) => `${count} filas listas para importar.`],
     [/^(\d+) starter line items$/, ([, count]) => `${count} partidas iniciales`],
