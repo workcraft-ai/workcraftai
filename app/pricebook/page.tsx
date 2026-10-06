@@ -159,7 +159,7 @@ export default function PriceBookPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><h2 className="font-semibold">Your rates</h2><p className="mt-1 text-xs text-slate-500">These are your business rates and can be edited on every estimate.</p></div>
                   <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <a download="tradeflow-pricebook-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,description,trade,unit,unit_price\nFaucet installation,Standard faucet install,Plumbing,each,245.00")}`} className="font-semibold text-blue-700 underline">Download CSV template</a>
+                    <a download="workcraftai-pricebook-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,description,trade,unit,unit_price\nFaucet installation,Standard faucet install,Plumbing,each,245.00")}`} className="font-semibold text-blue-700 underline">Download CSV template</a>
                     <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(event) => void selectImportFile(event)} className="sr-only" /></label>
                   </div>
                 </div>
