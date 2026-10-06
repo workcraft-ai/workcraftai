@@ -10,4 +10,4 @@ Static marketing site intended to run as a **separate Vercel project** with `mar
 - `robots.txt` and `sitemap.xml` are ready for Google Search Console after the custom domain resolves.
 - Review all product and company claims before connecting a custom domain or using the site in ads.
 
-The current design is a dependency-free static site: `index.html`, `styles.css`, and `favicon.svg`. A Vercel project rooted at this directory can serve it without building the application's Next.js project.
+The current design is a dependency-free static site: `index.html`, `styles.css`, and `favicon.svg`. The header language control switches the site between English and Spanish, remembers the visitor's choice on that device, and defaults to Spanish when the browser language is Spanish. A Vercel project rooted at this directory can serve it without building the application's Next.js project.

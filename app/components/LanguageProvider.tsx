@@ -245,6 +245,13 @@ Object.assign(spanish, {
   "This estimate was marked as declined. Contact the contractor if you have questions.": "Esta cotización se marcó como rechazada. Comunícate con el contratista si tienes preguntas.",
 });
 
+Object.assign(spanish, {
+  "Go to the app": "Ir a la aplicación",
+  "All rights reserved.": "Todos los derechos reservados.",
+  "Legal and support": "Información legal y soporte",
+  "Built for the work that keeps things moving.": "Hecho para el trabajo que mantiene todo en marcha.",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";
