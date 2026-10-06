@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
+import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 export const maxDuration = 60;
 
@@ -53,6 +54,16 @@ export async function POST(request: Request) {
         await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
         return false;
       }
+      const { reservation, error: quotaError } = await reserveAppEmail(admin, "follow_up");
+      if (quotaError || !reservation) {
+        console.error("Could not reserve estimate follow-up email quota:", quotaError?.message ?? "invalid reservation response");
+        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
+        return false;
+      }
+      if (!reservation.allowed || !reservation.reservation_id) {
+        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
+        return false;
+      }
       let result: Response;
       try {
         result = await fetch("https://api.resend.com/emails", {
@@ -75,6 +86,7 @@ export async function POST(request: Request) {
       }
       const responseData = await result.json().catch(() => ({}));
       if (!result.ok) {
+        if (result.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
         console.error("Follow-up email provider rejected request:", result.status);
         await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
         return false;

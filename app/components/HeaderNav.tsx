@@ -103,13 +103,13 @@ export default function HeaderNav() {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
+        <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
           {language === "en" ? "ES" : "EN"}
         </button>
-        <Link href="/login" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white">
+        <Link href="/login" className="inline-flex min-h-12 items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white">
           {translate(language, "Sign in")}
         </Link>
-        <Link href="/signup" className="rounded-lg bg-orange-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">
+        <Link href="/signup" className="inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">
           {translate(language, "Create account")}
         </Link>
       </div>
@@ -134,8 +134,8 @@ export default function HeaderNav() {
           className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
             isActive(href)
               ? "bg-slate-800 text-orange-300"
-              : "text-slate-300 hover:bg-slate-800 hover:text-white"
-          } ${mobile ? "block w-full" : "whitespace-nowrap"}`}
+            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+          } ${mobile ? "flex min-h-12 w-full items-center" : "inline-flex min-h-12 items-center whitespace-nowrap"}`}
         >
           {translate(language, label)}
         </Link>
@@ -143,7 +143,7 @@ export default function HeaderNav() {
       <Link
         href="/estimate/new"
         onClick={() => setMobileMenuOpen(false)}
-        className={`rounded-lg bg-orange-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 ${mobile ? "mt-2 block text-center" : "whitespace-nowrap"}`}
+        className={`rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 ${mobile ? "mt-2 flex min-h-12 items-center justify-center text-center" : "inline-flex min-h-12 items-center whitespace-nowrap"}`}
       >
         {translate(language, "+ New estimate")}
       </Link>
@@ -152,7 +152,7 @@ export default function HeaderNav() {
 
   return (
     <div className="relative flex items-center gap-2 sm:gap-3">
-      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
+      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
         {language === "en" ? "ES" : "EN"}
       </button>
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
@@ -166,9 +166,9 @@ export default function HeaderNav() {
           aria-expanded={dropdownOpen}
           aria-haspopup="menu"
           onClick={() => setDropdownOpen((open) => !open)}
-          className="flex max-w-44 items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+          className="flex min-h-12 max-w-44 items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm font-medium text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
         >
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-600 text-xs font-bold text-white" aria-hidden="true">{userInitial}</span>
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-700 text-xs font-bold text-white" aria-hidden="true">{userInitial}</span>
           <span className="hidden max-w-28 truncate sm:inline">{user.email}</span>
           <svg className={`h-4 w-4 text-slate-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
             <path d="m6 9 6 6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -197,7 +197,7 @@ export default function HeaderNav() {
         aria-expanded={mobileMenuOpen}
         aria-controls="mobile-main-navigation"
         onClick={() => setMobileMenuOpen((open) => !open)}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 lg:hidden"
+        className="inline-flex h-12 min-h-12 w-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 lg:hidden"
       >
         {mobileMenuOpen ? (
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" strokeWidth="2" strokeLinecap="round" /></svg>

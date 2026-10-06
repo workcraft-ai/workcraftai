@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
+import { releaseAppEmail, reserveEstimateEmail } from "@/lib/email-quota";
 
 function escapeHtml(value: string) {
   const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -51,14 +52,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const markup = estimateMoney.markupCents / 100;
   const tax = estimateMoney.taxCents / 100;
   const total = estimateMoney.totalCents / 100;
-  const { error: reserveError } = await admin.rpc("workcraft_reserve_estimate_email", { p_user_id: user.id, p_estimate_id: id });
+  const { reservation, error: reserveError } = await reserveEstimateEmail(admin, user.id, id);
   if (reserveError) {
-    if (reserveError.message.includes("ESTIMATE_EMAIL_DAILY_LIMIT")) return NextResponse.json({ error: "You’ve reached the daily estimate-email limit. Try again tomorrow." }, { status: 429 });
     if (reserveError.message.includes("WORKCRAFT_PRO_REQUIRED")) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
     console.error("Estimate email quota reservation failed:", reserveError.message);
     return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
   }
-  const usageDate = new Date().toISOString().slice(0, 10);
+  if (!reservation) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
+  if (!reservation.allowed) {
+    const message = reservation.reason === "account_daily_limit"
+      ? "You’ve reached the daily estimate-email limit. Try again tomorrow."
+      : "WorkCraft AI has reached its daily email capacity. Please try again tomorrow.";
+    return NextResponse.json({ error: message }, { status: 429 });
+  }
+  if (!reservation.reservation_id) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
   const businessName = typeof user.user_metadata?.business_name === "string" && user.user_metadata.business_name.trim() ? user.user_metadata.business_name.trim() : "your contractor";
   const brandColor = typeof user.user_metadata?.brand_color === "string" && /^#[0-9a-f]{6}$/i.test(user.user_metadata.brand_color) ? user.user_metadata.brand_color : "#c85b2d";
   const logoUrl = typeof user.user_metadata?.logo_url === "string" && user.user_metadata.logo_url.startsWith("https://") ? `<img src="${escapeHtml(user.user_metadata.logo_url)}" alt="" style="max-height:56px;max-width:180px">` : "";
@@ -79,18 +86,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }),
     });
   } catch (error) {
-    await admin.rpc("workcraft_release_estimate_email", { p_user_id: user.id, p_usage_date: usageDate });
     console.error("Estimate email provider request failed:", error instanceof Error ? error.name : "unknown error");
     return NextResponse.json({ error: "The email service did not respond. Please retry shortly." }, { status: 502 });
   }
   const responseData = await emailResponse.json().catch(() => ({}));
   if (!emailResponse.ok) {
-    await admin.rpc("workcraft_release_estimate_email", { p_user_id: user.id, p_usage_date: usageDate });
+    if (emailResponse.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
     console.error("Estimate email provider rejected request:", emailResponse.status);
     return NextResponse.json({ error: "Could not send the estimate email. Please try again." }, { status: 502 });
   }
 
-  const { error: eventError } = await supabase.from("estimate_email_events").insert({ user_id: user.id, estimate_id: id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "sent" });
+  const { error: eventError } = await admin.from("estimate_email_events").insert({ user_id: user.id, estimate_id: id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "sent" });
   if (eventError) console.error("Estimate email event could not be recorded:", eventError.message);
   const followupAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("estimates").update({ followup_at: followupAt, followup_sent_at: null, followup_claimed_at: null }).eq("id", id).eq("user_id", user.id);

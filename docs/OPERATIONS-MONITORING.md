@@ -72,6 +72,10 @@ Use a dedicated Stripe test-mode destination and connected-account test fixture 
 
 Resend domain verification and recent password-reset/support deliveries were confirmed in the previous provider check. An owner-controlled inbox received an earlier estimate email immediately, but its Resend event was not inspected. Production estimate messages now use `WorkCraft AI <estimates@workcraftai.com>` and set Reply-To to the contractor’s account email. Send a new test estimate to an owner-controlled inbox and inspect its Resend event and headers. Do not use a real customer address for smoke tests. Setting `NEXT_PUBLIC_SUPPORT_EMAIL` only changes the public support contact; it does not route provider alerts.
 
+The repository now includes a signed Resend delivery-event endpoint at `https://app.workcraftai.com/api/webhooks/resend`. After its database migration is applied and the app is deployed, create a Resend webhook for `email.delivered`, `email.delivery_delayed`, `email.bounced`, and `email.complained`; add its signing secret to Vercel Production as the server-only `RESEND_WEBHOOK_SECRET`, then redeploy. Confirm a test delivery appears on the estimate dashboard. The handler verifies the Svix signature and timestamp, deduplicates event IDs, and records only events for estimate emails already recorded by the app.
+
+The prepared global email quota migration limits all app-originated Resend sends together: 75 per UTC day by default, adjustable by a super admin from 1 to 90. This remains below Resend's currently reported 100-message daily free allowance and leaves headroom for provider/operational messages. The counter covers estimates, follow-ups, support, proposal-question notifications, and account-retention notices; it is atomic across Vercel instances. A provider timeout may remain counted if delivery is ambiguous. This control is not active until the migration is safely applied and its app build is deployed.
+
 ## Abuse and cost controls
 
 - Free users have a durable, atomic 10-saved-estimates-per-UTC-day limit, adjustable by an authorized administrator.

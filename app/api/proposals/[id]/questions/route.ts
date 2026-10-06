@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { getProAccess } from "@/lib/pro-access";
+import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 const MAX_QUESTION_BODY_BYTES = 8_000;
 
@@ -54,17 +55,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const sender = process.env.RESEND_FROM_EMAIL;
   let emailSent = false;
   if (hasProEmail && businessEmail && apiKey && sender) {
-    try {
-      const mail = await fetch("https://api.resend.com/emails", {
-        method: "POST", signal: AbortSignal.timeout(10_000),
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `proposal-question-${questionId}` },
-        body: JSON.stringify({ from: sender, to: [businessEmail], reply_to: email, subject: `Customer question about estimate ${id}`,
-          text: `${name} (${email}) asked about ${estimate.client_name}'s proposal:\n\n${message}`,
-          html: `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) asked a question about proposal ${escapeHtml(id)}:</p><blockquote>${escapeHtml(message).replace(/\n/g, "<br>")}</blockquote><p>Reply directly to this email to respond.</p>` }),
-      });
-      emailSent = mail.ok;
-      if (!mail.ok) console.error("Proposal question notification email failed:", mail.status);
-    } catch (mailError) { console.error("Proposal question notification failed:", mailError); }
+    const { reservation, error: quotaError } = await reserveAppEmail(admin, "proposal_question");
+    if (quotaError) {
+      console.error("Proposal question email quota reservation failed:", quotaError.message);
+    } else if (reservation?.allowed && reservation.reservation_id) {
+      try {
+        const mail = await fetch("https://api.resend.com/emails", {
+          method: "POST", signal: AbortSignal.timeout(10_000),
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `proposal-question-${questionId}` },
+          body: JSON.stringify({ from: sender, to: [businessEmail], reply_to: email, subject: `Customer question about estimate ${id}`,
+            text: `${name} (${email}) asked about ${estimate.client_name}'s proposal:\n\n${message}`,
+            html: `<p><strong>${escapeHtml(name)}</strong> (${escapeHtml(email)}) asked a question about proposal ${escapeHtml(id)}:</p><blockquote>${escapeHtml(message).replace(/\n/g, "<br>")}</blockquote><p>Reply directly to this email to respond.</p>` }),
+        });
+        emailSent = mail.ok;
+        if (!mail.ok) {
+          if (mail.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
+          console.error("Proposal question notification email failed:", mail.status);
+        }
+      } catch (mailError) {
+        console.error("Proposal question notification failed:", mailError instanceof Error ? mailError.name : "unknown error");
+      }
+    }
   }
   return NextResponse.json({ success: true, emailSent });
 }
