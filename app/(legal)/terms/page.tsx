@@ -28,7 +28,7 @@ export default function TermsPage() {
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700"><LocalizedText text="WorkCraft AI · Legal" /></p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900"><LocalizedText text="Terms of Service" /></h1>
-          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: September 2026" /></p>
+          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 2026" /></p>
         </header>
 
         <section className="space-y-3">
@@ -48,7 +48,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="3. Paid Plans and Payments" /></h2>
           <p className="text-sm leading-7 text-slate-700">
-            <LocalizedText text="Some features require an active paid plan. Plan charges are processed through Stripe. If you enable customer payments, your customer pays your connected Stripe account directly through Stripe Checkout. You are responsible for your services, prices, taxes, payment terms, customer support, refunds, and disputes. WorkCraft AI does not hold or transfer your customer funds. Stripe may require identity, business, and payout verification before you can accept payments." />
+            <LocalizedText text="Some features require an active paid plan. Your WorkCraft AI Pro subscription is billed separately from customer payments. If you enable customer payments, customers pay from an accepted proposal through Stripe Checkout as direct charges on your connected Stripe account. Stripe processes the payment, deducts applicable processing fees from your connected account, and pays out according to Stripe’s schedule and terms. WorkCraft AI does not receive or hold customer funds and does not add a per-payment fee. New connected accounts use the Full Stripe Dashboard, which you access using your own Stripe credentials; an existing connection may retain its previously configured Dashboard access. You must complete Stripe’s onboarding and accept its terms. You are responsible for the services you provide, prices, taxes, payment terms, customer communication, and service-related refund or dispute decisions, and must respond to Stripe requests. Stripe manages payment processing and eligible connected-account risk, including eligible unrecoverable negative balances, under its separate terms. Stripe may require identity, business, and payout verification before you can accept payments." />
           </p>
         </section>
 

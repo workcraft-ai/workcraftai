@@ -31,6 +31,7 @@ export default function ProfilePage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeChargesEnabled, setStripeChargesEnabled] = useState(false);
   const [stripeRequirementsDue, setStripeRequirementsDue] = useState(true);
+  const [stripeDashboard, setStripeDashboard] = useState<"full" | "express" | "none" | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,6 +70,7 @@ export default function ProfilePage() {
             setStripeConnected(connect.connected === true);
             setStripeChargesEnabled(connect.chargesEnabled === true);
             setStripeRequirementsDue(connect.requirementsDue === true);
+            setStripeDashboard(connect.dashboard === "full" || connect.dashboard === "express" || connect.dashboard === "none" ? connect.dashboard : null);
           }
         } catch { /* Stripe status is rechecked before each payment session. */ }
       }
@@ -182,14 +184,15 @@ export default function ProfilePage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer payments</p>
             <h2 className="mt-1 text-lg font-bold text-slate-900">Stripe payment setup</h2>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">Customers pay your business directly through Stripe. Stripe collects verification and bank details, and you manage payments, refunds, disputes, and payouts with Stripe.</p>
+            <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">{stripeDashboard === "express" ? "This existing Stripe connection uses the Express Dashboard. New connections use the Full Stripe Dashboard. Use the Open Stripe Express button to review payments and payout settings." : "Stripe-hosted onboarding collects verification and payout information directly. New connected accounts use the Full Stripe Dashboard; after Stripe activates your account, use your own Stripe login to manage payments, payouts, reports, and account details. Stripe processing fees are separate from your WorkCraft AI Pro subscription."}</p>
             {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature.</p>}
             {hasProAccess && !connectLoading && stripeConnected && stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-green-700">Stripe is connected and can accept payments.{stripeRequirementsDue ? " Stripe may request updated business information later." : ""}</p>}
             {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-amber-700">Finish Stripe verification before accepting customer payments.</p>}
-            {hasProAccess && !connectLoading && !stripeConnected && <p className="mt-2 text-xs text-slate-600">Connect Stripe to collect down payments and invoice balances. You’ll complete a guided setup hosted by Stripe.</p>}
+            {hasProAccess && !connectLoading && !stripeConnected && <p className="mt-2 text-xs text-slate-600">Connect Stripe to collect down payments and invoice balances. Stripe will guide you through account verification. Once active, sign in to Stripe with your own credentials to use the Full Dashboard.</p>}
             {hasProAccess && connectLoading && <p className="mt-2 text-xs text-slate-500">Checking Stripe connection…</p>}
           </div>
-          {hasProAccess && <button type="button" disabled={connectingStripe || connectLoading || (stripeConnected && stripeChargesEnabled && !stripeRequirementsDue)} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected ? stripeChargesEnabled ? "Update Stripe details" : "Continue Stripe setup" : "Connect Stripe"}</button>}
+          {hasProAccess && stripeConnected && stripeChargesEnabled && stripeDashboard === "full" && <a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">Open Stripe Dashboard</a>}
+          {hasProAccess && !(stripeConnected && stripeChargesEnabled && stripeDashboard === "full") && <button type="button" disabled={connectingStripe || connectLoading} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected && stripeChargesEnabled && stripeDashboard === "express" ? "Open Stripe Express" : stripeConnected ? "Continue Stripe setup" : "Connect Stripe"}</button>}
         </div>
       </section>
 

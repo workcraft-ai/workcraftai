@@ -27,7 +27,7 @@ export async function GET() {
       }).eq("user_id", user.id);
       if (updateError) throw updateError;
     }
-    return NextResponse.json({ connected: true, ...state });
+    return NextResponse.json({ connected: true, dashboard: stripeAccount.dashboard ?? null, ...state });
   } catch (error) {
     console.error("Could not load connected Stripe account state:", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json({ error: "Could not load Stripe account status." }, { status: 502 });

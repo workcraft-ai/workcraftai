@@ -400,6 +400,7 @@ export default function ClientEstimatePage() {
                   {estimate.require_deposit && paymentSummary.amountPaidCents === 0 && <button type="button" disabled={startingPayment} onClick={() => void startCustomerPayment("deposit")} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{startingPayment ? "Opening Stripe…" : `Pay down payment · $${depositAmount.toFixed(2)}`}</button>}
                   <button type="button" disabled={startingPayment} onClick={() => void startCustomerPayment("balance")} className="rounded-lg border border-blue-700 px-4 py-2.5 text-sm font-semibold text-blue-800 disabled:opacity-50">{startingPayment ? "Opening Stripe…" : paymentSummary.amountPaidCents > 0 ? `Pay remaining balance · $${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}` : `Pay in full · $${(paymentSummary.totalCents / 100).toFixed(2)}`}</button>
                 </div>
+                <p className="mt-3 text-center text-[11px] leading-5 text-slate-600">Payments are processed by Stripe and go directly to the contractor’s Stripe account. WorkCraft AI does not receive or hold the payment.</p>
               </div>}
             </div>
           ) : estimate.status === "declined" ? (

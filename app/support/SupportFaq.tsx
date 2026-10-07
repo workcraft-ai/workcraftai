@@ -17,6 +17,26 @@ const questions = [
     answer: "Yes. Share the proposal link from the estimate. Your customer can review the proposal and respond through its customer-facing page without signing in to WorkCraft AI.",
   },
   {
+    question: "How do customer payments work in WorkCraft AI?",
+    answer: "Online payments are a Pro feature. After Stripe verifies and activates your connected account, a customer can pay a deposit or balance from an accepted proposal using Stripe Checkout. The payment is processed directly on your Stripe account; WorkCraft AI does not receive or hold the funds.",
+  },
+  {
+    question: "Do I need to set up Stripe to accept payments?",
+    answer: "Yes. Open Profile and choose Connect Stripe. Stripe hosts the guided onboarding and collects your identity, business, and payout information. New connections use the Full Stripe Dashboard, which you access with your own Stripe credentials at dashboard.stripe.com. An existing connection may keep its previous Dashboard access method.",
+  },
+  {
+    question: "Where do I manage payouts, refunds, and disputes?",
+    answer: "Use your Stripe Dashboard to review payments and payouts, update payout details, and respond to refund or dispute matters. You remain responsible for your services, customer communication, and decisions about resolving service issues. Stripe manages payment processing and eligible connected-account risk under its terms.",
+  },
+  {
+    question: "What fees apply to customer payments?",
+    answer: "Stripe applies its payment-processing fees to your connected account under Stripe’s pricing and agreement. WorkCraft AI does not add a per-payment fee. The WorkCraft AI Pro subscription is billed separately; check Stripe for the current rates that apply to your account and payment methods.",
+  },
+  {
+    question: "Does my customer need a WorkCraft AI or Stripe account?",
+    answer: "Customers do not need a WorkCraft AI account. They can open the proposal link, approve it, and pay through Stripe Checkout. Stripe collects their payment details; WorkCraft AI does not store card or bank-account numbers.",
+  },
+  {
     question: "Where can I find jobs, invoices, and reports?",
     answer: "Use Schedule & jobs to manage jobs and open an invoice from a job. Reports and your estimates are available from the app navigation.",
   },

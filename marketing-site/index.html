@@ -80,6 +80,7 @@
       <nav class="main-nav" aria-label="Main navigation">
         <a href="#how-it-works">How it works</a>
         <a href="#plans">Plans</a>
+        <a href="#payment-faq">Payments</a>
         <a href="#about">About</a>
         <a href="#contact">Contact</a>
       </nav>
@@ -88,6 +89,7 @@
       <nav class="mobile-nav" id="mobile-navigation" aria-label="Mobile navigation" hidden>
         <a href="#how-it-works">How it works</a>
         <a href="#plans">Plans</a>
+        <a href="#payment-faq">Payments</a>
         <a href="#about">About</a>
         <a href="#contact">Contact</a>
       </nav>
@@ -168,7 +170,19 @@
           <article class="plan-card"><p class="plan-kicker">WORKCRAFT AI FREE</p><h3>$0 <span>always</span></h3><p class="plan-description">A practical place to build estimates and organize your pricing.</p><ul><li>Up to 10 saved estimates per day (UTC)</li><li>Create estimates with your price book and manual line items</li><li>Save and reuse price book items and estimate templates</li><li>Share proposals for customer review and approval</li><li>Estimate pipeline and acceptance reports</li><li>Profile, tax, markup, and proposal language settings</li></ul><a class="plan-button plan-button-light" href="https://app.workcraftai.com/signup">Start free <span aria-hidden="true">↗</span></a></article>
           <article class="plan-card plan-card-pro"><p class="plan-kicker">WORKCRAFT AI PRO</p><h3>$9.99 <span>/ month</span></h3><p class="plan-description">More help building proposals and managing the work that follows.</p><ul><li>Unlimited saved estimates</li><li>Cloud AI estimate drafting matched to your price book</li><li>Send proposals by branded email and automated follow-ups</li><li>Private estimate photos and voice notes</li><li>Schedule jobs, track actual costs, and manage invoice status</li><li>Job value and gross profit reporting</li><li>Good / Better / Best packages and proposal deposit terms</li></ul><a class="plan-button plan-button-dark" href="https://app.workcraftai.com/signup">Explore Pro in the app <span aria-hidden="true">↗</span></a></article>
         </div>
-        <p class="plans-note">Start Free without a trial or payment method. Pro is $9.99 per month. With Pro and completed Stripe setup, customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Payments go directly to the contractor’s connected Stripe account. The invoice page links to the proposal for payment; WorkCraft AI does not hold customer funds.</p>
+        <p class="plans-note">Start Free without a trial or payment method. Pro is $9.99 per month. Customer payments require Pro and completed Stripe onboarding. Customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Charges go directly to the contractor’s Stripe account; Stripe deducts applicable processing fees and pays out on its schedule. New connections use the Full Stripe Dashboard with the contractor’s own Stripe login; an existing connection may keep its previous Dashboard access. WorkCraft AI does not receive or hold customer funds or add a per-payment fee.</p>
+      </section>
+
+      <section class="payment-faq-section section-wrap" id="payment-faq" aria-labelledby="payment-faq-title">
+        <div class="section-heading"><div><p class="eyebrow"><span class="eyebrow-line"></span>Stripe customer payments</p><h2 id="payment-faq-title">Customer payments, clearly explained.</h2></div><p>See how contractors connect Stripe, how customers pay, and where payments are managed.</p></div>
+        <div class="payment-faq-list">
+          <details class="payment-faq-item"><summary>How do customer payments work?</summary><p>Customer payments are a Pro feature. After Stripe verifies and activates a contractor’s connected account, the contractor can offer a deposit or balance payment on an accepted proposal. The customer opens the proposal link and pays through Stripe Checkout.</p></details>
+          <details class="payment-faq-item"><summary>Do contractors need to create a Stripe account?</summary><p>WorkCraft AI starts Stripe-hosted onboarding for a connected account. Stripe collects identity, business, and payout information and may require verification. New connections use the Full Stripe Dashboard, accessed with the contractor’s own Stripe credentials at dashboard.stripe.com. An existing connection may keep its previous Dashboard access method.</p></details>
+          <details class="payment-faq-item"><summary>Where does the customer’s money go?</summary><p>Stripe processes each payment directly on the contractor’s connected Stripe account and pays out according to Stripe’s schedule. WorkCraft AI does not receive or hold customer funds.</p></details>
+          <details class="payment-faq-item"><summary>Do customers need a WorkCraft AI account?</summary><p>No. Customers can review an estimate and use Stripe Checkout from its proposal link without signing in to WorkCraft AI. Stripe collects their payment details; WorkCraft AI does not store card or bank-account numbers.</p></details>
+          <details class="payment-faq-item"><summary>What fees apply, and who handles refunds?</summary><p>Stripe applies its current processing fees to the contractor’s connected account. WorkCraft AI does not add a per-payment fee; the Pro subscription is billed separately. Contractors manage their services, customer communication, and service-related refund decisions in Stripe. Stripe handles payment processing and eligible connected-account risk under its terms.</p></details>
+        </div>
+        <p class="payment-faq-note">Need help? <a href="https://app.workcraftai.com/support">Visit WorkCraft AI Support</a>.</p>
       </section>
 
       <section class="about-section" id="about">
@@ -192,6 +206,7 @@
         "Skip to content": "Saltar al contenido",
         "How it works": "Cómo funciona",
         "Plans": "Planes",
+        "Payments": "Pagos",
         "About": "Acerca de",
         "Contact": "Contacto",
         "Menu": "Menú",
@@ -278,7 +293,22 @@
         "Job value and gross profit reporting": "Informes del valor de los trabajos y las ganancias brutas",
         "Good / Better / Best packages and proposal deposit terms": "Paquetes Bueno / Mejor / Óptimo y condiciones de anticipo en las propuestas",
         "Explore Pro in the app": "Explora Pro en la aplicación",
-        "Start Free without a trial or payment method. Pro is $9.99 per month. With Pro and completed Stripe setup, customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Payments go directly to the contractor’s connected Stripe account. The invoice page links to the proposal for payment; WorkCraft AI does not hold customer funds.": "Empieza gratis sin período de prueba ni método de pago. Pro cuesta $9.99 al mes. Con Pro y la configuración de Stripe completa, los clientes pueden pagar anticipos o saldos mediante Stripe Checkout desde una propuesta aceptada. Los pagos llegan directamente a la cuenta conectada de Stripe del contratista. La página de factura enlaza a la propuesta para realizar el pago; WorkCraft AI no retiene fondos de clientes.",
+        "Start Free without a trial or payment method. Pro is $9.99 per month. Customer payments require Pro and completed Stripe onboarding. Customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Charges go directly to the contractor’s Stripe account; Stripe deducts applicable processing fees and pays out on its schedule. New connections use the Full Stripe Dashboard with the contractor’s own Stripe login; an existing connection may keep its previous Dashboard access. WorkCraft AI does not receive or hold customer funds or add a per-payment fee.": "Empieza gratis sin período de prueba ni método de pago. Pro cuesta $9.99 al mes. Los pagos de clientes requieren Pro y completar la incorporación de Stripe. Los clientes pueden pagar anticipos o saldos mediante Stripe Checkout desde una propuesta aceptada. Los cargos llegan directamente a la cuenta de Stripe del contratista; Stripe deduce las tarifas de procesamiento aplicables y deposita los fondos según su calendario. Las nuevas conexiones usan el Panel completo de Stripe con las propias credenciales del contratista; una conexión existente podría conservar el acceso anterior al Panel. WorkCraft AI no recibe ni retiene fondos de clientes ni agrega una tarifa por pago.",
+        "Stripe customer payments": "Pagos de clientes con Stripe",
+        "Customer payments, clearly explained.": "Pagos de clientes, explicados con claridad.",
+        "See how contractors connect Stripe, how customers pay, and where payments are managed.": "Descubre cómo los contratistas conectan Stripe, cómo pagan los clientes y dónde se administran los pagos.",
+        "How do customer payments work?": "¿Cómo funcionan los pagos de clientes?",
+        "Customer payments are a Pro feature. After Stripe verifies and activates a contractor’s connected account, the contractor can offer a deposit or balance payment on an accepted proposal. The customer opens the proposal link and pays through Stripe Checkout.": "Los pagos de clientes son una función Pro. Cuando Stripe verifique y active la cuenta conectada del contratista, este podrá ofrecer el pago de un anticipo o saldo en una propuesta aceptada. El cliente abre el enlace de la propuesta y paga mediante Stripe Checkout.",
+        "Do contractors need to create a Stripe account?": "¿Los contratistas deben crear una cuenta de Stripe?",
+        "WorkCraft AI starts Stripe-hosted onboarding for a connected account. Stripe collects identity, business, and payout information and may require verification. New connections use the Full Stripe Dashboard, accessed with the contractor’s own Stripe credentials at dashboard.stripe.com. An existing connection may keep its previous Dashboard access method.": "WorkCraft AI inicia la incorporación alojada por Stripe para una cuenta conectada. Stripe recopila los datos de identidad, negocio y depósito, y podría exigir una verificación. Las nuevas conexiones usan el Panel completo de Stripe, al que el contratista accede con sus propias credenciales en dashboard.stripe.com. Una conexión existente podría conservar su método de acceso anterior al Panel.",
+        "Where does the customer’s money go?": "¿A dónde va el dinero del cliente?",
+        "Stripe processes each payment directly on the contractor’s connected Stripe account and pays out according to Stripe’s schedule. WorkCraft AI does not receive or hold customer funds.": "Stripe procesa cada pago directamente en la cuenta de Stripe conectada del contratista y deposita los fondos según su calendario. WorkCraft AI no recibe ni retiene fondos de clientes.",
+        "Do customers need a WorkCraft AI account?": "¿Los clientes necesitan una cuenta de WorkCraft AI?",
+        "No. Customers can review an estimate and use Stripe Checkout from its proposal link without signing in to WorkCraft AI. Stripe collects their payment details; WorkCraft AI does not store card or bank-account numbers.": "No. Los clientes pueden revisar una cotización y usar Stripe Checkout desde el enlace de la propuesta sin iniciar sesión en WorkCraft AI. Stripe recopila sus datos de pago; WorkCraft AI no almacena números de tarjetas ni cuentas bancarias.",
+        "What fees apply, and who handles refunds?": "¿Qué tarifas se aplican y quién administra los reembolsos?",
+        "Stripe applies its current processing fees to the contractor’s connected account. WorkCraft AI does not add a per-payment fee; the Pro subscription is billed separately. Contractors manage their services, customer communication, and service-related refund decisions in Stripe. Stripe handles payment processing and eligible connected-account risk under its terms.": "Stripe aplica sus tarifas actuales de procesamiento a la cuenta conectada del contratista. WorkCraft AI no agrega una tarifa por pago; la suscripción Pro se factura por separado. Los contratistas administran sus servicios, la comunicación con sus clientes y las decisiones sobre reembolsos relacionados con el servicio en Stripe. Stripe gestiona el procesamiento de pagos y los riesgos aplicables de cuentas conectadas conforme a sus términos.",
+        "Need help?": "¿Necesitas ayuda?",
+        "Visit WorkCraft AI Support": "Visita el soporte de WorkCraft AI",
         "Good work deserves a smoother way to run the business around it.": "El buen trabajo merece una forma más sencilla de administrar el negocio.",
         "THE IDEA BEHIND WORKCRAFT AI": "LA IDEA DETRÁS DE WORKCRAFT AI",
         "About WorkCraft AI": "Acerca de WorkCraft AI",
