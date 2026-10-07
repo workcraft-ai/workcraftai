@@ -70,9 +70,23 @@
 .language-toggle:hover{background:#eef1eb}
 .language-toggle:focus-visible{outline:2px solid var(--orange);outline-offset:3px}
 @media(max-width:650px){.site-header .brand-image{width:145px}.language-toggle{min-width:48px;min-height:48px;padding:8px}}
-@media(min-width:651px) and (max-width:900px){.site-header .brand-image{width:185px}.main-nav{gap:16px;font-size:12px}}
+@media(min-width:651px) and (max-width:900px){.site-header .brand-image{width:160px}.main-nav{gap:12px;font-size:11px}}
 
 /* Keep the secondary hero action easy to tap and the mockup caption readable. */
 .hero-actions .text-link{min-height:48px;padding:12px 4px}
 .art-caption{color:#56615a;font-size:10px}
 @media(max-width:650px){.art-caption{font-size:9px}}
+
+.payment-faq-section{padding-top:78px;padding-bottom:78px}
+.payment-faq-section .section-heading{margin-bottom:26px}
+.payment-faq-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.payment-faq-item{align-self:start;border:1px solid #dce1d9;border-radius:9px;background:#fffefa;padding:0 18px;box-shadow:0 5px 18px #26382b08}
+.payment-faq-item summary{position:relative;min-height:58px;display:flex;align-items:center;padding:14px 30px 14px 0;color:var(--dark);font-family:var(--font-display);font-size:13px;font-weight:700;line-height:1.5;cursor:pointer;list-style:none}
+.payment-faq-item summary::-webkit-details-marker{display:none}
+.payment-faq-item summary:after{content:'+';position:absolute;right:0;color:#a94727;font-size:20px;font-weight:500}
+.payment-faq-item[open] summary:after{content:'−'}
+.payment-faq-item summary:focus-visible{outline:2px solid var(--orange);outline-offset:3px;border-radius:2px}
+.payment-faq-item p{margin:0;padding:0 0 18px;color:#56615a;font-size:12px;line-height:1.75}
+.payment-faq-note{margin:22px 0 0;color:#56615a;font-size:11px;text-align:center}
+.payment-faq-note a{color:#a94727;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:650px){.payment-faq-section{padding-top:58px;padding-bottom:60px}.payment-faq-list{grid-template-columns:1fr;gap:9px}.payment-faq-item{padding-inline:15px}.payment-faq-item summary{min-height:54px;font-size:12px}.payment-faq-item p{font-size:11px}}

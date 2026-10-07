@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { getAppOrigin, getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { createWorkCraftConnectedAccountParams, getConnectedAccountDestination } from "@/lib/stripe-connect-configuration.mjs";
 
 export async function POST(request: Request) {
   const supabase = await createUserSupabaseClient();
@@ -23,18 +24,16 @@ export async function POST(request: Request) {
 
     let accountId = saved?.stripe_account_id;
     let hasActiveCardPayments = false;
+    let dashboard: "express" | "full" | "none" | undefined;
     if (!accountId) {
-      const account = await stripe.v2.core.accounts.create({
-        contact_email: user.email,
-        display_name: typeof user.user_metadata?.business_name === "string" ? user.user_metadata.business_name.slice(0, 100) : undefined,
-        dashboard: "express",
-        identity: { country: process.env.STRIPE_CONNECT_ACCOUNT_COUNTRY || "US" },
-        defaults: { responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
-        configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
-        include: ["configuration.merchant", "requirements"],
-        metadata: { workcraft_user_id: user.id },
-      }, { idempotencyKey: `workcraft-connect-${user.id}` });
+      const account = await stripe.v2.core.accounts.create(createWorkCraftConnectedAccountParams({
+        userId: user.id,
+        email: user.email,
+        businessName: typeof user.user_metadata?.business_name === "string" ? user.user_metadata.business_name : undefined,
+        country: process.env.STRIPE_CONNECT_ACCOUNT_COUNTRY || "US",
+      }), { idempotencyKey: `workcraft-connect-${user.id}` });
       accountId = account.id;
+      dashboard = account.dashboard;
       const state = getCardPaymentsState(account);
       hasActiveCardPayments = state.chargesEnabled;
       const { error: saveError } = await admin.from("stripe_connected_accounts").insert({
@@ -51,28 +50,32 @@ export async function POST(request: Request) {
     } else {
       const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant", "requirements"] });
       hasActiveCardPayments = getCardPaymentsState(account).chargesEnabled;
+      dashboard = account.dashboard;
+    }
+
+    const destination = getConnectedAccountDestination(dashboard, hasActiveCardPayments);
+    if (destination === "full_dashboard") {
+      return NextResponse.json({ url: "https://dashboard.stripe.com/" });
+    }
+    if (destination === "express_dashboard") {
+      const loginLink = await stripe.accounts.createLoginLink(accountId);
+      return NextResponse.json({ url: loginLink.url });
+    }
+    if (destination === "unsupported") {
+      return NextResponse.json({ error: "Stripe Dashboard access could not be verified. Contact support for help." }, { status: 409 });
     }
 
     const origin = getAppOrigin(request);
     const accountLink = await stripe.v2.core.accountLinks.create({
       account: accountId,
       use_case: {
-        type: hasActiveCardPayments ? "account_update" : "account_onboarding",
-        ...(hasActiveCardPayments ? {
-          account_update: {
-            configurations: ["merchant"],
-            collection_options: { fields: "eventually_due", future_requirements: "include" },
-            return_url: `${origin}/profile?connect=return`,
-            refresh_url: `${origin}/profile?connect=refresh`,
-          },
-        } : {
-          account_onboarding: {
-            configurations: ["merchant"],
-            collection_options: { fields: "eventually_due", future_requirements: "include" },
-            return_url: `${origin}/profile?connect=return`,
-            refresh_url: `${origin}/profile?connect=refresh`,
-          },
-        }),
+        type: "account_onboarding",
+        account_onboarding: {
+          configurations: ["merchant"],
+          collection_options: { fields: "eventually_due", future_requirements: "include" },
+          return_url: `${origin}/profile?connect=return`,
+          refresh_url: `${origin}/profile?connect=refresh`,
+        },
       },
     });
     return NextResponse.json({ url: accountLink.url });
