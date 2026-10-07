@@ -161,6 +161,12 @@ Object.assign(spanish, {
 
 Object.assign(spanish, {
   "Stripe-hosted onboarding collects verification and payout information directly. After Stripe activates your account, use your own Stripe login to access the Full Stripe Dashboard and manage payments, payouts, reports, and account details. Stripe processing fees are separate from your WorkCraft AI Pro subscription.": "La incorporación alojada por Stripe recopila directamente tus datos de verificación y depósito. Cuando Stripe active tu cuenta, usa tus propias credenciales de Stripe para acceder al Panel completo de Stripe y administrar pagos, depósitos, informes y datos de la cuenta. Las tarifas de procesamiento de Stripe son independientes de tu suscripción Pro de WorkCraft AI.",
+  "Stripe still needs information before it can activate payments. Continue setup to complete the remaining verification steps.": "Stripe todavía necesita información para activar los pagos. Continúa la configuración para completar los pasos de verificación pendientes.",
+  "Stripe is reviewing your identity or business information. You do not need to submit it again while Stripe reviews it; we will check your status automatically for a short time.": "Stripe está revisando tu información de identidad o negocio. No necesitas volver a enviarla mientras Stripe la revisa; comprobaremos el estado automáticamente durante un breve periodo.",
+  "Stripe setup is not active yet. Continue setup to review any remaining steps.": "La configuración de Stripe aún no está activa. Continúa para revisar los pasos pendientes.",
+  "We could not check your Stripe status. Retry the status check.": "No pudimos comprobar el estado de Stripe. Vuelve a comprobar el estado.",
+  "Check Stripe status": "Comprobar el estado de Stripe",
+  "Checking status…": "Comprobando el estado…",
   "Connect Stripe to collect down payments and invoice balances. Stripe will guide you through account verification. Once active, sign in to Stripe with your own credentials to use the Full Dashboard.": "Conecta Stripe para cobrar anticipos y saldos de facturas. Stripe te guiará durante la verificación de la cuenta. Cuando esté activa, inicia sesión en Stripe con tus propias credenciales para usar el Panel completo.",
   "Open Stripe Dashboard": "Abrir el Panel de Stripe",
   "Open Stripe Express": "Abrir Stripe Express",

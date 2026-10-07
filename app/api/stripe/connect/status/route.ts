@@ -13,7 +13,7 @@ export async function GET() {
       .select("stripe_account_id, charges_enabled, requirements_due")
       .eq("user_id", user.id).maybeSingle();
     if (error) throw error;
-    if (!account) return NextResponse.json({ connected: false, chargesEnabled: false, requirementsDue: true });
+    if (!account) return NextResponse.json({ connected: false, chargesEnabled: false, requirementsDue: true, setupState: "incomplete" });
 
     const stripeAccount = await getStripeClient().v2.core.accounts.retrieve(account.stripe_account_id, {
       include: ["configuration.merchant", "requirements"],

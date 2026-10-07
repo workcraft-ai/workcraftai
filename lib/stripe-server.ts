@@ -19,10 +19,23 @@ export function getAppOrigin(request: Request) {
 }
 
 export function getCardPaymentsState(account: Stripe.V2.Core.Account) {
-  const cardStatus = account.configuration?.merchant?.capabilities?.card_payments?.status;
+  const cardPayments = account.configuration?.merchant?.capabilities?.card_payments;
+  const cardStatus = cardPayments?.status;
+  const cardStatusDetails = cardPayments?.status_details ?? [];
   const requirements = account.requirements?.entries ?? [];
+  const userActionRequired = requirements.some((entry) => entry.awaiting_action_from === "user");
+  const stripeActionPending = requirements.some((entry) => entry.awaiting_action_from === "stripe");
+  const stripeReviewPending = cardStatusDetails.some((detail) => detail.code === "requirements_pending_verification" || detail.code === "determining_status");
+  const setupState = account.configuration?.merchant?.applied === true && cardStatus === "active"
+    ? "ready"
+    : userActionRequired
+      ? "needs_action"
+      : stripeActionPending || cardStatus === "pending" || stripeReviewPending
+        ? "under_review"
+        : "incomplete";
   return {
-    chargesEnabled: account.configuration?.merchant?.applied === true && cardStatus === "active",
+    chargesEnabled: setupState === "ready",
     requirementsDue: requirements.length > 0,
+    setupState,
   };
 }

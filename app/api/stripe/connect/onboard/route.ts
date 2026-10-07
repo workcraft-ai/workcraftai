@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
-import { getAppOrigin, getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
+import { getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { createStripeOnboardingLink, getStripeConnectOrigin } from "@/lib/stripe-connect-onboarding";
 import { createWorkCraftConnectedAccountParams, getConnectedAccountDestination } from "@/lib/stripe-connect-configuration.mjs";
 
 export async function POST(request: Request) {
@@ -65,19 +66,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stripe Dashboard access could not be verified. Contact support for help." }, { status: 409 });
     }
 
-    const origin = getAppOrigin(request);
-    const accountLink = await stripe.v2.core.accountLinks.create({
-      account: accountId,
-      use_case: {
-        type: "account_onboarding",
-        account_onboarding: {
-          configurations: ["merchant"],
-          collection_options: { fields: "eventually_due", future_requirements: "include" },
-          return_url: `${origin}/profile?connect=return`,
-          refresh_url: `${origin}/profile?connect=refresh`,
-        },
-      },
-    });
+    const accountLink = await createStripeOnboardingLink(
+      stripe,
+      accountId,
+      getStripeConnectOrigin(request),
+    );
     return NextResponse.json({ url: accountLink.url });
   } catch (error) {
     console.error("Stripe Connect onboarding could not be started:", error instanceof Error ? error.message : "unknown error");
