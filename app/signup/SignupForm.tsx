@@ -58,9 +58,9 @@ export default function SignupForm() {
     <LocalizedTree>
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <h2 className="text-3xl font-extrabold text-white">
+        <h1 className="text-3xl font-extrabold text-white">
           Create Account
-        </h2>
+        </h1>
 
         <p className="mt-2 text-sm text-slate-400">
           Sign up to get started with your account

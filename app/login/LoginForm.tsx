@@ -44,9 +44,9 @@ export default function LoginForm() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
         <Logo className="h-10 w-10" />
 
-        <h2 className="mt-6 text-center text-2xl font-bold tracking-tight text-white">
+        <h1 className="mt-6 text-center text-2xl font-bold tracking-tight text-white">
           Sign in to your account
-        </h2>
+        </h1>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

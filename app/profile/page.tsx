@@ -209,10 +209,11 @@ export default function ProfilePage() {
         )}
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor="profile-email" className="block text-xs font-medium text-slate-700 mb-1">
             Email Address (Read-only)
           </label>
           <input
+            id="profile-email"
             type="email"
             disabled
             value={email}
@@ -222,10 +223,11 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="profile-full-name" className="block text-xs font-medium text-slate-700 mb-1">
               Full Name
             </label>
             <input
+              id="profile-full-name"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -236,10 +238,11 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="profile-business-name" className="block text-xs font-medium text-slate-700 mb-1">
               Business / Company Name
             </label>
             <input
+              id="profile-business-name"
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
@@ -249,16 +252,16 @@ export default function ProfilePage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Business address</label>
-            <input type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Street, city, state, ZIP" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
+            <label htmlFor="profile-business-address" className="block text-xs font-medium text-slate-700 mb-1">Business address</label>
+            <input id="profile-business-address" type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Street, city, state, ZIP" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Public logo URL (optional)</label>
-            <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://your-site.com/logo.png" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
+            <label htmlFor="profile-logo-url" className="block text-xs font-medium text-slate-700 mb-1">Public logo URL (optional)</label>
+            <input id="profile-logo-url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://your-site.com/logo.png" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Proposal accent color</label>
-            <div className="flex gap-2"><input type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-10 w-14 rounded border border-slate-200" /><input type="text" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} pattern="^#[0-9A-Fa-f]{6}$" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" /></div>
+            <label htmlFor="profile-brand-color-picker" className="block text-xs font-medium text-slate-700 mb-1">Proposal accent color</label>
+            <div className="flex gap-2"><input id="profile-brand-color-picker" type="color" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} className="h-10 w-14 rounded border border-slate-200" /><label htmlFor="profile-brand-color-text" className="sr-only">Hex color value</label><input id="profile-brand-color-text" type="text" aria-label="Hex color value" value={brandColor} onChange={(e) => setBrandColor(e.target.value)} pattern="^#[0-9A-Fa-f]{6}$" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" /></div>
           </div>
         </div>
 
@@ -273,10 +276,11 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="profile-phone" className="block text-xs font-medium text-slate-700 mb-1">
               Phone Number
             </label>
             <input
+              id="profile-phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}

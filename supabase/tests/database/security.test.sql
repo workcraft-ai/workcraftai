@@ -4,26 +4,20 @@ create extension if not exists pgtap with schema extensions;
 
 select plan(26);
 
--- The browser's anonymous role must have no direct data or function access.
+-- App-owned tables in public must be protected even when a future migration adds one.
 select ok(
   not exists (
     select 1
-    from unnest(array[
-      'subscriptions', 'estimate_email_events', 'price_book_items',
-      'estimate_templates', 'jobs', 'proposal_questions',
-      'estimate_attachments', 'estimates', 'line_items',
-      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
-      'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
-      'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-      'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
-      'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
-    ]) as tables(table_name)
+    from pg_class as app_table
+    join pg_namespace as app_schema on app_schema.oid = app_table.relnamespace
     cross join unnest(array[
       'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'
     ]) as privileges(privilege)
-    where has_table_privilege('anon', format('public.%I', table_name), privilege)
+    where app_schema.nspname = 'public'
+      and app_table.relkind in ('r', 'p')
+      and has_table_privilege('anon', app_table.oid, privilege)
   ),
-  'anon has no direct privileges on user data tables'
+  'anon has no direct privileges on any public application table'
 );
 
 select ok(
@@ -31,42 +25,21 @@ select ok(
     select 1
     from pg_policies
     where schemaname = 'public'
-      and tablename = any(array[
-        'subscriptions', 'estimate_email_events', 'price_book_items',
-        'estimate_templates', 'jobs', 'proposal_questions',
-        'estimate_attachments', 'estimates', 'line_items',
-        'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
-        'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
-        'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-        'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
-        'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
-      ])
       and roles && array['anon'::name, 'public'::name]
   ),
-  'user data policies only target authenticated users'
+  'no public-schema RLS policy grants access to anon or PUBLIC'
 );
 
 select ok(
   not exists (
     select 1
-    from unnest(array[
-      'subscriptions', 'estimate_email_events', 'price_book_items',
-      'estimate_templates', 'jobs', 'proposal_questions',
-      'estimate_attachments', 'estimates', 'line_items',
-      'tradeflow_app_settings', 'tradeflow_daily_estimate_usage',
-      'tradeflow_ai_daily_usage', 'tradeflow_ai_generation_events',
-      'tradeflow_ai_global_daily_usage', 'stripe_webhook_events',
-      'estimate_email_daily_usage', 'estimate_acceptances', 'pro_checkout_attempts',
-      'tradeflow_app_email_daily_usage', 'tradeflow_app_email_reservations'
-    ]) as tables(table_name)
-    where not (
-      select c.relrowsecurity
-      from pg_class c
-      join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relname = table_name
-    )
+    from pg_class as app_table
+    join pg_namespace as app_schema on app_schema.oid = app_table.relnamespace
+    where app_schema.nspname = 'public'
+      and app_table.relkind in ('r', 'p')
+      and not app_table.relrowsecurity
   ),
-  'row-level security is enabled on every user data table'
+  'row-level security is enabled on every public application table'
 );
 
 select ok(
