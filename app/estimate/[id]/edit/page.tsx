@@ -44,6 +44,7 @@ export default function EditEstimatePage() {
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemInput[]>([]);
   const [packageOptions, setPackageOptions] = useState<EstimatePackage[]>([]);
+  const [zeroRateConfirmationKey, setZeroRateConfirmationKey] = useState("");
 
   // Load existing Estimate and Line Items
   useEffect(() => {
@@ -118,6 +119,9 @@ export default function EditEstimatePage() {
   const estimateMoney = calculateEstimateMoney({ require_deposit: requireDeposit, deposit_percentage: depositPercentage }, lineItems);
   const subtotal = estimateMoney.subtotalCents / 100;
   const depositAmount = estimateMoney.depositCents / 100;
+  const zeroRateLineItems = lineItems.filter((item) => item.description.trim() && Number(item.unit_price) === 0);
+  const zeroRateReviewKey = JSON.stringify(lineItems.filter((item) => item.description.trim()).map(({ description, quantity, unit_price }) => [description.trim(), Number(quantity), Number(unit_price)]));
+  const zeroRateConfirmed = zeroRateLineItems.length === 0 || zeroRateConfirmationKey === zeroRateReviewKey;
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +134,7 @@ export default function EditEstimatePage() {
       alert("Line item quantities must be greater than zero and prices cannot be negative.");
       return;
     }
+    if (!zeroRateConfirmed) return;
     setSaving(true);
 
     try {
@@ -202,10 +207,11 @@ export default function EditEstimatePage() {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="edit-client-name" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Name *
                 </label>
                 <input
+                  id="edit-client-name"
                   type="text"
                   required
                   value={clientName}
@@ -215,10 +221,11 @@ export default function EditEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="edit-client-email" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Email *
                 </label>
                 <input
+                  id="edit-client-email"
                   type="email"
                   required
                   value={clientEmail}
@@ -228,10 +235,11 @@ export default function EditEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="edit-client-phone" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Phone
                 </label>
                 <input
+                  id="edit-client-phone"
                   type="tel"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
@@ -240,17 +248,18 @@ export default function EditEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="edit-job-address" className="block text-xs font-medium text-slate-700 mb-1">
                   Job Address
                 </label>
                 <input
+                  id="edit-job-address"
                   type="text"
                   value={jobAddress}
                   onChange={(e) => setJobAddress(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <div><label className="block text-xs font-medium text-slate-700 mb-1">Customer proposal language</label><select value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></div>
+              <div><label htmlFor="edit-proposal-language" className="block text-xs font-medium text-slate-700 mb-1">Customer proposal language</label><select id="edit-proposal-language" value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></div>
             </div>
           </div>
 
@@ -284,6 +293,7 @@ export default function EditEstimatePage() {
                 >
                   <div className="flex items-center gap-2">
                   <input
+                    aria-label={`Line item ${index + 1} description`}
                     type="text"
                     value={item.description}
                     onChange={(e) =>
@@ -293,6 +303,7 @@ export default function EditEstimatePage() {
                     className="flex-1 bg-white border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <input
+                    aria-label={`Line item ${index + 1} quantity`}
                     type="number"
                     min="1"
                     value={item.quantity}
@@ -306,6 +317,7 @@ export default function EditEstimatePage() {
                     className="w-16 bg-white border border-slate-200 rounded-md p-2 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <input
+                    aria-label={`Line item ${index + 1} rate`}
                     type="number"
                     min="0"
                     step="0.01"
@@ -325,6 +337,7 @@ export default function EditEstimatePage() {
                   <button
                     type="button"
                     onClick={() => handleRemoveItem(index)}
+                    aria-label={`Remove line item ${index + 1}`}
                     className="text-slate-400 hover:text-red-500 text-xs px-1"
                     title="Remove item"
                   >
@@ -336,6 +349,14 @@ export default function EditEstimatePage() {
               ))}
             </div>
           </div>
+
+          {zeroRateLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p role="alert" className="font-semibold">One or more line items have a $0 rate. Review the pricing before sharing this proposal.</p>
+            <label className="mt-2 flex items-start gap-2">
+              <input id="zero-rate-confirmation" type="checkbox" required checked={zeroRateConfirmed} onChange={(event) => setZeroRateConfirmationKey(event.target.checked ? zeroRateReviewKey : "")} className="mt-0.5" />
+              <span>I confirmed every $0 line item is intentional.</span>
+            </label>
+          </div>}
 
           {isPro ? <section className="space-y-3 rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best</h2><p className="mt-1 text-xs text-slate-500">Add or adjust service options customers can choose from.</p></div><button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add options"}</button></div>
@@ -360,6 +381,7 @@ export default function EditEstimatePage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="number"
+                    aria-label="Deposit percentage"
                     min="5"
                     max="100"
                     value={depositPercentage}

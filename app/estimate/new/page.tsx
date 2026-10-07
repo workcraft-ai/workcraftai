@@ -93,6 +93,7 @@ export default function CreateEstimatePage() {
   const [templateName, setTemplateName] = useState("");
   const [templateMessage, setTemplateMessage] = useState("");
   const [packageOptions, setPackageOptions] = useState<EstimatePackage[]>([]);
+  const [zeroRateConfirmationKey, setZeroRateConfirmationKey] = useState("");
 
   const [saving, setSaving] = useState(false);
 
@@ -301,6 +302,9 @@ export default function CreateEstimatePage() {
   const taxAmount = estimateMoney.taxCents / 100;
   const estimateTotal = estimateMoney.totalCents / 100;
   const depositAmount = estimateMoney.depositCents / 100;
+  const zeroRateLineItems = lineItems.filter((item) => item.description.trim() && Number(item.unit_price) === 0);
+  const zeroRateReviewKey = JSON.stringify(lineItems.filter((item) => item.description.trim()).map(({ description, quantity, unit_price }) => [description.trim(), Number(quantity), Number(unit_price)]));
+  const zeroRateConfirmed = zeroRateLineItems.length === 0 || zeroRateConfirmationKey === zeroRateReviewKey;
 
   const startVoiceNote = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setDraftMessage("Voice recording is not supported by this browser."); return; }
@@ -337,6 +341,7 @@ export default function CreateEstimatePage() {
       alert("Line item quantities must be greater than zero and prices cannot be negative.");
       return;
     }
+    if (!zeroRateConfirmed) return;
 
     setSaving(true);
     let createdEstimateId: string | null = null;
@@ -447,8 +452,9 @@ export default function CreateEstimatePage() {
             <label className="block max-w-sm text-xs font-medium text-slate-700">Customer proposal language<select value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Trade</label>
+                <label htmlFor="estimate-trade" className="block text-xs font-medium text-slate-700 mb-1">Trade</label>
                 <select
+                  id="estimate-trade"
                   value={trade}
                   onChange={(e) => setTrade(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -457,10 +463,11 @@ export default function CreateEstimatePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="estimate-client-name" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Name *
                 </label>
                 <input
+                  id="estimate-client-name"
                   type="text"
                   required
                   value={clientName}
@@ -471,10 +478,11 @@ export default function CreateEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="estimate-client-email" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Email *
                 </label>
                 <input
+                  id="estimate-client-email"
                   type="email"
                   required
                   value={clientEmail}
@@ -485,10 +493,11 @@ export default function CreateEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="estimate-client-phone" className="block text-xs font-medium text-slate-700 mb-1">
                   Client Phone
                 </label>
                 <input
+                  id="estimate-client-phone"
                   type="tel"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
@@ -498,10 +507,11 @@ export default function CreateEstimatePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="estimate-job-address" className="block text-xs font-medium text-slate-700 mb-1">
                   Job Address
                 </label>
                 <input
+                  id="estimate-job-address"
                   type="text"
                   value={jobAddress}
                   onChange={(e) => setJobAddress(e.target.value)}
@@ -560,6 +570,7 @@ export default function CreateEstimatePage() {
                 <div key={index} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5">
                 <div className="flex items-center gap-2">
                   <input
+                    aria-label={`Line item ${index + 1} description`}
                     type="text"
                     placeholder="Item or service description"
                     value={item.description}
@@ -567,6 +578,7 @@ export default function CreateEstimatePage() {
                     className="flex-1 bg-white border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <input
+                    aria-label={`Line item ${index + 1} quantity`}
                     type="number"
                     min="1"
                     placeholder="Qty"
@@ -575,6 +587,7 @@ export default function CreateEstimatePage() {
                     className="w-16 bg-white border border-slate-200 rounded-md p-2 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <input
+                    aria-label={`Line item ${index + 1} rate`}
                     type="number"
                     min="0"
                     step="0.01"
@@ -590,6 +603,7 @@ export default function CreateEstimatePage() {
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
+                      aria-label={`Remove line item ${index + 1}`}
                       className="text-slate-400 hover:text-red-500 text-xs px-1"
                     >
                       ✕
@@ -602,6 +616,14 @@ export default function CreateEstimatePage() {
             </div>
           </div>
 
+          {zeroRateLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p role="alert" className="font-semibold">One or more line items have a $0 rate. Review the pricing before sharing this proposal.</p>
+            <label className="mt-2 flex items-start gap-2">
+              <input id="zero-rate-confirmation" type="checkbox" required checked={zeroRateConfirmed} onChange={(event) => setZeroRateConfirmationKey(event.target.checked ? zeroRateReviewKey : "")} className="mt-0.5" />
+              <span>I confirmed every $0 line item is intentional.</span>
+            </label>
+          </div>}
+
           {isProSubscriber && <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
@@ -610,7 +632,7 @@ export default function CreateEstimatePage() {
             <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope and quantities. Matching rates come from your Price Book; unmatched items stay at $0 for you to price.</p>
             {aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             <div className="flex flex-col gap-2 sm:flex-row">
-              <input type="text" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              <input type="text" aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
               <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim()} className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
             </div>
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
@@ -643,6 +665,7 @@ export default function CreateEstimatePage() {
                 <div className="flex items-center space-x-2">
                   <input
                     type="number"
+                    aria-label="Deposit percentage"
                     min="5"
                     max="100"
                     value={depositPercentage}
