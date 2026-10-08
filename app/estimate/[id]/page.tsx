@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { supabase } from "@/lib/supabase";
 
 interface LineItem {
   id: string;
@@ -61,6 +63,10 @@ export default function ClientEstimatePage() {
   const [photos, setPhotos] = useState<ProposalPhoto[]>([]);
   const [ownerAttachments, setOwnerAttachments] = useState<OwnerAttachment[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [ownerHasPro, setOwnerHasPro] = useState(false);
+  const [ownerPlanLoaded, setOwnerPlanLoaded] = useState(false);
+  const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [wasConverted, setWasConverted] = useState(false);
   const [questionName, setQuestionName] = useState("");
   const [questionEmail, setQuestionEmail] = useState("");
@@ -95,6 +101,17 @@ export default function ClientEstimatePage() {
             setIsOwner(true);
             const ownerData = await ownerResponse.json();
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
+            const convertedJobId = ownerData.estimate?.converted_job_id;
+            setInvoiceJobId(typeof convertedJobId === "string" && convertedJobId ? convertedJobId : null);
+            try {
+              const entitlementResponse = await fetch("/api/user/entitlements", { cache: "no-store" });
+              const entitlement = entitlementResponse.ok ? await entitlementResponse.json() : null;
+              setOwnerHasPro(entitlement?.has_pro === true);
+            } catch {
+              setOwnerHasPro(false);
+            } finally {
+              setOwnerPlanLoaded(true);
+            }
           }
         } catch { /* Customer proposal access does not depend on owner-only recordings. */ }
         setSignatureName(estData.signature_name || "");
@@ -176,6 +193,29 @@ export default function ClientEstimatePage() {
     }
   };
 
+  const createOrOpenInvoice = async () => {
+    if (invoiceJobId) {
+      router.push(`/invoice/${encodeURIComponent(invoiceJobId)}`);
+      return;
+    }
+    if (!isOwner || !ownerHasPro || !["accepted", "paid"].includes(estimate?.status ?? "")) return;
+    setCreatingInvoice(true);
+    setErrorMsg("");
+    const { data: jobId, error } = await supabase.rpc("convert_accepted_estimate_to_job", {
+      p_estimate_id: id,
+      p_scheduled_at: null,
+      p_title: null,
+      p_notes: "",
+    });
+    if (error || typeof jobId !== "string") {
+      setErrorMsg("Could not create the invoice. Please try again.");
+      setCreatingInvoice(false);
+      return;
+    }
+    setInvoiceJobId(jobId);
+    router.push(`/invoice/${encodeURIComponent(jobId)}`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -212,7 +252,7 @@ export default function ClientEstimatePage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Contractor-only status and navigation controls */}
-        {isOwner && <div className="print:hidden bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
+        {isOwner && <div className="print:hidden bg-slate-900 text-white p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-300">Status:</span>
             <span
@@ -226,7 +266,10 @@ export default function ClientEstimatePage() {
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && (ownerHasPro
+              ? <button type="button" disabled={creatingInvoice} onClick={() => void createOrOpenInvoice()} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60">{creatingInvoice ? "Creating invoice…" : invoiceJobId ? "View invoice" : "Create invoice"}</button>
+              : <Link href="/profile" className="rounded-lg border border-orange-300 px-3 py-1.5 font-semibold text-orange-100 hover:bg-slate-800">Create invoice (Pro)</Link>)}
             <button
               type="button"
               onClick={() => router.push(`/estimate/${id}/edit`)}

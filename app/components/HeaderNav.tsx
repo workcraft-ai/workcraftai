@@ -9,6 +9,7 @@ import { translate, useLanguage } from "@/app/components/LanguageProvider";
 
 const appLinks = [
   { href: "/dashboard", label: "Estimates" },
+  { href: "/customers", label: "Customers" },
   { href: "/schedule", label: "Schedule & jobs" },
   { href: "/pricebook", label: "Price book" },
   { href: "/reports", label: "Reports" },
