@@ -436,9 +436,9 @@ export default function CreateEstimatePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-sm font-semibold text-slate-800">Unfinished estimate</h2><p className="mt-1 text-xs text-slate-600">Save or restore a draft in this browser on this device.</p></div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={saveDraftOnDevice} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
-                <button type="button" onClick={restoreDraftFromDevice} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
-                <button type="button" onClick={deleteDraftFromDevice} className="px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
+                <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
+                <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
+                <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-11 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
               </div>
             </div>
             {draftStorageMessage && <p role="status" className="mt-3 text-xs text-slate-600">{draftStorageMessage}</p>}
@@ -535,7 +535,7 @@ export default function CreateEstimatePage() {
                 });
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
-              }} /></label> : <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
+              }} /></label> : <Link href="/profile" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
               {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
@@ -549,8 +549,8 @@ export default function CreateEstimatePage() {
                 Scope & Line Items
               </h2>
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
-                <button type="button" onClick={handleAddItem} className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600">+ Add line item</button>
+                <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
+                <button type="button" onClick={handleAddItem} className="inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600">+ Add line item</button>
               </div>
             </div>
 
@@ -561,7 +561,7 @@ export default function CreateEstimatePage() {
                   <option value="">Choose a saved item</option>
                   {priceBookItems.map((item) => <option key={item.id} value={item.id}>{item.name} · ${Number(item.unit_price).toFixed(2)} / {item.unit}</option>)}
                 </select>
-                <button type="button" onClick={addSelectedPriceBookItem} disabled={!selectedPriceBookItemId} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Add selected item</button>
+                <button type="button" onClick={addSelectedPriceBookItem} disabled={!selectedPriceBookItemId} className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Add selected item</button>
               </> : <p className="text-xs text-slate-600">Your price book is empty. <Link href="/pricebook" className="font-semibold text-blue-700 underline">Add your rates</Link></p>}
             </div>}
 
@@ -634,7 +634,7 @@ export default function CreateEstimatePage() {
             {aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             <div className="flex flex-col gap-2 sm:flex-row">
               <input type="text" aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim()} className="rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
             </div>
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
           </section>}
@@ -643,7 +643,7 @@ export default function CreateEstimatePage() {
             <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Template name<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
-              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
+              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
               {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
             </div>
           </details>

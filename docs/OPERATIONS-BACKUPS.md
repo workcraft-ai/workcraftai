@@ -1,10 +1,11 @@
 # WorkCraft AI encrypted off-site backups
 
-This runbook covers the repository-managed backup workflow for Supabase Production. It uses Supabase's logical database dump, downloads the private `estimate-media` Storage bucket, encrypts and deduplicates both with Restic, and stores the encrypted repository in a dedicated Google Drive folder through rclone.
+This runbook covers the repository-managed backup workflow for Supabase Production. It uses Supabase's logical database dump plus a separate, narrowly scoped Auth account export, downloads the private `estimate-media` Storage bucket, encrypts and deduplicates the snapshot with Restic, and stores the encrypted repository in a dedicated Google Drive folder through rclone.
 
 ## What the workflow protects
 
-- A database dump runs daily at 04:00 UTC. It includes database roles, schema, application/auth data, and the Supabase migration history.
+- A database dump runs daily at 04:00 UTC. It includes database roles, schema, application data, and the Supabase migration history. Because Supabase's normal CLI dump excludes its managed Auth schema, a separate PostgreSQL 17 `pg_dump` exports `auth.users`, `auth.identities`, and `auth.mfa_factors` into `database/auth-users.sql`.
+- The Auth export preserves user IDs, account metadata, password hashes, login identities, and enrolled MFA factors. It intentionally excludes active sessions, refresh tokens, one-time codes, and Supabase's internal Auth migration history; users will need to sign in again after recovery.
 - Every Sunday at 04:00 UTC, the snapshot also downloads private estimate photos and voice notes from `estimate-media`. A manual run from the `main` branch can include Storage on demand.
 - Restic encrypts file contents and repository metadata on the GitHub runner before data is uploaded. Google Drive stores encrypted Restic repository objects; it is not the encryption layer.
 - Restic retains 30 daily snapshots and prunes expired data. A complete database-plus-media recovery point is therefore normally no more than a week old, and old/deleted data can remain in a backup for up to 30 days.
@@ -57,7 +58,7 @@ This repository is public. Anonymous readers cannot access Actions secrets, and 
 
 ## Start and verify backups
 
-After saving the secrets, open **Actions → Encrypted off-site backup → Run workflow** on `main`. Select `include_storage: true` for the initial full snapshot. Confirm the run finishes green and its summary says media was included. Subsequent daily runs back up the database; Sunday runs include media.
+After saving the secrets, open **Actions → Encrypted off-site backup → Run workflow** on `main`. Select `include_storage: true` for the initial full snapshot. Confirm the run finishes green and its summary says Auth account data was included and media was included. Subsequent daily runs back up database and Auth account data; Sunday runs include media.
 
 Confirm the encrypted repository exists with rclone (the object names are Restic's encrypted repository files, not readable SQL or photos):
 
@@ -83,13 +84,14 @@ Restore into a **new recovery Supabase project first**. Do not overwrite the liv
    ```
 
    The `find` command prints the restored backup directory; use that path as `BACKUP_ROOT` below. Protect and delete this local plaintext recovery copy after the drill.
-3. Create a new Supabase project and set `RECOVERY_DB_URL` to its connection URI. Restore the database dump in the documented order:
+3. Create a new Supabase project and set `RECOVERY_DB_URL` to its connection URI. Before importing Auth records, confirm the recovery project's Auth schema is compatible with the source schema represented by the backup. Do not import Auth data into a project with a mismatched schema; stop and adapt the restore with Supabase support or an Auth migration specialist. Restore database objects and rows in this order:
 
    ```sh
    psql "$RECOVERY_DB_URL" --single-transaction --set ON_ERROR_STOP=1 \
      --file "$BACKUP_ROOT/database/roles.sql" \
      --file "$BACKUP_ROOT/database/schema.sql" \
      --command 'SET session_replication_role = replica' \
+     --file "$BACKUP_ROOT/database/auth-users.sql" \
      --file "$BACKUP_ROOT/database/data.sql"
    ```
 
@@ -101,7 +103,7 @@ Restore into a **new recovery Supabase project first**. Do not overwrite the liv
      --file "$BACKUP_ROOT/database/migration-history-data.sql"
    ```
 
-   Supabase-managed Auth and Storage customizations, Auth/provider configuration, Edge Functions, API keys, and project settings may need separate recovery. Compare the recovered project with the checked-in migrations and reapply the `estimate-media` bucket and its private access policies from `supabase/migrations/202609290001_proposals_field_tools.sql` before restoring files. Do not make the bucket public.
+   The selected Auth records preserve account IDs used by application rows, but they do not restore active sessions or project configuration. A recovery project has its own JWT signing secret, so existing access tokens will not work and every user must sign in again. Password hashes and MFA factors are included, but verify that the target Auth version accepts them before relying on password sign-in. Auth/provider settings, email templates and URLs, Auth customizations/triggers, Edge Functions, API keys, and project settings require separate recovery. Compare the recovered project with the checked-in migrations and reapply the `estimate-media` bucket and its private access policies from `supabase/migrations/202609290001_proposals_field_tools.sql` before restoring files. Do not make the bucket public.
 4. Restore the files into the private bucket in the recovery project. Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` to the recovery project's values, and `BACKUP_STORAGE_DIR` to the restored `storage` directory, then run:
 
    ```sh
@@ -117,6 +119,7 @@ Restore into a **new recovery Supabase project first**. Do not overwrite the liv
 - Supabase Free does not provide managed daily backups or point-in-time recovery. This workflow is an owner-managed logical backup, not a substitute for Supabase PITR.
 - Database snapshots are daily; media is captured weekly. Changes made to media after the last weekly run may not be recoverable. A manual full snapshot can be run before a high-risk database or Storage change.
 - Database and Storage are read at different times, so the weekly snapshot is not a transactionally consistent point-in-time image. The restore drill must check application relationships and sample files.
+- The Auth export is data-only and depends on compatible managed Auth table definitions in the recovery project. Supabase does not provide a one-size-fits-all Auth-only restore script; a successful dump is not proof that the Auth rows can be imported into every project version. Complete the restore drill before relying on it.
 - The backup contains sensitive personal and business data, including customer addresses, estimate details, account data, and uploaded media. Access to the Drive account, GitHub secrets, and Restic password must be restricted.
 - Account deletion removes live application data immediately, but an encrypted copy may remain in the rolling backup set for up to 30 days before Restic retention expires it.
 - This workflow does not back up Vercel environment variables, Stripe/Resend/Gemini settings, Supabase Auth provider configuration, Edge Functions, or DNS. Keep a separate secure operations inventory and recovery steps for those services.

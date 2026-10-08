@@ -77,6 +77,13 @@
 .art-caption{color:#56615a;font-size:10px}
 @media(max-width:650px){.art-caption{font-size:9px}}
 
+/* Use vector paths instead of platform font glyphs for stable icon rendering. */
+.inline-icon{display:inline-block;width:1em;height:1em;min-width:1em;vertical-align:-.16em;flex:none}
+.workflow-step .step-icon svg{display:block;width:24px;height:24px}
+.tag-icon svg,.check-icon svg{display:block;width:16px;height:16px}
+.plan-card li:before{top:2px;left:4px;width:6px;height:10px;border-right:2px solid #d58054;border-bottom:2px solid #d58054;content:"";transform:rotate(45deg)}
+.plan-button{min-height:48px}
+
 .payment-faq-section{padding-top:78px;padding-bottom:78px}
 .payment-faq-section .section-heading{margin-bottom:26px}
 .payment-faq-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}

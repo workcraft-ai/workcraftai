@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
 import { getAppOrigin, getServiceSupabase } from "@/lib/stripe-server";
 import { getProAccess } from "@/lib/pro-access";
@@ -9,8 +10,14 @@ function errorResponse(message: string, status: number) {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let body: unknown;
-  try { body = await request.json(); } catch { return errorResponse("Choose a valid payment option.", 400); }
+  const parsedBody = await readLimitedJsonObject(request, 1_000);
+  if (!parsedBody.ok) {
+    return errorResponse(
+      parsedBody.reason === "too_large" ? "Payment request is too large." : "Choose a valid payment option.",
+      parsedBody.reason === "too_large" ? 413 : 400,
+    );
+  }
+  const body = parsedBody.value;
   const kind = body && typeof body === "object" && "kind" in body && body.kind === "deposit" ? "deposit" :
     body && typeof body === "object" && "kind" in body && body.kind === "balance" ? "balance" : null;
   if (!kind) return errorResponse("Choose a valid payment option.", 400);
