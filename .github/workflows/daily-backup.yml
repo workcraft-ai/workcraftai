@@ -84,6 +84,29 @@ jobs:
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-schema.sql" --schema supabase_migrations
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-data.sql" --use-copy --data-only --schema supabase_migrations
 
+      - name: Export recoverable Auth accounts
+        env:
+          DATABASE_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+          BACKUP_ROOT: ${{ runner.temp }}/workcraftai-backup
+        run: |
+          set -euo pipefail
+          # Supabase's standard CLI dump excludes managed Auth tables. Use a
+          # matching PostgreSQL 17 client to export only durable account data.
+          # Never print the connection URI or the resulting SQL.
+          docker run --rm \
+            --env DATABASE_URL \
+            --entrypoint sh \
+            postgres:17-alpine \
+            -ec 'exec pg_dump --dbname="$DATABASE_URL" --data-only --no-owner --no-privileges --table=auth.users --table=auth.identities --table=auth.mfa_factors' \
+            > "$BACKUP_ROOT/database/auth-users.sql"
+
+          for table in users identities mfa_factors; do
+            if ! grep -q "^COPY auth\\.${table} " "$BACKUP_ROOT/database/auth-users.sql"; then
+              echo "::error::Auth backup is missing the expected auth.${table} table export"
+              exit 1
+            fi
+          done
+
       - name: Select weekly or manually requested media backup
         id: media
         env:
@@ -123,7 +146,7 @@ jobs:
           restic forget --host workcraftai-production --tag workcraftai-production --keep-daily 30 --prune
           {
             echo "## Encrypted backup completed"
-            echo "- Database snapshot: daily"
+            echo "- Database and Auth account snapshot: daily"
             echo "- Private estimate media included: $INCLUDE_STORAGE"
             echo "- Retention: 30 daily snapshots"
             echo "- Repository: restricted Google Drive folder; Restic client-side encryption"

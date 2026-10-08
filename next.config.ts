@@ -26,7 +26,7 @@ const securityHeaders = [
     value: "camera=(self), microphone=(self), geolocation=()",
   },
   {
-    key: "Content-Security-Policy-Report-Only",
+    key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
       "base-uri 'self'",
@@ -34,6 +34,7 @@ const securityHeaders = [
       "frame-ancestors 'none'",
       "form-action 'self' https://checkout.stripe.com",
       "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      "script-src-attr 'none'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

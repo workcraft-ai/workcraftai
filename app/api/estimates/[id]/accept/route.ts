@@ -1,18 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+
+const MAX_APPROVAL_BODY_BYTES = 2_000;
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Proposal approval is not configured." }, { status: 503 });
   const { id } = await params;
-  let body: Record<string, unknown>;
-  try {
-    const parsed: unknown = await request.json();
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return NextResponse.json({ error: "Enter your approval details." }, { status: 400 });
-    body = parsed as Record<string, unknown>;
-  } catch {
-    return NextResponse.json({ error: "Enter your approval details." }, { status: 400 });
+  const parsedBody = await readLimitedJsonObject(request, MAX_APPROVAL_BODY_BYTES);
+  if (!parsedBody.ok) {
+    return NextResponse.json(
+      { error: parsedBody.reason === "too_large" ? "Approval details are too large." : "Enter your approval details." },
+      { status: parsedBody.reason === "too_large" ? 413 : 400 },
+    );
   }
+  const body = parsedBody.value;
   const signatureName = typeof body.signatureName === "string" ? body.signatureName.trim().slice(0, 120) : "";
   const selectedPackage = typeof body.selectedPackage === "string" && body.selectedPackage.trim() ? body.selectedPackage.trim().slice(0, 40) : null;
   if (signatureName.length < 2) return NextResponse.json({ error: "Enter your full name to approve this estimate." }, { status: 400 });

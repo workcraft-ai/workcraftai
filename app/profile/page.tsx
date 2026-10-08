@@ -221,8 +221,8 @@ export default function ProfilePage() {
         <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Pro tools are enabled on this account." : "Create up to 10 estimates per day, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
         <div className="flex flex-wrap items-center gap-2">
           {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus}</span>}
-          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
-          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
+          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
+          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
         </div>
         {!hasProAccess && <p className="w-full text-xs text-slate-600">WorkCraft AI Pro is $9.99 per month. Free features remain available with no trial required.</p>}
       </section>
@@ -242,9 +242,9 @@ export default function ProfilePage() {
             {hasProAccess && !connectLoading && !stripeConnected && <p className="mt-2 text-xs text-slate-600">Connect Stripe to collect down payments and invoice balances. Stripe will guide you through account verification. Once active, sign in to Stripe with your own credentials to use the Full Dashboard.</p>}
             {hasProAccess && connectLoading && <p className="mt-2 text-xs text-slate-500">Checking Stripe connection…</p>}
           </div>
-          {hasProAccess && stripeConnected && stripeChargesEnabled && stripeDashboard === "full" && <a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">Open Stripe Dashboard</a>}
-          {hasProAccess && stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review" && <button type="button" disabled={stripeStatusRefreshing || connectLoading} onClick={() => void handleRefreshStripeStatus()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{stripeStatusRefreshing ? "Checking status…" : "Check Stripe status"}</button>}
-          {hasProAccess && !(stripeConnected && stripeChargesEnabled && stripeDashboard === "full") && !(stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review") && <button type="button" disabled={connectingStripe || connectLoading} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected && stripeChargesEnabled && stripeDashboard === "express" ? "Open Stripe Express" : stripeConnected ? "Continue Stripe setup" : "Connect Stripe"}</button>}
+          {hasProAccess && stripeConnected && stripeChargesEnabled && stripeDashboard === "full" && <a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">Open Stripe Dashboard</a>}
+          {hasProAccess && stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review" && <button type="button" disabled={stripeStatusRefreshing || connectLoading} onClick={() => void handleRefreshStripeStatus()} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{stripeStatusRefreshing ? "Checking status…" : "Check Stripe status"}</button>}
+          {hasProAccess && !(stripeConnected && stripeChargesEnabled && stripeDashboard === "full") && !(stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review") && <button type="button" disabled={connectingStripe || connectLoading} onClick={() => void handleConnectStripe()} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected && stripeChargesEnabled && stripeDashboard === "express" ? "Open Stripe Express" : stripeConnected ? "Continue Stripe setup" : "Connect Stripe"}</button>}
         </div>
       </section>
 
@@ -350,7 +350,7 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
+            className="min-h-11 bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
           >
             {saving ? "Saving Changes..." : "Save Preferences"}
           </button>
