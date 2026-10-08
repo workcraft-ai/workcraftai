@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
+import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
+import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
   if (!event) return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
-  const { data: claimed, error: claimError } = await admin.rpc("workcraft_claim_stripe_webhook", {
+  const { data: claimState, error: claimError } = await admin.rpc("workcraft_claim_stripe_webhook_state", {
     p_event_id: event.id,
     p_event_type: event.type,
   });
@@ -53,7 +55,13 @@ export async function POST(request: Request) {
     console.error("Stripe webhook idempotency check failed:", claimError.message);
     return NextResponse.json({ error: "Webhook processing is temporarily unavailable." }, { status: 503 });
   }
-  if (claimed !== true) return NextResponse.json({ received: true, duplicate: true });
+  const claimAction = getStripeWebhookClaimAction(claimState);
+  if (claimAction === "acknowledge_duplicate") {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+  if (claimAction === "retry") {
+    return NextResponse.json({ error: "This event is already being processed or could not be claimed. Stripe may retry it." }, { status: 503 });
+  }
 
   async function syncCustomerPayment(paymentId: string, connectedAccountId: string, paymentIntentId?: string | null) {
     const { data: payment, error: lookupError } = await admin.from("customer_payments")
@@ -106,7 +114,7 @@ export async function POST(request: Request) {
     // cannot roll local subscription status back to an older event snapshot.
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const userId = subscription.metadata.user_id;
-    if (!userId) return false;
+    if (!userId) return null;
     const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
     const { error } = await admin.from("subscriptions").upsert({
       user_id: userId,
@@ -117,7 +125,43 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     if (error) throw error;
-    return true;
+    return { userId, subscription };
+  }
+
+  async function sendPastDueBillingNotice(userId: string, eventId: string) {
+    const apiKey = process.env.RESEND_API_KEY;
+    const sender = process.env.RESEND_FROM_EMAIL;
+    if (!apiKey || !sender) throw new Error("Past-due billing email is not configured.");
+
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (error) throw new Error("Could not load the account email for a past-due notice.");
+    const recipient = data.user?.email;
+    if (!recipient) throw new Error("The account has no email address for a past-due notice.");
+
+    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@workcraftai.com";
+    const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin;
+    const billingUrl = new URL("/profile", appOrigin).toString();
+    const language = data.user?.user_metadata?.app_language === "es" ? "es" : "en";
+    const email = buildPastDueBillingEmail({ language, billingUrl, supportEmail });
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": pastDueNoticeIdempotencyKey(eventId),
+      },
+      body: JSON.stringify({
+        from: sender,
+        reply_to: supportEmail,
+        to: [recipient],
+        ...email,
+      }),
+    });
+    if (!response.ok) {
+      console.error("Past-due billing email provider rejected request:", response.status);
+      throw new Error("Past-due billing email provider request failed.");
+    }
   }
 
   try {
@@ -205,10 +249,19 @@ export async function POST(request: Request) {
 
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
+    const previousStatus = (event.data.previous_attributes as { status?: string } | null)?.status;
     const synced = await syncSubscription(subscription.id);
     if (!synced) {
       await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
       return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+    }
+    if (shouldSendPastDueNotice({
+      eventType: event.type,
+      eventStatus: subscription.status,
+      previousStatus,
+      currentStatus: synced.subscription.status,
+    })) {
+      await sendPastDueBillingNotice(synced.userId, event.id);
     }
   }
 

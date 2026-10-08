@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
@@ -31,12 +31,27 @@ export default function ProfilePage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeChargesEnabled, setStripeChargesEnabled] = useState(false);
   const [stripeRequirementsDue, setStripeRequirementsDue] = useState(true);
+  const [stripeSetupState, setStripeSetupState] = useState<"ready" | "needs_action" | "under_review" | "incomplete">("incomplete");
+  const [stripeStatusError, setStripeStatusError] = useState(false);
+  const [stripeStatusRefreshing, setStripeStatusRefreshing] = useState(false);
   const [stripeDashboard, setStripeDashboard] = useState<"full" | "express" | "none" | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  const refreshStripeStatus = useCallback(async () => {
+    const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
+    const connect = await response.json();
+    if (!response.ok) throw new Error(connect.error || "Could not load Stripe account status.");
+    setStripeConnected(connect.connected === true);
+    setStripeChargesEnabled(connect.chargesEnabled === true);
+    setStripeRequirementsDue(connect.requirementsDue === true);
+    setStripeSetupState(connect.setupState === "ready" || connect.setupState === "needs_action" || connect.setupState === "under_review" ? connect.setupState : "incomplete");
+    setStripeDashboard(connect.dashboard === "full" || connect.dashboard === "express" || connect.dashboard === "none" ? connect.dashboard : null);
+    setStripeStatusError(false);
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -64,22 +79,44 @@ export default function ProfilePage() {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
         }
         try {
-          const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
-          const connect = await response.json();
-          if (response.ok) {
-            setStripeConnected(connect.connected === true);
-            setStripeChargesEnabled(connect.chargesEnabled === true);
-            setStripeRequirementsDue(connect.requirementsDue === true);
-            setStripeDashboard(connect.dashboard === "full" || connect.dashboard === "express" || connect.dashboard === "none" ? connect.dashboard : null);
-          }
-        } catch { /* Stripe status is rechecked before each payment session. */ }
+          await refreshStripeStatus();
+        } catch {
+          setStripeStatusError(true);
+        }
       }
       setLoading(false);
       setConnectLoading(false);
     }
 
     loadProfile();
-  }, [supabase]);
+  }, [refreshStripeStatus, supabase]);
+
+  useEffect(() => {
+    if (stripeSetupState !== "under_review") return;
+
+    let active = true;
+    let remainingChecks = 12;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const checkAgain = () => {
+      timer = setTimeout(async () => {
+        if (!active) return;
+        remainingChecks -= 1;
+        try {
+          await refreshStripeStatus();
+        } catch {
+          if (active) setStripeStatusError(true);
+        }
+        if (active && remainingChecks > 0) checkAgain();
+      }, 10_000);
+    };
+
+    checkAgain();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [refreshStripeStatus, stripeSetupState]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +184,17 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRefreshStripeStatus = async () => {
+    setStripeStatusRefreshing(true);
+    try {
+      await refreshStripeStatus();
+    } catch {
+      setStripeStatusError(true);
+    } finally {
+      setStripeStatusRefreshing(false);
+    }
+  };
+
   const hasBillingHistory = planStatus !== "free";
   const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
 
@@ -187,12 +235,16 @@ export default function ProfilePage() {
             <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">{stripeDashboard === "express" ? "This existing Stripe connection uses the Express Dashboard. New connections use the Full Stripe Dashboard. Use the Open Stripe Express button to review payments and payout settings." : "Stripe-hosted onboarding collects verification and payout information directly. New connected accounts use the Full Stripe Dashboard; after Stripe activates your account, use your own Stripe login to manage payments, payouts, reports, and account details. Stripe processing fees are separate from your WorkCraft AI Pro subscription."}</p>
             {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature.</p>}
             {hasProAccess && !connectLoading && stripeConnected && stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-green-700">Stripe is connected and can accept payments.{stripeRequirementsDue ? " Stripe may request updated business information later." : ""}</p>}
-            {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-amber-700">Finish Stripe verification before accepting customer payments.</p>}
+            {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "needs_action" && <p role="status" className="mt-2 text-xs font-semibold text-amber-700">Stripe still needs information before it can activate payments. Continue setup to complete the remaining verification steps.</p>}
+            {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review" && <p role="status" className="mt-2 text-xs font-semibold text-amber-700">Stripe is reviewing your identity or business information. You do not need to submit it again while Stripe reviews it; we will check your status automatically for a short time.</p>}
+            {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "incomplete" && <p className="mt-2 text-xs font-semibold text-amber-700">Stripe setup is not active yet. Continue setup to review any remaining steps.</p>}
+            {hasProAccess && !connectLoading && stripeStatusError && <p role="status" className="mt-2 text-xs font-semibold text-red-700">We could not check your Stripe status. Retry the status check.</p>}
             {hasProAccess && !connectLoading && !stripeConnected && <p className="mt-2 text-xs text-slate-600">Connect Stripe to collect down payments and invoice balances. Stripe will guide you through account verification. Once active, sign in to Stripe with your own credentials to use the Full Dashboard.</p>}
             {hasProAccess && connectLoading && <p className="mt-2 text-xs text-slate-500">Checking Stripe connection…</p>}
           </div>
           {hasProAccess && stripeConnected && stripeChargesEnabled && stripeDashboard === "full" && <a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">Open Stripe Dashboard</a>}
-          {hasProAccess && !(stripeConnected && stripeChargesEnabled && stripeDashboard === "full") && <button type="button" disabled={connectingStripe || connectLoading} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected && stripeChargesEnabled && stripeDashboard === "express" ? "Open Stripe Express" : stripeConnected ? "Continue Stripe setup" : "Connect Stripe"}</button>}
+          {hasProAccess && stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review" && <button type="button" disabled={stripeStatusRefreshing || connectLoading} onClick={() => void handleRefreshStripeStatus()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{stripeStatusRefreshing ? "Checking status…" : "Check Stripe status"}</button>}
+          {hasProAccess && !(stripeConnected && stripeChargesEnabled && stripeDashboard === "full") && !(stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review") && <button type="button" disabled={connectingStripe || connectLoading} onClick={() => void handleConnectStripe()} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{connectingStripe ? "Opening Stripe…" : stripeConnected && stripeChargesEnabled && stripeDashboard === "express" ? "Open Stripe Express" : stripeConnected ? "Continue Stripe setup" : "Connect Stripe"}</button>}
         </div>
       </section>
 

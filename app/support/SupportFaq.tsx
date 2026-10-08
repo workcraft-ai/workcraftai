@@ -49,6 +49,10 @@ const questions = [
     answer: "Sign in and open your account menu to view your profile and plan options. If a charge or subscription change doesn’t look right, choose Billing in the contact form and include the email address on your WorkCraft AI account. Never send full payment card details.",
   },
   {
+    question: "What happens if my Pro subscription payment is past due?",
+    answer: "Your Pro access moves to the Free plan immediately, but your saved estimates, jobs, and other account data remain available. Sign in, open Profile, choose Manage billing, and update your payment method or pay the open invoice. Stripe restores Pro access after it confirms payment. WorkCraft AI sends a billing notice when the subscription first becomes past due.",
+  },
+  {
     question: "Does WorkCraft AI send estimates or customer emails?",
     answer: "You can send estimate and proposal emails from the app where the feature is available. If a message does not arrive, check the recipient address and spam folder, then contact us with the estimate number and the approximate time you sent it.",
   },
