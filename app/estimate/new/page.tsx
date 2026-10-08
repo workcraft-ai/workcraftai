@@ -568,14 +568,14 @@ export default function CreateEstimatePage() {
             <div className="space-y-3">
               {lineItems.map((item, index) => (
                 <div key={index} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5">
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:items-center">
                   <input
                     aria-label={`Line item ${index + 1} description`}
                     type="text"
                     placeholder="Item or service description"
                     value={item.description}
                     onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="col-span-2 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-1 sm:flex-1"
                   />
                   <input
                     aria-label={`Line item ${index + 1} quantity`}
@@ -584,7 +584,7 @@ export default function CreateEstimatePage() {
                     placeholder="Qty"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 0)}
-                    className="w-16 bg-white border border-slate-200 rounded-md p-2 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
                   />
                   <input
                     aria-label={`Line item ${index + 1} rate`}
@@ -594,17 +594,18 @@ export default function CreateEstimatePage() {
                     placeholder="Rate"
                     value={item.unit_price}
                     onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
-                    className="w-24 bg-white border border-slate-200 rounded-md p-2 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
                   />
-                  <div className="w-20 text-right text-xs font-semibold text-slate-700">
-                    ${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}
+                  <div className="flex min-w-0 items-center justify-between rounded-md px-2 text-sm font-semibold text-slate-700 sm:ml-auto sm:w-20 sm:justify-end sm:rounded-none sm:px-0 sm:text-right sm:text-xs">
+                    <span className="text-xs font-medium text-slate-500 sm:hidden">Amount</span>
+                    <span className="whitespace-nowrap">${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}</span>
                   </div>
                   {lineItems.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
                       aria-label={`Remove line item ${index + 1}`}
-                      className="text-slate-400 hover:text-red-500 text-xs px-1"
+                      className="min-h-12 min-w-12 justify-self-end px-3 text-xs text-slate-400 hover:text-red-500 sm:min-h-0 sm:min-w-0 sm:px-1"
                     >
                       ✕
                     </button>
