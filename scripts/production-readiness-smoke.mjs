@@ -48,6 +48,7 @@ async function signIn(emailName, passwordName) {
   assert.ok(data.session?.access_token, `No access token returned for ${emailName}`);
   return {
     accessToken: data.session.access_token,
+    userId: data.user.id,
     cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join("; "),
   };
 }
@@ -123,6 +124,9 @@ if (free && pro) {
   const otherRole = ownerRole === free ? pro : free;
   const estimateId = process.env.WORKCRAFT_E2E_CROSS_ACCOUNT_ESTIMATE_ID;
   if (estimateId) {
+    const readAppEstimate = async (account) => fetchJson(`${appUrl}/api/estimates/${encodeURIComponent(estimateId)}`, {
+      headers: { Cookie: account.cookie },
+    });
     const readEstimate = async (token) => {
       const query = new URLSearchParams({ select: "id", id: `eq.${estimateId}` });
       const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/estimates?${query}`, {
@@ -135,6 +139,58 @@ if (free && pro) {
     };
     await check("estimate owner can read the test estimate", async () => assert.equal((await readEstimate(ownerRole.accessToken)).length, 1));
     await check("another account cannot read the test estimate through Supabase REST", async () => assert.deepEqual(await readEstimate(otherRole.accessToken), []));
+    await check("estimate owner can read through the application API", async () => {
+      const { response, data } = await readAppEstimate(ownerRole);
+      assert.equal(response.status, 200, `Owner app API returned HTTP ${response.status}`);
+      assert.equal(data?.estimate?.id, estimateId);
+    });
+    await check("another account cannot read through the application API", async () => {
+      const { response } = await readAppEstimate(otherRole);
+      assert.equal(response.status, 404, `Other-account app API returned HTTP ${response.status}`);
+    });
+
+    const attachmentsQuery = new URLSearchParams({
+      select: "storage_path",
+      estimate_id: `eq.${estimateId}`,
+      user_id: `eq.${ownerRole.userId}`,
+      limit: "1",
+    });
+    const attachmentsResponse = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/estimate_attachments?${attachmentsQuery}`, {
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${ownerRole.accessToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    assert.equal(attachmentsResponse.status, 200, "Could not inspect the test estimate's private media fixture.");
+    const [attachment] = await attachmentsResponse.json();
+    if (attachment?.storage_path) {
+      const requestSignedUrl = async (account) => {
+        const encodedPath = attachment.storage_path.split("/").map(encodeURIComponent).join("/");
+        return fetch(`${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/sign/estimate-media/${encodedPath}`, {
+          method: "POST",
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${account.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ expiresIn: 30 }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(10_000),
+        });
+      };
+      await check("media owner can create a short-lived private-media URL", async () => {
+        const response = await requestSignedUrl(ownerRole);
+        assert.equal(response.status, 200, `Owner Storage API returned HTTP ${response.status}`);
+        const data = await response.json();
+        assert.ok(typeof data?.signedURL === "string" && data.signedURL.length > 0);
+      });
+      await check("another account cannot create a private-media URL", async () => {
+        const response = await requestSignedUrl(otherRole);
+        const data = await response.json().catch(() => null);
+        assert.ok(response.status !== 200 || typeof data?.signedURL !== "string", "Other account received a signed media URL.");
+      });
+    } else {
+      console.log("SKIP private-media isolation: attach a photo to the dedicated estimate fixture, then rerun.");
+    }
   } else {
     console.log("SKIP cross-account RLS checks: set WORKCRAFT_E2E_CROSS_ACCOUNT_ESTIMATE_ID to a dedicated test estimate ID.");
   }
@@ -162,6 +218,38 @@ async function runTestModeWebhookFixtures() {
 
   const adminHeaders = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" };
   const dbBase = `${supabaseUrl.replace(/\/$/, "")}/rest/v1`;
+  await check("concurrent duplicate Stripe deliveries claim one durable event", async () => {
+    const eventId = `evt_e2e_retry_${randomUUID().replaceAll("-", "")}`;
+    const event = {
+      id: eventId,
+      object: "event",
+      api_version: "2025-03-31.basil",
+      created: Math.floor(Date.now() / 1000),
+      data: { object: { id: `in_${randomUUID().replaceAll("-", "")}`, object: "invoice" } },
+      livemode: false,
+      pending_webhooks: 12,
+      request: { id: null, idempotency_key: null },
+      type: "invoice.created",
+    };
+    const payload = JSON.stringify(event);
+    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
+    const deliveries = await Promise.all(Array.from({ length: 12 }, () => fetch(`${appUrl}/api/webhooks/stripe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "stripe-signature": signature },
+      body: payload,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    })));
+    assert.ok(deliveries.every((response) => response.status === 200 || response.status === 503),
+      `Unexpected duplicate-event responses: ${deliveries.map(({ status }) => status).join(", ")}`);
+    const query = new URLSearchParams({ select: "status,attempts", event_id: `eq.${eventId}` });
+    const response = await fetch(`${dbBase}/stripe_webhook_events?${query}`, { headers: adminHeaders, cache: "no-store" });
+    assert.equal(response.status, 200, "Could not verify the durable webhook claim result.");
+    const [result] = await response.json();
+    assert.equal(result?.status, "processed");
+    assert.equal(result?.attempts, 1, "Concurrent copies claimed the event more than once.");
+  });
+
   const paymentQuery = new URLSearchParams({ select: "id,estimate_id,status,stripe_account_id", id: `eq.${paymentId}` });
   const initialResponse = await fetch(`${dbBase}/customer_payments?${paymentQuery}`, { headers: adminHeaders, cache: "no-store" });
   assert.equal(initialResponse.status, 200, "Could not read the disposable payment fixture.");
