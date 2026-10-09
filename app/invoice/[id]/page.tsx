@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -23,8 +23,13 @@ interface JobInvoice {
 }
 interface InvoiceLine { id: string; description: string; quantity: number; unit_price: number }
 
+const subscribeToLocation = () => () => {};
+const cameFromEstimateOnClient = () => new URLSearchParams(window.location.search).get("from") === "estimate";
+const cameFromEstimateOnServer = () => false;
+
 export default function InvoicePage() {
   const params = useParams<{ id: string }>();
+  const cameFromEstimate = useSyncExternalStore(subscribeToLocation, cameFromEstimateOnClient, cameFromEstimateOnServer);
   const [job, setJob] = useState<JobInvoice | null>(null);
   const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
@@ -68,12 +73,17 @@ export default function InvoicePage() {
   if (loading) return <main className="p-12 text-center text-sm text-slate-500">Preparing invoice…</main>;
   if (!job) return <main className="mx-auto max-w-xl p-8"><div className="rounded-xl border border-red-200 bg-white p-6 text-sm text-red-800">{error}</div></main>;
 
+  const returnHref = cameFromEstimate && job.estimate_id
+    ? `/estimate/${encodeURIComponent(job.estimate_id)}`
+    : "/schedule";
+  const returnLabel = returnHref === "/schedule" ? "← Back to jobs" : "← Back to estimate";
+
   return (
     <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-3xl space-y-5">
         {error && <p role="alert" className="print:hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-        <div className="print:hidden flex flex-wrap items-center justify-between gap-3"><Link href="/schedule" className="text-sm font-semibold text-blue-700 underline">← Back to jobs</Link><div className="flex gap-2">{isPro ? <select aria-label="Invoice status" value={job.invoice_status} onChange={(event) => void setStatus(event.target.value as JobInvoice["invoice_status"])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option></select> : <Link href="/profile" className="self-center text-xs font-semibold text-blue-700 underline">Manage invoice status with Pro</Link>}<button disabled={saving} onClick={() => window.print()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Print / Save PDF</button></div></div>
+        <div className="print:hidden flex flex-wrap items-center justify-between gap-3"><Link href={returnHref} className="text-sm font-semibold text-blue-700 underline">{returnLabel}</Link><div className="flex gap-2">{isPro ? <select aria-label="Invoice status" value={job.invoice_status} onChange={(event) => void setStatus(event.target.value as JobInvoice["invoice_status"])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option></select> : <Link href="/profile" className="self-center text-xs font-semibold text-blue-700 underline">Manage invoice status with Pro</Link>}<button disabled={saving} onClick={() => window.print()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Print / Save PDF</button></div></div>
         <article className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm sm:p-10">
           <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">WorkCraft AI · Invoice</p><h1 className="mt-1 text-3xl font-bold">Invoice</h1><p className="mt-2 text-sm text-slate-500">Invoice for {job.title}</p></div><div className="text-right"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-700">{job.invoice_status}</span><p className="mt-3 text-xs text-slate-500">Created {new Date(job.created_at).toLocaleDateString()}</p><p className="text-xs text-slate-500">Job status: {job.status.replaceAll("_", " ")}</p></div></header>
           <section className="grid gap-6 py-6 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Bill to</p><p className="mt-2 font-semibold">{job.client_name || "Customer"}</p><p className="text-sm text-slate-600">{job.client_email}</p><p className="text-sm text-slate-600">{job.job_address}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Job</p><p className="mt-2 font-semibold">{job.title}</p><p className="text-sm text-slate-600">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString() : "Date not scheduled"}</p></div></section>
