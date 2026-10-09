@@ -5,6 +5,18 @@ import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
+type UsageSnapshot = {
+  plan: "free" | "pro";
+  estimates: { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
+  ai: { included: boolean; enabled: boolean; daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
+  email: { included: boolean; daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
+  media: { included: boolean; monthly_used_bytes: number; monthly_limit_bytes: number; retained_bytes: number; retained_limit_bytes: number; file_count: number; file_limit: number };
+};
+
+function remaining(used: number, limit: number) {
+  return Math.max(limit - used, 0);
+}
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,6 +47,8 @@ export default function ProfilePage() {
   const [stripeStatusError, setStripeStatusError] = useState(false);
   const [stripeStatusRefreshing, setStripeStatusRefreshing] = useState(false);
   const [stripeDashboard, setStripeDashboard] = useState<"full" | "express" | "none" | null>(null);
+  const [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,6 +83,13 @@ export default function ProfilePage() {
         setBrandColor(user.user_metadata?.brand_color ?? "#c85b2d");
         setTaxRate(String(user.user_metadata?.tax_rate ?? 0));
         setMarkupPercentage(String(user.user_metadata?.markup_percentage ?? 0));
+        void fetch("/api/account/usage", { cache: "no-store" })
+          .then(async (response) => {
+            if (!response.ok) throw new Error("usage unavailable");
+            setUsageSnapshot(await response.json() as UsageSnapshot);
+          })
+          .catch(() => setUsageSnapshot(null))
+          .finally(() => setUsageLoading(false));
         const entitlement = await getClientProEntitlement();
         if (entitlement) {
           setPlanStatus(entitlement.stripe_status);
@@ -84,6 +105,7 @@ export default function ProfilePage() {
           setStripeStatusError(true);
         }
       }
+      if (!user) setUsageLoading(false);
       setLoading(false);
       setConnectLoading(false);
     }
@@ -218,13 +240,41 @@ export default function ProfilePage() {
       </div>
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Pro tools are enabled on this account." : "Create up to 10 estimates per day, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Your Pro plan includes up to 50 estimates per day and 500 per month, 5 cloud AI drafts per day and 50 per month, 5 customer-facing emails per day and 100 per month, and up to 100 MB of media uploads per month. Check the usage panel below for what remains." : "Create up to 10 estimates per day and 50 per month, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
         <div className="flex flex-wrap items-center gap-2">
           {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus}</span>}
           {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-11 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
         </div>
         {!hasProAccess && <p className="w-full text-xs text-slate-600">WorkCraft AI Pro is $9.99 per month. Free features remain available with no trial required.</p>}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="account-usage-heading">
+        <h2 id="account-usage-heading" className="text-lg font-bold text-slate-900">Your usage and allowances</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-600">Usage is counted per account and resets at UTC midnight or the first day of the month, as shown.</p>
+        {usageLoading && <p role="status" className="mt-3 text-sm text-slate-500">Loading your usage…</p>}
+        {!usageLoading && !usageSnapshot && <p role="status" className="mt-3 text-sm text-amber-800">Usage totals are temporarily unavailable. Refresh this page shortly.</p>}
+        {usageSnapshot && <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg bg-slate-50 p-4">
+            <h3 className="text-sm font-bold text-slate-900">Estimates</h3>
+            <p role="status" className={`mt-1 text-xs leading-5 ${remaining(usageSnapshot.estimates.daily_used, usageSnapshot.estimates.daily_limit) === 0 || remaining(usageSnapshot.estimates.monthly_used, usageSnapshot.estimates.monthly_limit) === 0 ? "font-semibold text-red-800" : remaining(usageSnapshot.estimates.daily_used, usageSnapshot.estimates.daily_limit) <= 2 || remaining(usageSnapshot.estimates.monthly_used, usageSnapshot.estimates.monthly_limit) <= 10 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{remaining(usageSnapshot.estimates.daily_used, usageSnapshot.estimates.daily_limit)} of {usageSnapshot.estimates.daily_limit} left today · {remaining(usageSnapshot.estimates.monthly_used, usageSnapshot.estimates.monthly_limit)} of {usageSnapshot.estimates.monthly_limit} left this month</p>
+          </div>
+          {hasProAccess && <>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <h3 className="text-sm font-bold text-slate-900">Cloud AI drafts</h3>
+              <p role="status" className={`mt-1 text-xs leading-5 ${remaining(usageSnapshot.ai.daily_used, usageSnapshot.ai.daily_limit) === 0 || remaining(usageSnapshot.ai.monthly_used, usageSnapshot.ai.monthly_limit) === 0 ? "font-semibold text-red-800" : remaining(usageSnapshot.ai.daily_used, usageSnapshot.ai.daily_limit) <= 1 || remaining(usageSnapshot.ai.monthly_used, usageSnapshot.ai.monthly_limit) <= 10 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{usageSnapshot.ai.enabled ? `${remaining(usageSnapshot.ai.daily_used, usageSnapshot.ai.daily_limit)} of ${usageSnapshot.ai.daily_limit} left today · ${remaining(usageSnapshot.ai.monthly_used, usageSnapshot.ai.monthly_limit)} of ${usageSnapshot.ai.monthly_limit} left this month` : "Cloud estimate drafting is temporarily paused."}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <h3 className="text-sm font-bold text-slate-900">Customer emails</h3>
+              <p role="status" className={`mt-1 text-xs leading-5 ${remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit) === 0 || remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit) === 0 ? "font-semibold text-red-800" : remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit) <= 1 || remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit) <= 20 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit)} of {usageSnapshot.email.daily_limit} left today · {remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit)} of {usageSnapshot.email.monthly_limit} left this month</p>
+              <p className="mt-1 text-[11px] text-slate-500">Estimate emails, follow-ups, and customer-question alerts share this allowance.</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <h3 className="text-sm font-bold text-slate-900">Private media storage</h3>
+              <p role="status" className={`mt-1 text-xs leading-5 ${usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 0 ? "font-semibold text-red-800" : usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 10 * 1048576 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{Math.max(usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes, 0) / 1048576} MB left to upload this month · {(usageSnapshot.media.retained_bytes / 1048576).toFixed(1)} of {(usageSnapshot.media.retained_limit_bytes / 1048576).toFixed(0)} MB stored · {usageSnapshot.media.file_count} of {usageSnapshot.media.file_limit} files</p>
+            </div>
+          </>}
+        </div>}
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

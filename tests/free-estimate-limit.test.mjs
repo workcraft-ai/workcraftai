@@ -9,7 +9,7 @@ import {
 test("free estimate limit accepts bounded whole numbers, including zero", () => {
   assert.equal(parseFreeDailyEstimateLimit(0), 0);
   assert.equal(parseFreeDailyEstimateLimit(10), 10);
-  assert.equal(parseFreeDailyEstimateLimit(1000), 1000);
+  assert.equal(parseFreeDailyEstimateLimit(1000), null);
   for (const value of [-1, 1001, 1.5, "10", null, undefined, Number.NaN]) {
     assert.equal(parseFreeDailyEstimateLimit(value), null);
   }

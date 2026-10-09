@@ -31,6 +31,7 @@ interface Estimate {
 
 type EstimateStatus = "pending" | "accepted" | "paid" | "declined";
 const estimateStatuses: EstimateStatus[] = ["pending", "accepted", "paid", "declined"];
+type EmailAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
 
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 
@@ -61,6 +62,7 @@ export default function DashboardPage() {
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
   const [firstName, setFirstName] = useState("");
   const [greetingKey, setGreetingKey] = useState<GreetingKey | null>(null);
+  const [emailAllowance, setEmailAllowance] = useState<EmailAllowance | null>(null);
 
   async function fetchEstimates() {
     try {
@@ -77,8 +79,14 @@ export default function DashboardPage() {
         setFirstName(typeof fullName === "string" ? fullName.trim().split(/\s+/)[0] ?? "" : "");
         const entitlement = await getClientProEntitlement();
         setIsPro(entitlement?.has_pro === true);
+        void fetch("/api/account/usage", { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) return;
+          const usage = await response.json();
+          if (usage.email) setEmailAllowance(usage.email as EmailAllowance);
+        }).catch(() => {});
       } else {
         setFirstName("");
+        setEmailAllowance(null);
       }
       const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, event, created_at").order("created_at", { ascending: false });
       const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").order("created_at", { ascending: false }).limit(20);
@@ -118,9 +126,23 @@ export default function DashboardPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Email could not be sent.");
       setEmailEvents((current) => ({ ...current, [id]: "sent" }));
-      setSendMessage("Estimate email sent.");
+      if (typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number") {
+        setEmailAllowance((current) => current ? {
+          ...current,
+          daily_used: current.daily_limit - result.emailQuota.remainingToday,
+          monthly_used: current.monthly_limit - result.emailQuota.remainingThisMonth,
+        } : current);
+      }
+      setSendMessage(typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number"
+        ? `Estimate email sent. ${result.emailQuota.remainingToday} Pro emails remain today and ${result.emailQuota.remainingThisMonth} this month.`
+        : "Estimate email sent.");
     } catch (error) {
       setSendMessage(error instanceof Error ? error.message : "Email could not be sent.");
+      void fetch("/api/account/usage", { cache: "no-store" }).then(async (usageResponse) => {
+        if (!usageResponse.ok) return;
+        const usage = await usageResponse.json();
+        if (usage.email) setEmailAllowance(usage.email as EmailAllowance);
+      }).catch(() => {});
     } finally { setSendingId(null); }
   };
 
@@ -227,6 +249,9 @@ export default function DashboardPage() {
           <ToolLink href="/pricebook" title="Price book & templates" description="Save your rates and reusable scopes" />
           <ToolLink href="/reports" title="Reports" description="See estimate pipeline and job totals" />
         </nav>
+        {isPro && emailAllowance && <p role="status" className={`rounded-lg border bg-white px-4 py-3 text-sm ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) === 0 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) === 0 ? "border-red-200 font-semibold text-red-800" : Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) <= 1 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) <= 20 ? "border-amber-200 font-semibold text-amber-800" : "border-slate-200 text-slate-700"}`}>
+          {translate(language, `Customer email allowance: ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0)} of ${emailAllowance.daily_limit} left today · ${Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0)} of ${emailAllowance.monthly_limit} left this month (UTC).`)}
+        </p>}
         {sendMessage && <p role="status" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{sendMessage}</p>}
 
         {questions.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

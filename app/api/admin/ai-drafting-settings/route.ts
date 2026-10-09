@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageFreeDailyEstimateLimit, parseFreeDailyEstimateLimit } from "@/lib/free-estimate-limit.mjs";
+import { canManageFreeDailyEstimateLimit } from "@/lib/free-estimate-limit.mjs";
 import { requireTradeFlowAdmin, sameOrigin, validReason } from "@/lib/admin-support";
 
 export async function GET() {
@@ -10,13 +10,15 @@ export async function GET() {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }, { data: globalUsage, error: globalUsageError }] = await Promise.all([
-    access.admin.from("tradeflow_app_settings").select("ai_drafting_enabled, ai_daily_generation_limit, ai_global_daily_generation_limit, updated_at").eq("singleton", true).single(),
+  const month = `${today.slice(0, 7)}-01`;
+  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }, { data: globalUsage, error: globalUsageError }, { data: monthlyUsage, error: monthlyUsageError }] = await Promise.all([
+    access.admin.from("tradeflow_app_settings").select("ai_drafting_enabled, ai_daily_generation_limit, ai_monthly_generation_limit, ai_global_daily_generation_limit, updated_at").eq("singleton", true).single(),
     access.admin.from("tradeflow_ai_daily_usage").select("attempts_started, succeeded, failed").eq("usage_date", today),
     access.admin.from("tradeflow_ai_global_daily_usage").select("attempts_started").eq("usage_date", today).maybeSingle(),
+    access.admin.from("tradeflow_ai_monthly_usage").select("attempts_started").eq("usage_month", month),
   ]);
-  if (settingsError || usageError || globalUsageError) {
-    console.error("Could not read AI drafting settings:", settingsError?.message ?? usageError?.message ?? globalUsageError?.message);
+  if (settingsError || usageError || globalUsageError || monthlyUsageError) {
+    console.error("Could not read AI drafting settings:", settingsError?.message ?? usageError?.message ?? globalUsageError?.message ?? monthlyUsageError?.message);
     return NextResponse.json({ error: "Could not load AI drafting settings. Apply the AI cost controls migration." }, { status: 503 });
   }
 
@@ -25,7 +27,8 @@ export async function GET() {
     succeeded: result.succeeded + row.succeeded,
     failed: result.failed + row.failed,
   }), { attempts_started: 0, succeeded: 0, failed: 0 });
-  return NextResponse.json({ ...settings, today: { ...totals, global_attempts_started: globalUsage?.attempts_started ?? 0 } }, { headers: { "Cache-Control": "no-store" } });
+  const monthAttempts = (monthlyUsage ?? []).reduce((sum, row) => sum + row.attempts_started, 0);
+  return NextResponse.json({ ...settings, today: { ...totals, global_attempts_started: globalUsage?.attempts_started ?? 0 }, this_month: { attempts_started: monthAttempts } }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -40,8 +43,8 @@ export async function POST(request: Request) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
   if (typeof body.enabled !== "boolean") return NextResponse.json({ error: "The cloud drafting status must be enabled or paused." }, { status: 400 });
-  const limit = parseFreeDailyEstimateLimit(body.daily_limit);
-  if (limit === null || limit < 1) return NextResponse.json({ error: "The daily AI generation limit must be a whole number from 1 to 1,000." }, { status: 400 });
+  const limit = typeof body.daily_limit === "number" ? body.daily_limit : Number(body.daily_limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 5) return NextResponse.json({ error: "The daily AI generation limit must be a whole number from 1 to 5." }, { status: 400 });
   const globalLimit = typeof body.global_daily_limit === "number" ? body.global_daily_limit : Number(body.global_daily_limit);
   if (!Number.isInteger(globalLimit) || globalLimit < 1 || globalLimit > 5000) return NextResponse.json({ error: "The platform-wide AI daily limit must be a whole number from 1 to 5,000." }, { status: 400 });
   if (!validReason(body.reason)) return NextResponse.json({ error: "Provide a reason of at least 8 characters." }, { status: 400 });

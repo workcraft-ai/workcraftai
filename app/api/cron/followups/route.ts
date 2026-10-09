@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
         return false;
       }
-      const { reservation, error: quotaError } = await reserveAppEmail(admin, "follow_up");
+      const { reservation, error: quotaError } = await reserveAppEmail(admin, "follow_up", estimate.user_id, estimate.id);
       if (quotaError || !reservation) {
         console.error("Could not reserve estimate follow-up email quota:", quotaError?.message ?? "invalid reservation response");
         await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });

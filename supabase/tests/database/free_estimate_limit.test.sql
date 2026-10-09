@@ -127,7 +127,7 @@ select is(
 );
 select throws_ok(
   $$select public.update_free_daily_estimate_limit(1001, 'a1000000-0000-4000-8000-000000000003', 'quota-admin@example.test', 'Invalid test limit')$$,
-  '22023', 'Limit must be an integer from 0 to 1000.', 'the database rejects out-of-range limits'
+  '22023', 'Limit must be an integer from 0 to 10.', 'the database rejects out-of-range limits'
 );
 select throws_ok(
   $$select public.update_free_daily_estimate_limit(4, 'a1000000-0000-4000-8000-000000000003', 'quota-admin@example.test', 'short')$$,
