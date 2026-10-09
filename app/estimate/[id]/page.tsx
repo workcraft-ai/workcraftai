@@ -227,7 +227,7 @@ export default function ClientEstimatePage() {
 
   const createOrOpenInvoice = async () => {
     if (invoiceJobId) {
-      router.push(`/invoice/${encodeURIComponent(invoiceJobId)}`);
+      router.push(`/invoice/${encodeURIComponent(invoiceJobId)}?from=estimate`);
       return;
     }
     if (!isOwner || !ownerHasPro || !["accepted", "paid"].includes(estimate?.status ?? "")) return;
@@ -242,7 +242,7 @@ export default function ClientEstimatePage() {
         return;
       }
       setInvoiceJobId(result.job_id);
-      router.push(`/invoice/${encodeURIComponent(result.job_id)}`);
+      router.push(`/invoice/${encodeURIComponent(result.job_id)}?from=estimate`);
     } catch {
       setInvoiceError("Could not create the invoice. Please try again.");
       setCreatingInvoice(false);
