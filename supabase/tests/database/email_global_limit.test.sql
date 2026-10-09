@@ -74,10 +74,16 @@ select is(
   0,
   'released reservations decrement the global counter exactly once'
 );
-select is(
-  (select reason from public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000001')),
-  'allowed',
-  'Pro estimate email reserves through the same global quota'
+select ok(
+  exists (
+    select 1
+    from public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000001') as reservation
+    where reservation.reason = 'allowed'
+      and reservation.usage_date = (pg_catalog.now() at time zone 'UTC')::date
+      and reservation.account_daily_limit = 5
+      and reservation.account_monthly_limit = 100
+  ),
+  'Pro estimate email reserves quota and returns the per-account limits'
 );
 select is(
   (select email_count from public.estimate_email_daily_usage where user_id = 'a5000000-0000-4000-8000-000000000001' and usage_date = (pg_catalog.now() at time zone 'UTC')::date),
@@ -100,7 +106,11 @@ select is(
   'authorized super admin can update the platform email cap'
 );
 select is(
-  (select reason from public.workcraft_reserve_app_email('follow_up')),
+  (select reason from public.workcraft_reserve_app_email(
+    'follow_up',
+    'a5000000-0000-4000-8000-000000000001',
+    'b5000000-0000-4000-8000-000000000001'
+  )),
   'allowed',
   'the final available global slot is reserved'
 );
