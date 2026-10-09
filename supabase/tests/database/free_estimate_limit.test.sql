@@ -89,8 +89,10 @@ select auth.uid(), 'Pro test ' || n, 'pro' || n || '@example.test'
 from generate_series(1, 4) n;
 reset role;
 select is(
-  (select count(*) from public.tradeflow_daily_estimate_usage where user_id = 'a1000000-0000-4000-8000-000000000002'),
-  4::bigint,
+  (select estimates_created from public.tradeflow_daily_estimate_usage
+    where user_id = 'a1000000-0000-4000-8000-000000000002'
+      and usage_date = (now() at time zone 'UTC')::date),
+  4,
   'active Pro estimate activity is tracked against the Pro account allowance'
 );
 
