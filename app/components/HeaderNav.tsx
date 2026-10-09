@@ -141,24 +141,32 @@ export default function HeaderNav() {
           {translate(language, label)}
         </Link>
       ))}
-      <Link
-        href="/estimate/new"
-        onClick={() => setMobileMenuOpen(false)}
-        className={`rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 ${mobile ? "mt-2 flex min-h-12 items-center justify-center text-center" : "inline-flex min-h-12 items-center whitespace-nowrap"}`}
-      >
-        {translate(language, "+ New estimate")}
-      </Link>
+      {!mobile && (
+        <Link
+          href="/estimate/new"
+          className="inline-flex min-h-12 items-center whitespace-nowrap rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+        >
+          {translate(language, "+ New estimate")}
+        </Link>
+      )}
     </>
   );
 
   return (
-    <div className="relative flex items-center gap-2 sm:gap-3">
-      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
+    <div className="relative flex w-full items-center justify-end gap-1 sm:gap-2 lg:w-auto">
+      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="hidden min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 sm:inline-flex" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
         {language === "en" ? "ES" : "EN"}
       </button>
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
         {renderLinks()}
       </nav>
+
+      <Link
+        href="/estimate/new"
+        className="inline-flex min-h-12 items-center whitespace-nowrap rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 lg:hidden"
+      >
+        {translate(language, "+ New estimate")}
+      </Link>
 
       <div className="relative" ref={dropdownRef}>
         <button
@@ -210,6 +218,9 @@ export default function HeaderNav() {
       {mobileMenuOpen && (
         <nav id="mobile-main-navigation" aria-label="Mobile navigation" className="absolute right-0 top-full z-40 mt-3 w-64 rounded-xl border border-slate-700 bg-slate-900 p-2 shadow-xl lg:hidden">
           {renderLinks(true)}
+          <button type="button" onClick={() => { setLanguage(language === "en" ? "es" : "en"); setMobileMenuOpen(false); }} className="mt-2 inline-flex min-h-12 w-full items-center rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
+            {translate(language, language === "en" ? "Spanish" : "English")}
+          </button>
         </nav>
       )}
     </div>

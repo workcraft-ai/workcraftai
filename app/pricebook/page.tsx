@@ -123,13 +123,22 @@ export default function PriceBookPage() {
     router.push("/estimate/new");
   };
 
+  const openPriceBookItems = () => {
+    if (tab !== "items") {
+      setTab("items");
+      window.setTimeout(() => document.getElementById("add-price-book-item")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      return;
+    }
+    document.getElementById("add-price-book-item")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Free tools</p><h1 className="mt-1 text-2xl font-bold">Price book & templates</h1><p className="mt-1 text-sm text-slate-600">Set your own rates and reuse the work you quote most.</p></div>
-          <Link href="/estimate/new" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Create estimate</Link>
+          <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Free tools</p><h1 className="mt-1 text-2xl font-bold">Price book & templates</h1><p className="mt-1 text-sm text-slate-600">Set your own rates and reuse the work you quote most.</p></div>
+          <button type="button" onClick={openPriceBookItems} className="inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">+ Add item</button>
         </header>
 
         {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -142,7 +151,7 @@ export default function PriceBookPage() {
 
         {tab === "items" ? (
           <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-            <form onSubmit={addItem} className="h-fit space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <form id="add-price-book-item" onSubmit={addItem} className="h-fit scroll-mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold">{editingId ? "Edit price book item" : "Add a price book item"}</h2>
               <Field label="Item or service"><input required value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} placeholder="Faucet installation" /></Field>
               <Field label="Description"><input value={description} onChange={(event) => setDescription(event.target.value)} className={fieldClass} placeholder="Standard fixture install" /></Field>

@@ -197,11 +197,11 @@ export default function SchedulePage() {
         </section> : <>
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Operations</p>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Operations</p>
             <h1 className="mt-1 text-2xl font-bold">Schedule & job tracking</h1>
             <p className="mt-1 text-sm text-slate-600">Plan upcoming work and keep every job moving.</p>
           </div>
-          <button onClick={() => setShowForm((open) => !open)} className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">{showForm ? "Close" : "+ Schedule a job"}</button>
+          <button type="button" onClick={() => setShowForm((open) => !open)} className={showForm ? "inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" : "inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"}>{showForm ? "Close" : "+ Schedule a job"}</button>
         </header>
 
         {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
