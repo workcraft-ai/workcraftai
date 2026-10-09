@@ -8,7 +8,7 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { translate, useLanguage } from "@/app/components/LanguageProvider";
 
 const appLinks = [
-  { href: "/dashboard", label: "Estimates" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/customers", label: "Customers" },
   { href: "/schedule", label: "Schedule & jobs" },
   { href: "/pricebook", label: "Price book" },
