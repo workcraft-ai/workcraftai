@@ -18,6 +18,7 @@ interface LineItem {
 
 interface Estimate {
   id: string;
+  reference_number: string;
   client_name: string;
   client_email: string;
   client_phone?: string;
@@ -297,6 +298,7 @@ export default function ClientEstimatePage() {
                 {contractor.logoUrl && <Image unoptimized width={128} height={48} src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-12 w-32 object-contain" />}
                 <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
               </div>
+              <p className="mt-2 text-xs font-semibold text-slate-600"><span>Estimate #</span>{estimate.reference_number}</p>
               <p className="text-xs text-slate-500 mt-0.5">
                 <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(estimate.proposal_language === "es" ? "es-ES" : "en-US")}
               </p>

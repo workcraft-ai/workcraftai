@@ -29,6 +29,7 @@ export default function EditEstimatePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [referenceNumber, setReferenceNumber] = useState("");
 
   // Form State
   const [clientName, setClientName] = useState("");
@@ -61,6 +62,7 @@ export default function EditEstimatePage() {
 
         const { estimate, lineItems: items } = data;
 
+        setReferenceNumber(typeof estimate.reference_number === "string" ? estimate.reference_number : "");
         setClientName(estimate.client_name || "");
         setClientEmail(estimate.client_email || "");
         setClientPhone(estimate.client_phone || "");
@@ -187,9 +189,7 @@ export default function EditEstimatePage() {
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Edit Estimate</h1>
-              <p className="text-xs text-slate-500">
-                Modifying estimate ID: <span className="font-mono">{id}</span>
-              </p>
+              {referenceNumber && <p className="text-xs font-medium text-slate-600">Estimate #{referenceNumber}</p>}
             </div>
             <button
               type="button"

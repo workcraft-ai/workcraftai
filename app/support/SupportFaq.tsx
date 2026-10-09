@@ -9,6 +9,10 @@ const questions = [
     answer: "Sign in and choose New estimate. Add the customer and job details, review the line items and totals, then save. You can find saved estimates on your dashboard.",
   },
   {
+    question: "Where can I find my estimate reference number?",
+    answer: "Each saved estimate has a readable reference such as WC-2026-0001. You can see it in your estimate list, on the proposal, and in estimate emails. The full ID in a share link remains in place for secure access.",
+  },
+  {
     question: "How many estimates can I create on the free plan?",
     answer: "Free accounts can save up to 10 new estimates per UTC calendar day and 50 per UTC calendar month. Both counters reset by UTC. Editing an estimate, saving a browser-only draft, or a failed save does not use a slot. Existing estimates remain available.",
   },
