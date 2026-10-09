@@ -27,11 +27,11 @@ The app shows estimates remaining in the estimate editor and Profile; Pro AI rem
 
 ## Migration and release sequence
 
-The migration `supabase/migrations/20261008231000_per_account_plan_quotas.sql` is prepared but has not been applied to any database. It does not delete customer estimates, email events, or media. It seeds current-period counters from existing estimates, email events/reservations, AI events, and current-month media objects. Consequently, existing activity in the active UTC period counts toward that period's initial allowance. The Free daily admin setting is clamped to a maximum of 10; the AI daily setting is set to the advertised 5 and cannot be raised above 5.
+The migration `supabase/migrations/20261009025908_per_account_plan_quotas.sql` has been applied to Staging and is awaiting the Production release. It does not delete customer estimates, email events, or media. It seeds current-period counters from existing estimates, email events/reservations, AI events, and current-month media objects. Consequently, existing activity in the active UTC period counts toward that period's initial allowance. The Free daily admin setting is clamped to a maximum of 10; the AI daily setting is set to the advertised 5 and cannot be raised above 5.
 
-Before production release:
+For this release:
 
-1. Apply and inspect this migration in Staging first, using the repository's established Supabase workflow.
+1. **Complete:** Apply this migration in Staging first. The recorded version is `20261009025908`, matching the repository filename.
 2. Run the database security checks and quota concurrency checks against Staging, including estimate daily/monthly contention, AI daily/monthly and global contention, email reservation/release behavior, and two concurrent media uploads at the edge of a cap.
 3. Deploy the matching application version to Preview and verify Free and Pro account displays, rejection at each account cap, reset text, and English/Spanish copy. Confirm existing estimates and retained files remain accessible.
 4. After Staging and Preview pass, schedule production migration and deployment together. Do not deploy this application before its migration is applied: the app reads newly introduced settings and RPCs.
