@@ -31,6 +31,10 @@ Pro checkout and subscription management are available from **Profile & Preferen
 
 The public support form remains available to prospective customers and is protected by request size checks, origin validation, a honeypot, and IP-based rate limits. Support and retention mail count against the shared 75/day platform email ceiling, but not an individual Pro customer's 5/day and 100/month allowance. Those business-support messages are operational overhead rather than an app tier feature.
 
+## Planned security improvement with a Supabase plan upgrade
+
+When WorkCraft AI upgrades Supabase to a plan that supports Auth session duration controls, configure a **30-day inactivity timeout** and a **90-day maximum session lifetime**. Keep the current refreshable session behavior until then so contractors can work on phones without unnecessary daily sign-ins. Before enabling the limits, verify that normal use refreshes the session, inactive users are asked to sign in again, and estimates in progress recover safely after reauthentication. This is a future Auth configuration and verification task; it does not change the current session behavior or require a schema migration.
+
 ## Invoice and payment flow
 
 An accepted estimate can be converted into a Pro job and a printable invoice. The invoice view links back to the accepted proposal, where customers can pay an enabled deposit or remaining balance through Stripe Checkout. WorkCraft AI does not currently provide a separate emailed, customer-facing invoice portal. Customer charges use Stripe Connect direct charges on the contractor's connected account; WorkCraft AI does not receive or transfer customer funds. Stripe-hosted onboarding collects contractor verification and payout details. The contractor is responsible for the work, payment terms, customer support, refunds, and disputes.
