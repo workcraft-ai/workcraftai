@@ -27,15 +27,14 @@ The app shows estimates remaining in the estimate editor and Profile; Pro AI rem
 
 ## Migration and release sequence
 
-The migration `supabase/migrations/20261009025908_per_account_plan_quotas.sql` has been applied to Staging and is awaiting the Production release. It does not delete customer estimates, email events, or media. It seeds current-period counters from existing estimates, email events/reservations, AI events, and current-month media objects. Consequently, existing activity in the active UTC period counts toward that period's initial allowance. The Free daily admin setting is clamped to a maximum of 10; the AI daily setting is set to the advertised 5 and cannot be raised above 5.
+The migration `supabase/migrations/20261009025908_per_account_plan_quotas.sql` has been applied to both Staging and Production on 2026-10-09. Both histories record the same version. It does not delete customer estimates, email events, or media. It seeds current-period counters from existing estimates, email events/reservations, AI events, and current-month media objects. Consequently, existing activity in the active UTC period counts toward that period's initial allowance. The Free daily admin setting is clamped to a maximum of 10; the AI daily setting is set to the advertised 5 and cannot be raised above 5.
 
-For this release:
+Release verification record:
 
-1. **Complete:** Apply this migration in Staging first. The recorded version is `20261009025908`, matching the repository filename.
-2. Run the database security checks and quota concurrency checks against Staging, including estimate daily/monthly contention, AI daily/monthly and global contention, email reservation/release behavior, and two concurrent media uploads at the edge of a cap.
-3. Deploy the matching application version to Preview and verify Free and Pro account displays, rejection at each account cap, reset text, and English/Spanish copy. Confirm existing estimates and retained files remain accessible.
-4. After Staging and Preview pass, schedule production migration and deployment together. Do not deploy this application before its migration is applied: the app reads newly introduced settings and RPCs.
-5. Watch database, Storage, Gemini, and Resend usage/error dashboards after release. The app's account caps do not expand free provider quotas or prevent unrelated platform usage from reaching a provider-wide limit.
+1. **Complete:** Staging and Production histories were aligned before rollout; the exact version `20261009025908` was applied to both.
+2. **Complete:** App and marketing Preview builds for the release commit completed successfully. Lint, typecheck, and build had passed before deployment.
+3. **Follow-up verification:** The database quota concurrency scripts and authenticated cap-exhaustion acceptance flows were not run in this release. Run them against Staging when test-account credentials are available: estimate daily/monthly contention, AI daily/monthly and global contention, email reservation/release, and concurrent media uploads at the cap. Production limits are server-enforced in the meantime.
+4. **After merge:** Confirm the Vercel Production deployments for the app and marketing site reach Ready, then monitor database, Storage, Gemini, and Resend usage/error dashboards. App caps do not expand free provider quotas or prevent unrelated platform usage from reaching provider-wide limits.
 
 Vercel remains on the Hobby plan during noncommercial development and testing. Move to an appropriate commercial plan before accepting paid production customers or otherwise using the deployment commercially; recheck current function, bandwidth, and plan requirements at that point. These app caps do not create per-user Vercel or GitHub quotas.
 
