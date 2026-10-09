@@ -268,5 +268,5 @@ Coverage gaps to close before broad launch:
 - npm run build: passed; Next.js built 42 static pages with Webpack.
 - npm audit --omit=dev --audit-level=high: could not reach registry.npmjs.org, so no audit conclusion.
 - Supabase Production and Staging: 32 migration versions match through 20261009161204_fix_estimate_email_quota_usage_date_ambiguity; all listed tables have RLS enabled.
-- Vercel: previously recorded app and company-site Production deployments were Ready at f65f2cb; current deployment/environment API requests returned 403 and the CLI is unavailable, so this release's deployment state is not yet verified.
+- Vercel: after PR #74 merged as 209daa8, both Production deployment checks passed; the app health endpoint and marketing homepage returned 200. Current deployment/environment API requests returned 403 and the CLI is unavailable, so project settings and plan remain unverified.
 - This audit did not execute a new live Production two-account Storage/API check, Stripe provider event, Resend delivery, outage simulation, or backup restore.
