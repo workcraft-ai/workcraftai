@@ -1,6 +1,6 @@
 # Production readiness status and remaining verification
 
-Last refreshed: 2026-10-08. This checklist separates checks supported by current evidence from steps that still need provider delivery evidence or an owner-controlled account. It does not claim that a test event, restore, legal review, or Production cross-account exercise has succeeded unless noted below.
+Last refreshed: 2026-10-09. This checklist separates checks supported by current evidence from steps that still need provider delivery evidence or an owner-controlled account. It does not claim that a test event, restore, legal review, or Production cross-account exercise has succeeded unless noted below.
 
 ## Verified state
 
@@ -15,6 +15,7 @@ Last refreshed: 2026-10-08. This checklist separates checks supported by current
 - Google Search Console's `workcraftai.com` Domain property is available. Both sitemaps show **Success**; URL Inspection confirms the canonical `https://workcraftai.com/` homepage is indexed and served over HTTPS. The examples in the current indexing report are expected (`/login` is noindex, HTTP redirects to HTTPS, and `www` canonicalizes to the root HTTPS host). Recheck at the next Google report refresh; no immediate indexing fix is indicated.
 - Estimate email source sets `WorkCraft AI <estimates@workcraftai.com>` and contractor Reply-To. The signed-in dashboard send attempt showed no confirmation or sent status, and Resend shows no new estimate message or POST `/emails` request after that attempt. A fresh estimate delivery event and Reply-To headers therefore remain unverified. The bilingual subscription past-due email is deployed to Preview and Production and still needs a delivery test.
 - Zoho is out of scope. No Zoho API integration is required for this release.
+- After the initial quota rollout, three forward-only database fixes were applied to both Staging and Production: Storage upload preflight authorization, serialized retained-media checks, and qualified email-quota usage-date references. Both migration histories now match through `20261009161204_fix_estimate_email_quota_usage_date_ambiguity` (32 versions). These migrations preserve existing customer data; the source/test release is being prepared through the protected-main PR workflow.
 - The owner selected subscription cancellation at period end and no refunds except where law requires. Stripe's Live and test-mode customer portal settings both show “Cancel at end of billing period.” The bilingual Terms were published in this release; counsel review of renewal, cancellation, refund, and `past_due` wording remains required.
 - The owner confirmed the existing immediate-downgrade policy: Pro access moves to Free as soon as Stripe syncs `past_due`; data is preserved and Pro access returns when Stripe reports `active` or `trialing`. A bilingual transactional notice explains the downgrade and billing-recovery steps and is deployed to Preview and Production; delivery in both languages still needs testing.
 

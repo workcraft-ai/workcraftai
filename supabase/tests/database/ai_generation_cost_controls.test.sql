@@ -44,7 +44,7 @@ insert into public.subscriptions(user_id, status) values
   ('a6000000-0000-4000-8000-000000000001', 'active'),
   ('a6000000-0000-4000-8000-000000000005', 'active');
 
-select is((select ai_daily_generation_limit from public.tradeflow_app_settings where singleton), 20, 'the initial AI allowance is 20 attempts per user per day');
+select is((select ai_daily_generation_limit from public.tradeflow_app_settings where singleton), 5, 'the initial AI allowance is 5 attempts per Pro user per day');
 select is((select ai_global_daily_generation_limit from public.tradeflow_app_settings where singleton), 250, 'the initial platform allowance is 250 attempts per UTC day');
 select ok((select ai_drafting_enabled from public.tradeflow_app_settings where singleton), 'cloud drafting starts enabled');
 update public.tradeflow_app_settings set ai_daily_generation_limit = 2, ai_drafting_enabled = true where singleton;

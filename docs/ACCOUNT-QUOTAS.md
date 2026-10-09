@@ -29,6 +29,8 @@ The app shows estimates remaining in the estimate editor and Profile; Pro AI rem
 
 The migration `supabase/migrations/20261009025908_per_account_plan_quotas.sql` has been applied to both Staging and Production on 2026-10-09. Both histories record the same version. It does not delete customer estimates, email events, or media. It seeds current-period counters from existing estimates, email events/reservations, AI events, and current-month media objects. Consequently, existing activity in the active UTC period counts toward that period's initial allowance. The Free daily admin setting is clamped to a maximum of 10; the AI daily setting is set to the advertised 5 and cannot be raised above 5.
 
+As of 2026-10-09, Staging and Production histories match through `20261009161204_fix_estimate_email_quota_usage_date_ambiguity` (32 migration versions). The follow-up migrations correct estimate-media Storage preflight authorization, preserve serialization of per-account media limits, and fix an ambiguous `usage_date` reference in the app-email reservation function. They do not reset quota counters or remove customer data.
+
 Release verification record:
 
 1. **Complete:** Staging and Production histories were aligned before rollout; the exact version `20261009025908` was applied to both.

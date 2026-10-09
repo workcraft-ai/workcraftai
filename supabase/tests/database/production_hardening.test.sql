@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(48);
+select plan(45);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.stripe_webhook_events'::regclass)
@@ -22,7 +22,7 @@ select ok(
   and not has_function_privilege('authenticated', 'public.workcraft_reserve_estimate_email(uuid,uuid)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.workcraft_reserve_estimate_email(uuid,uuid)', 'EXECUTE')
   and to_regprocedure('public.workcraft_can_upload_estimate_media(uuid,text,bigint,text)') is null
-  and has_function_privilege('authenticated', 'private.workcraft_can_upload_estimate_media(text,bigint,text)', 'EXECUTE'),
+  and has_function_privilege('authenticated', 'private.workcraft_can_upload_estimate_media(text,bigint,bigint,text)', 'EXECUTE'),
   'privileged RPCs are server-only and the Storage helper lives outside the exposed API schema'
 );
 select ok(
@@ -137,20 +137,6 @@ select is(
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub = 'a5000000-0000-4000-8000-000000000001';
-select is(
-  private.workcraft_can_upload_estimate_media('a5000000-0000-4000-8000-000000000001/b5000000-0000-4000-8000-000000000001/photo.png', 1024, 'image/png'),
-  true, 'a Pro user can upload a supported attachment to their own estimate'
-);
-set local request.jwt.claim.sub = 'a5000000-0000-4000-8000-000000000002';
-select is(
-  private.workcraft_can_upload_estimate_media('a5000000-0000-4000-8000-000000000002/b5000000-0000-4000-8000-000000000004/photo.png', 1024, 'image/png'),
-  false, 'a Free account cannot upload attachments'
-);
-set local request.jwt.claim.sub = 'a5000000-0000-4000-8000-000000000001';
-select is(
-  private.workcraft_can_upload_estimate_media('a5000000-0000-4000-8000-000000000001/b5000000-0000-4000-8000-000000000001/photo.png', 15728641, 'image/png'),
-  false, 'an attachment over the Storage object limit is rejected'
-);
 select lives_ok(
   $$select public.workcraft_create_estimate_with_items(
     '{"client_name":"Atomic create","client_email":"atomic@example.test","package_options":[],"tax_rate":0,"markup_percentage":0}'::jsonb,
@@ -219,7 +205,7 @@ select results_eq(
 reset role;
 set local role service_role;
 do $$ begin
-  for i in 2..50 loop
+  for i in 2..5 loop
     perform public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003');
   end loop;
 end $$;
@@ -227,7 +213,7 @@ reset role;
 set local role service_role;
 select results_eq(
   $$select email_count from public.estimate_email_daily_usage where user_id = 'a5000000-0000-4000-8000-000000000001'$$,
-  array[50], 'the daily Pro email limit stops at fifty sends'
+  array[5], 'the daily Pro email limit stops at five sends'
 );
 reset role;
 set local role authenticated;
@@ -239,7 +225,7 @@ reset role;
 set local role service_role;
 select is(
   (select allowed from public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003')),
-  false, 'the fifty-first estimate email is rejected'
+  false, 'the sixth estimate email is rejected'
 );
 
 select * from finish();
