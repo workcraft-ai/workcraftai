@@ -226,24 +226,19 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Business overview</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900">
               {greetingKey
                 ? `${translate(language, greetingKey)}${firstName ? `, ${firstName}` : ""}`
                 : "WorkCraft AI Dashboard"}
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="mt-1 text-sm text-slate-600">
               Manage estimates, tracking, and payments
             </p>
           </div>
-          <Link
-            href="/estimate/new"
-            className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors shadow-sm"
-          >
-            + New Estimate
-          </Link>
-        </div>
+        </header>
 
         <nav aria-label="Business tools" className="grid gap-3 sm:grid-cols-3">
           <ToolLink href="/schedule" title="Schedule & jobs" description="Plan work and track job progress" />

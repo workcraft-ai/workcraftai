@@ -137,17 +137,17 @@ export default function CustomersPage() {
         <div className="mx-auto max-w-5xl space-y-6">
           <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">Free tools</p>
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Free tools</p>
               <h1 className="mt-1 text-2xl font-bold">Saved customers</h1>
               <p className="mt-1 text-sm text-slate-600">Save contact details once and reuse them when preparing estimates.</p>
             </div>
-            <Link href="/estimate/new" className="inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-600">Create estimate</Link>
+            <Link href="#customer-form" className="inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">{editingId ? "Edit customer" : "+ Add customer"}</Link>
           </header>
 
           {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
           {notice && <p role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{notice}</p>}
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="customer-form-title">
+          <section id="customer-form" className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="customer-form-title">
             <h2 id="customer-form-title" className="text-lg font-bold">{editingId ? "Edit customer" : "Add a customer"}</h2>
             <p className="mt-1 text-sm text-slate-600">Only your account can view or manage these saved contacts.</p>
             <form onSubmit={(event) => void saveContact(event)} className="mt-5 grid gap-4 sm:grid-cols-2">

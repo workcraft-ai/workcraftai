@@ -46,7 +46,7 @@ export default function RootLayout({
       React.createElement(AccountActivityTracker, null),
       React.createElement(
           "header",
-          { className: "print:hidden relative z-20 bg-slate-900 text-white px-4 md:px-8 py-3.5 border-b border-slate-800 flex items-center justify-between shadow-sm" },
+          { className: "print:hidden relative z-20 bg-slate-900 text-white px-4 md:px-8 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 shadow-sm" },
           React.createElement(Logo, null),
           React.createElement(HeaderNav, null)
         ),
