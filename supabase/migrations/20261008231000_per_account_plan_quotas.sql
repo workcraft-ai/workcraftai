@@ -826,6 +826,6 @@ $$;
 revoke all on function public.workcraft_get_account_usage(uuid) from public, anon, authenticated;
 grant execute on function public.workcraft_get_account_usage(uuid) to service_role;
 
-comment on function public.workcraft_get_account_usage(uuid) is 'Returns the authenticated user's plan-specific UTC quota snapshot; callable only by service_role after app authentication.';
+comment on function public.workcraft_get_account_usage(uuid) is 'Returns the authenticated user''s plan-specific UTC quota snapshot; callable only by service_role after app authentication.';
 
 commit;
