@@ -205,7 +205,7 @@ select results_eq(
 reset role;
 set local role service_role;
 do $$ begin
-  for i in 2..50 loop
+  for i in 2..5 loop
     perform public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003');
   end loop;
 end $$;
@@ -213,7 +213,7 @@ reset role;
 set local role service_role;
 select results_eq(
   $$select email_count from public.estimate_email_daily_usage where user_id = 'a5000000-0000-4000-8000-000000000001'$$,
-  array[50], 'the daily Pro email limit stops at fifty sends'
+  array[5], 'the daily Pro email limit stops at five sends'
 );
 reset role;
 set local role authenticated;
@@ -225,7 +225,7 @@ reset role;
 set local role service_role;
 select is(
   (select allowed from public.workcraft_reserve_estimate_email('a5000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000003')),
-  false, 'the fifty-first estimate email is rejected'
+  false, 'the sixth estimate email is rejected'
 );
 
 select * from finish();

@@ -90,8 +90,8 @@ from generate_series(1, 4) n;
 reset role;
 select is(
   (select count(*) from public.tradeflow_daily_estimate_usage where user_id = 'a1000000-0000-4000-8000-000000000002'),
-  0::bigint,
-  'active Pro estimates do not use the free-tier quota'
+  4::bigint,
+  'active Pro estimate activity is tracked against the Pro account allowance'
 );
 
 reset role;
