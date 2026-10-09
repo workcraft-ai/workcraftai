@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   const limit = parseFreeDailyEstimateLimit(body.limit);
-  if (limit === null) return NextResponse.json({ error: "Limit must be a whole number from 0 to 1,000." }, { status: 400 });
+  if (limit === null) return NextResponse.json({ error: "Limit must be a whole number from 0 to 10." }, { status: 400 });
   if (!validReason(body.reason)) return NextResponse.json({ error: "Provide a reason of at least 8 characters." }, { status: 400 });
 
   const { data, error } = await access.admin.rpc("update_free_daily_estimate_limit", {

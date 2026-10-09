@@ -80,9 +80,8 @@ export async function POST(request: Request) {
     p_line_items: lineItems,
   });
   if (error) {
-    if (error.message.includes("FREE_DAILY_ESTIMATE_LIMIT")) {
-      return NextResponse.json({ error: "FREE_DAILY_ESTIMATE_LIMIT", code: "FREE_DAILY_ESTIMATE_LIMIT" }, { status: 429 });
-    }
+    const estimateLimitMatch = error.message.match(/(?:FREE|PRO)_(?:DAILY|MONTHLY)_ESTIMATE_LIMIT/);
+    if (estimateLimitMatch) return NextResponse.json({ error: estimateLimitMatch[0], code: estimateLimitMatch[0] }, { status: 429 });
     if (error.message.includes("WORKCRAFT_PRO_REQUIRED")) return NextResponse.json({ error: "Deposits and proposal packages require WorkCraft AI Pro." }, { status: 403 });
     if (error.message.includes("ESTIMATE_TOTAL_TOO_LARGE")) return NextResponse.json({ error: "Estimate line-item subtotal cannot exceed $1,000,000,000." }, { status: 400 });
     if (error.message.includes("INVALID_LINE_ITEMS") || error.message.includes("INVALID_ESTIMATE")) return NextResponse.json({ error: "Check the estimate details and try again." }, { status: 400 });

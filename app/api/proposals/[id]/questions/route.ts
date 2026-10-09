@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const sender = process.env.RESEND_FROM_EMAIL;
   let emailSent = false;
   if (hasProEmail && businessEmail && apiKey && sender) {
-    const { reservation, error: quotaError } = await reserveAppEmail(admin, "proposal_question");
+    const { reservation, error: quotaError } = await reserveAppEmail(admin, "proposal_question", estimate.user_id, id);
     if (quotaError) {
       console.error("Proposal question email quota reservation failed:", quotaError.message);
     } else if (reservation?.allowed && reservation.reservation_id) {

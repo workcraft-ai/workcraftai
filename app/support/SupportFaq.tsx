@@ -10,7 +10,11 @@ const questions = [
   },
   {
     question: "How many estimates can I create on the free plan?",
-    answer: "Free accounts can save up to 10 new estimates per UTC calendar day. The counter resets at 00:00 UTC. Editing an estimate, saving a browser-only draft, or a failed save does not use a slot. Existing estimates remain available.",
+    answer: "Free accounts can save up to 10 new estimates per UTC calendar day and 50 per UTC calendar month. Both counters reset by UTC. Editing an estimate, saving a browser-only draft, or a failed save does not use a slot. Existing estimates remain available.",
+  },
+  {
+    question: "What are the Pro usage limits?",
+    answer: "Pro ($9.99/month) includes up to 50 saved estimates per UTC day and 500 per UTC month; 5 cloud AI drafts per day and 50 per month; and 5 estimate emails, follow-ups, or customer-question alerts per day and 100 per month. Pro also includes 100 MB of new private media uploads per month, up to 250 MB and 100 files retained. View your current usage and how much remains in Profile. Counters reset at 00:00 UTC or the start of each UTC month. Failed AI provider attempts count. These are account allowances; shared provider capacity may pause an action sooner.",
   },
   {
     question: "Can my customer review a proposal without an account?",

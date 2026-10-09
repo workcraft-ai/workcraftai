@@ -30,20 +30,26 @@ export async function GET() {
   if (!serviceKey) return NextResponse.json({ error: "Cloud drafting is temporarily unavailable." }, { status: 503 });
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const today = new Date().toISOString().slice(0, 10);
-  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }] = await Promise.all([
-    admin.from("tradeflow_app_settings").select("ai_drafting_enabled, ai_daily_generation_limit").eq("singleton", true).single(),
+  const month = `${today.slice(0, 7)}-01`;
+  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }, { data: monthlyUsage, error: monthlyError }] = await Promise.all([
+    admin.from("tradeflow_app_settings").select("ai_drafting_enabled, ai_daily_generation_limit, ai_monthly_generation_limit").eq("singleton", true).single(),
     admin.from("tradeflow_ai_daily_usage").select("attempts_started").eq("user_id", user.id).eq("usage_date", today).maybeSingle(),
+    admin.from("tradeflow_ai_monthly_usage").select("attempts_started").eq("user_id", user.id).eq("usage_month", month).maybeSingle(),
   ]);
-  if (settingsError || usageError) {
-    console.error("Could not read AI drafting allowance:", settingsError?.message ?? usageError?.message);
+  if (settingsError || usageError || monthlyError) {
+    console.error("Could not read AI drafting allowance:", settingsError?.message ?? usageError?.message ?? monthlyError?.message);
     return NextResponse.json({ error: "Could not load your cloud drafting allowance." }, { status: 503 });
   }
   const used = usage?.attempts_started ?? 0;
+  const monthlyUsed = monthlyUsage?.attempts_started ?? 0;
   return NextResponse.json({
     enabled: settings.ai_drafting_enabled,
     daily_limit: settings.ai_daily_generation_limit,
     used,
     remaining: Math.max(settings.ai_daily_generation_limit - used, 0),
+    monthly_limit: settings.ai_monthly_generation_limit,
+    monthly_used: monthlyUsed,
+    monthly_remaining: Math.max(settings.ai_monthly_generation_limit - monthlyUsed, 0),
   }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -119,6 +125,9 @@ export async function POST(request: Request) {
     if (reservation?.reason === "daily_limit") {
       return NextResponse.json({ error: "You’ve reached today’s cloud drafting limit. Your allowance resets at UTC midnight." }, { status: 429 });
     }
+    if (reservation?.reason === "monthly_limit") {
+      return NextResponse.json({ error: "You’ve reached this month’s cloud drafting limit. Your allowance resets on the first day of next month (UTC)." }, { status: 429 });
+    }
     if (reservation?.reason === "global_daily_limit") {
       return NextResponse.json({ error: "WorkCraft AI has reached today’s cloud drafting capacity. Please try again after the UTC reset." }, { status: 429 });
     }
@@ -129,12 +138,14 @@ export async function POST(request: Request) {
   }
 
   const generationId = reservation.generation_id as string;
-  const complete = async (outcome: "succeeded" | "failed", providerStatus: number | null, generatedItems: number | null) => {
+  const complete = async (outcome: "succeeded" | "failed", providerStatus: number | null, generatedItems: number | null, inputTokens: number | null = null, outputTokens: number | null = null) => {
     const { error } = await admin.rpc("complete_workcraft_ai_generation", {
       p_generation_id: generationId,
       p_outcome: outcome,
       p_provider_status: providerStatus,
       p_generated_items: generatedItems,
+      p_input_tokens: inputTokens,
+      p_output_tokens: outputTokens,
     });
     if (error) console.error("Could not record AI generation completion:", error.message);
   };
@@ -155,15 +166,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cloud AI request timed out or could not connect. Try again later." }, { status: 502 });
   }
 
-  let generated: { error?: { message?: string }; candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  let generated: { error?: { message?: string }; candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } };
   try {
     generated = await response.json();
   } catch {
     await complete("failed", response.status, null);
     return NextResponse.json({ error: "The AI response could not be read. Try again later." }, { status: 502 });
   }
+  const tokenCount = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 1_000_000_000 ? value : null;
+  const inputTokens = tokenCount(generated.usageMetadata?.promptTokenCount);
+  const outputTokens = tokenCount(generated.usageMetadata?.candidatesTokenCount === undefined
+    ? null
+    : generated.usageMetadata.candidatesTokenCount + (generated.usageMetadata.thoughtsTokenCount ?? 0));
   if (!response.ok) {
-    await complete("failed", response.status, null);
+    await complete("failed", response.status, null, inputTokens, outputTokens);
     console.error("Cloud AI provider rejected request:", response.status);
     return NextResponse.json({ error: "Cloud AI could not complete this draft. Try again later." }, { status: 502 });
   }
@@ -172,7 +188,7 @@ export async function POST(request: Request) {
   let parsed: { line_items?: unknown[] };
   try { parsed = JSON.parse(text || "{}"); }
   catch {
-    await complete("failed", response.status, null);
+    await complete("failed", response.status, null, inputTokens, outputTokens);
     return NextResponse.json({ error: "The AI response could not be read. Try a more specific job description." }, { status: 502 });
   }
   const line_items = Array.isArray(parsed.line_items) ? parsed.line_items.slice(0, 40).flatMap((rawItem: unknown) => {
@@ -184,10 +200,14 @@ export async function POST(request: Request) {
     return [{ description, quantity, unit_price: 0 }];
   }) : [];
   if (!line_items.length) {
-    await complete("failed", response.status, 0);
+    await complete("failed", response.status, 0, inputTokens, outputTokens);
     return NextResponse.json({ error: "The AI returned no usable line items. Add scope details and try again." }, { status: 502 });
   }
 
-  await complete("succeeded", response.status, line_items.length);
-  return NextResponse.json({ line_items, remaining_daily_generations: reservation.remaining });
+  await complete("succeeded", response.status, line_items.length, inputTokens, outputTokens);
+  return NextResponse.json({
+    line_items,
+    remaining_daily_generations: reservation.remaining,
+    remaining_monthly_generations: reservation.remaining_monthly,
+  });
 }

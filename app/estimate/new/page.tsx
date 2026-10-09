@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
-import { isFreeEstimateLimitError } from "@/lib/free-estimate-limit.mjs";
+import { isEstimateQuotaLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
@@ -60,13 +60,19 @@ interface LocalEstimateDraft {
 }
 
 interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
+type EstimateAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
+type AiAllowance = { enabled: boolean; daily_limit: number; used: number; remaining: number; monthly_limit: number; monthly_used: number; monthly_remaining: number };
+type MediaAllowance = { monthly_used_bytes: number; monthly_limit_bytes: number; retained_bytes: number; retained_limit_bytes: number; file_count: number; file_limit: number };
 
 export default function CreateEstimatePage() {
   const router = useRouter();
+  const { language } = useLanguage();
 
   // Paid cloud drafting is available to Pro subscribers only.
   const [isProSubscriber, setIsProSubscriber] = useState(false);
-  const [aiDailyAllowance, setAiDailyAllowance] = useState<{ enabled: boolean; daily_limit: number; used: number; remaining: number } | null>(null);
+  const [aiDailyAllowance, setAiDailyAllowance] = useState<AiAllowance | null>(null);
+  const [estimateAllowance, setEstimateAllowance] = useState<EstimateAllowance | null>(null);
+  const [mediaAllowance, setMediaAllowance] = useState<MediaAllowance | null>(null);
 
   // Form State
   const [clientName, setClientName] = useState("");
@@ -203,6 +209,14 @@ export default function CreateEstimatePage() {
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        void fetch("/api/account/usage", { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) return;
+          const usage = await response.json();
+          if (usage.estimates) setEstimateAllowance(usage.estimates as EstimateAllowance);
+          if (usage.media) setMediaAllowance(usage.media as MediaAllowance);
+        }).catch(() => {});
+      }
+      if (user) {
         setTaxRate(Number(user.user_metadata?.tax_rate) || 0);
         setMarkupPercentage(Number(user.user_metadata?.markup_percentage) || 0);
         const entitlement = await getClientProEntitlement();
@@ -254,6 +268,13 @@ export default function CreateEstimatePage() {
           remaining: data.remaining_daily_generations,
         } : previous);
       }
+      if (typeof data.remaining_monthly_generations === "number") {
+        setAiDailyAllowance((previous) => previous ? {
+          ...previous,
+          monthly_used: previous.monthly_limit - data.remaining_monthly_generations,
+          monthly_remaining: data.remaining_monthly_generations,
+        } : previous);
+      }
 
       if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
       const priced = applyPriceBookRates(data.line_items, priceBookItems, trade, true);
@@ -261,7 +282,18 @@ export default function CreateEstimatePage() {
       setDraftMessage(`${priced.matchedCount} line(s) matched your Price Book. Unmatched lines are $0 until you set your own rate.`);
       setPromptText("");
     } catch (err: unknown) {
-      alert("Error generating estimate: " + (err instanceof Error ? err.message : String(err)));
+      void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {
+        if (response.ok) setAiDailyAllowance(await response.json() as AiAllowance);
+      }).catch(() => {});
+      const errorText = err instanceof Error ? err.message : String(err);
+      const translatedError = language !== "es" ? errorText
+        : errorText.includes("today’s cloud drafting limit") ? "Alcanzaste el límite diario de redacción con IA en la nube. Se restablece a la medianoche UTC."
+          : errorText.includes("this month’s cloud drafting limit") ? "Alcanzaste el límite mensual de redacción con IA en la nube. Se restablece el primer día del próximo mes (UTC)."
+            : errorText.includes("today’s cloud drafting capacity") ? "WorkCraft AI alcanzó la capacidad diaria de redacción con IA en la nube. Inténtalo después del restablecimiento UTC."
+              : errorText.includes("temporarily paused") ? "La redacción de cotizaciones con IA en la nube está pausada temporalmente. Inténtalo más tarde."
+                : errorText.includes("no usable line items") ? "La IA no devolvió partidas utilizables. Agrega detalles del trabajo e inténtalo de nuevo."
+                  : errorText;
+      alert(`${language === "es" ? "Error al generar la cotización: " : "Error generating estimate: "}${translatedError}`);
     } finally {
       setIsGenerating(false);
     }
@@ -372,6 +404,23 @@ export default function CreateEstimatePage() {
         router.push("/login");
         throw new Error("Please sign in before creating an estimate.");
       }
+      if (attachments.length > 0) {
+        const usageResponse = await fetch("/api/account/usage", { cache: "no-store" });
+        if (!usageResponse.ok) throw new Error(language === "es" ? "No se pudo verificar el cupo de archivos. Actualiza la página e inténtalo de nuevo antes de guardar la cotización." : "Could not verify your media allowance. Refresh the page and try again before saving the estimate.");
+        const currentUsage = await usageResponse.json();
+        const latestMedia = currentUsage.media as MediaAllowance | undefined;
+        if (latestMedia) setMediaAllowance(latestMedia);
+        if (!latestMedia?.monthly_limit_bytes) throw new Error(language === "es" ? "Las cargas privadas de fotos y notas de voz requieren Pro." : "Private photo and voice-note uploads require Pro.");
+        const availableBytes = Math.max(latestMedia.monthly_limit_bytes - latestMedia.monthly_used_bytes, 0);
+        const retainedBytesAvailable = Math.max(latestMedia.retained_limit_bytes - latestMedia.retained_bytes, 0);
+        const requestedBytes = attachments.reduce((total, attachment) => total + attachment.file.size, 0);
+        if (requestedBytes > availableBytes) throw new Error(language === "es"
+          ? `Tus archivos suman ${(requestedBytes / 1048576).toFixed(1)} MB y quedan ${(availableBytes / 1048576).toFixed(1)} MB de carga este mes. Quita archivos o inténtalo el próximo mes UTC.`
+          : `Your attachments total ${(requestedBytes / 1048576).toFixed(1)} MB, with ${(availableBytes / 1048576).toFixed(1)} MB of uploads left this month. Remove files or try again next UTC month.`);
+        if (requestedBytes > retainedBytesAvailable || latestMedia.file_count + attachments.length > latestMedia.file_limit) throw new Error(language === "es"
+          ? "Estos archivos exceden el almacenamiento restante o el máximo de 100 archivos. Elimina archivos privados antiguos y vuelve a intentarlo."
+          : "These attachments exceed your remaining storage or 100-file limit. Remove older private files and try again.");
+      }
       // Estimate and line items are validated and committed together on the server.
       const createResponse = await fetch("/api/estimates", {
         method: "POST",
@@ -398,9 +447,26 @@ export default function CreateEstimatePage() {
       createdEstimateId = createResult.id;
 
       for (const attachment of attachments) {
-        const path = `${user.id}/${createdEstimateId}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const path = `${user.id}/${createdEstimateId}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180)}`;
+        const { data: reservationRows, error: reservationError } = await supabase.rpc("workcraft_reserve_estimate_media_upload", {
+          p_estimate_id: createdEstimateId,
+          p_storage_path: path,
+          p_size: attachment.file.size,
+          p_mime_type: attachment.file.type.toLowerCase(),
+        });
+        const reservation = Array.isArray(reservationRows) ? reservationRows[0] : reservationRows;
+        if (reservationError) throw new Error(`Media upload reservation failed: ${reservationError.message}`);
+        if (!reservation?.allowed || typeof reservation.reservation_id !== "string") {
+          const reason = reservation?.reason === "monthly_limit" ? "ESTIMATE_MEDIA_MONTHLY_LIMIT" : reservation?.reason === "storage_limit" ? "ESTIMATE_MEDIA_STORAGE_LIMIT" : reservation?.reason === "pro_required" ? "WORKCRAFT_PRO_REQUIRED" : "MEDIA_UPLOAD_UNAVAILABLE";
+          throw new Error(reason);
+        }
         const { error: uploadError } = await supabase.storage.from("estimate-media").upload(path, attachment.file, { contentType: attachment.file.type, upsert: false });
-        if (uploadError) throw new Error(`Estimate saved but attachment upload failed: ${uploadError.message}`);
+        if (uploadError) {
+          await supabase.rpc("workcraft_finish_estimate_media_upload", { p_reservation_id: reservation.reservation_id, p_uploaded: false });
+          throw new Error(`Estimate saved but attachment upload failed: ${uploadError.message}`);
+        }
+        const { data: uploadRecorded, error: finalizeError } = await supabase.rpc("workcraft_finish_estimate_media_upload", { p_reservation_id: reservation.reservation_id, p_uploaded: true });
+        if (finalizeError || uploadRecorded !== true) throw new Error("Estimate saved but uploaded media usage could not be recorded. Please contact support before retrying the upload.");
         const { error: metadataError } = await supabase.from("estimate_attachments").insert({ estimate_id: createdEstimateId, user_id: user.id, storage_path: path, media_type: attachment.mediaType, content_type: attachment.file.type });
         if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
       }
@@ -410,11 +476,20 @@ export default function CreateEstimatePage() {
       router.push("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
+      const quotaMessage = isEstimateQuotaLimitError(err)
+        ? language === "es"
+          ? "Alcanzaste el límite de cotizaciones para este período. Revisa el uso y la fecha de restablecimiento en Perfil."
+          : "You’ve reached your estimate limit for this period. Check Profile for your usage and reset time."
+        : message.includes("ESTIMATE_MEDIA_MONTHLY_LIMIT")
+          ? language === "es" ? "Alcanzaste el límite mensual de carga de archivos Pro. Revisa el uso en Perfil." : "You’ve reached the monthly Pro media upload allowance. Check Profile for your usage."
+          : message.includes("ESTIMATE_MEDIA_STORAGE_LIMIT")
+            ? language === "es" ? "Alcanzaste el límite de almacenamiento Pro. Elimina archivos privados antiguos o revisa Perfil." : "You’ve reached the Pro storage limit. Remove older private files or review Profile."
+        : null;
       alert(createdEstimateId
-        ? `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${message}`
-        : isFreeEstimateLimitError(err)
-          ? "You’ve reached today’s free estimate limit. Your allowance resets at midnight UTC. You can save a device draft now or try again after the reset."
-          : "Error creating estimate: " + message);
+        ? quotaMessage
+          ? language === "es" ? `Se creó la cotización ${createdEstimateId}. ${quotaMessage}` : `Estimate ${createdEstimateId} was saved. ${quotaMessage}`
+          : `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${message}`
+        : quotaMessage || "Error creating estimate: " + message);
     } finally {
       setSaving(false);
     }
@@ -445,6 +520,7 @@ export default function CreateEstimatePage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">WorkCraft AI / Estimates</p>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">Create an estimate</h1>
               <p className="mt-1 text-sm text-slate-500">Build a clear, editable quote for your next job.</p>
+              {estimateAllowance && <p role="status" className={`mt-2 text-xs ${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) === 0 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) === 0 ? "font-semibold text-red-800" : Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) <= 2 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) <= 10 ? "font-semibold text-amber-800" : "text-slate-600"}`}>{Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0)} of {estimateAllowance.daily_limit} estimates left today · {Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0)} of {estimateAllowance.monthly_limit} left this month (UTC)</p>}
             </div>
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
           </div>
@@ -562,8 +638,12 @@ export default function CreateEstimatePage() {
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">{isProSubscriber ? "Field photos & voice note" : "Field photos & voice note · Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p></div>
-              {isProSubscriber ? <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple className="sr-only" onChange={(event) => {
+              <div><h2 className="text-sm font-semibold text-slate-900">{isProSubscriber ? "Field photos & voice note" : "Field photos & voice note · Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p>
+                {isProSubscriber && mediaAllowance && <p role="status" className={`mt-2 text-xs ${mediaAllowance.monthly_limit_bytes - mediaAllowance.monthly_used_bytes <= 0 ? "font-semibold text-red-800" : mediaAllowance.monthly_limit_bytes - mediaAllowance.monthly_used_bytes <= 10 * 1048576 ? "font-semibold text-amber-800" : "text-slate-600"}`}>
+                  {translate(language, `Media allowance: ${(Math.max(mediaAllowance.monthly_limit_bytes - mediaAllowance.monthly_used_bytes, 0) / 1048576).toFixed(1)} MB left to upload this month · ${(mediaAllowance.retained_bytes / 1048576).toFixed(1)} of ${(mediaAllowance.retained_limit_bytes / 1048576).toFixed(0)} MB stored · ${mediaAllowance.file_count} of ${mediaAllowance.file_limit} files (UTC)`)}
+                </p>}
+              </div>
+              {isProSubscriber ? <label className={`rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 ${mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit) ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} className="sr-only" onChange={(event) => {
                 const selected = Array.from(event.target.files ?? []);
                 const photos = selected.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024);
                 setAttachments((current) => {
@@ -574,7 +654,7 @@ export default function CreateEstimatePage() {
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
               }} /></label> : <Link href="/profile" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
-              {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700">Record voice note</button>)}
+              {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
             {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
@@ -669,10 +749,10 @@ export default function CreateEstimatePage() {
               <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
             </div>
             <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope and quantities. Matching rates come from your Price Book; unmatched items stay at $0 for you to price.</p>
-            {aiDailyAllowance && <p role="status" className="text-[11px] text-slate-500">{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
+            {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             <div className="flex flex-col gap-2 sm:flex-row">
               <input type="text" aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
             </div>
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
           </section>}

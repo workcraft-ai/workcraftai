@@ -61,8 +61,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!reservation) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
   if (!reservation.allowed) {
     const message = reservation.reason === "account_daily_limit"
-      ? "You’ve reached the daily estimate-email limit. Try again tomorrow."
-      : "WorkCraft AI has reached its daily email capacity. Please try again tomorrow.";
+      ? "You’ve reached your Pro email limit for today. It resets at 00:00 UTC."
+      : reservation.reason === "account_monthly_limit"
+        ? "You’ve reached your Pro email limit for this month. It resets on the first day of next month (UTC)."
+        : "WorkCraft AI has reached its daily email capacity. Please try again tomorrow.";
     return NextResponse.json({ error: message }, { status: 429 });
   }
   if (!reservation.reservation_id) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
@@ -100,5 +102,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (eventError) console.error("Estimate email event could not be recorded:", eventError.message);
   const followupAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("estimates").update({ followup_at: followupAt, followup_sent_at: null, followup_claimed_at: null }).eq("id", id).eq("user_id", user.id);
-  return NextResponse.json({ success: true, emailId: responseData.id });
+  return NextResponse.json({
+    success: true,
+    emailId: responseData.id,
+    emailQuota: {
+      remainingToday: Math.max((reservation.account_daily_limit ?? 0) - (reservation.account_daily_used ?? 0), 0),
+      remainingThisMonth: Math.max((reservation.account_monthly_limit ?? 0) - (reservation.account_monthly_used ?? 0), 0),
+    },
+  });
 }

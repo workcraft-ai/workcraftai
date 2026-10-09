@@ -45,10 +45,13 @@ The encrypted backup workflow stores its Restic repository in the owner-controll
 
 The app also has durable application-level controls:
 
-- Free users have a configurable limit of 10 saved estimates per UTC day.
-- Pro cloud estimate drafting has per-account and platform-wide UTC-day limits.
-- App-originated Resend sends share a daily ceiling.
+- Free accounts can save 10 estimates per UTC day and 50 per UTC month. Pro accounts can save 50 per day and 500 per month.
+- Pro cloud AI has a 5/day and 50/month account limit; the platform-wide ceiling remains 250 attempts per UTC day. Attempts count when admitted, including provider failures.
+- Pro estimate emails, follow-ups, and proposal-question alerts share a 5/day and 100/month account allowance. All app mail shares the 75/day global Resend ceiling (admin-adjustable up to 90); support and retention messages use only that shared platform pool.
+- Pro private media permits 100 MB uploaded per UTC month, 250 MB retained, and 100 files. Deleting media frees retained capacity but not the monthly upload allowance.
 - Public support submissions are rate-limited.
+
+All account caps are enforced server-side with durable Postgres counters and storage reservations, and reset on UTC calendar boundaries. Customers can see remaining allowances in Profile and at estimate/AI creation points. Provider-wide service limits can still bind before a user's account quota does. Vercel remains on Hobby until the product begins selling; revisit its plan and current quotas before commercial launch. Gemini remains on its configured provider tier and existing data-handling setup; app caps bound use but do not change the provider plan or processing terms.
 
 These controls reduce abuse and bound feature use. They do not replace provider usage alerts or periodic restore tests.
 
