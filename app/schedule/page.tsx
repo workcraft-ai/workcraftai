@@ -66,7 +66,7 @@ export default function SchedulePage() {
     if (!pro) { setJobs([]); setEstimates([]); setLoading(false); return; }
     const [jobsResult, estimatesResult] = await Promise.all([
       supabase.from("jobs").select("*").order("scheduled_at", { ascending: true, nullsFirst: false }),
-      supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").eq("status", "accepted").is("converted_job_id", null).order("created_at", { ascending: false }),
+      supabase.from("estimates").select("id, client_name, client_email, job_address, trade, converted_job_id").in("status", ["accepted", "paid"]).is("converted_job_id", null).order("created_at", { ascending: false }),
     ]);
     if (jobsResult.error) setError("Could not load jobs. Refresh the page or contact support if the problem continues.");
     else setJobs((jobsResult.data ?? []) as Job[]);

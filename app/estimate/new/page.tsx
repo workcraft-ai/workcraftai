@@ -27,6 +27,14 @@ interface PriceBookItem {
   unit_price: number;
 }
 
+interface SavedCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  job_address: string;
+}
+
 interface EstimatePackage {
   name: "Good" | "Better" | "Best";
   description: string;
@@ -65,6 +73,9 @@ export default function CreateEstimatePage() {
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [jobAddress, setJobAddress] = useState("");
+  const [savedCustomers, setSavedCustomers] = useState<SavedCustomer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [savedCustomerLoadError, setSavedCustomerLoadError] = useState("");
   const [trade, setTrade] = useState("Plumbing");
   const [requireDeposit, setRequireDeposit] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(20);
@@ -207,6 +218,12 @@ export default function CreateEstimatePage() {
           setAiDailyAllowance(null);
         }
         if (!activePro) { setRequireDeposit(false); setPackageOptions([]); }
+        const { data: customerData, error: customerError } = await supabase
+          .from("customer_contacts")
+          .select("id, name, email, phone, job_address")
+          .order("name", { ascending: true });
+        if (customerError) setSavedCustomerLoadError("Saved customers are unavailable until the customer contacts database update is applied.");
+        else setSavedCustomers((customerData ?? []) as SavedCustomer[]);
       } else {
         setRequireDeposit(false); setPackageOptions([]);
       }
@@ -450,6 +467,27 @@ export default function CreateEstimatePage() {
               Client Information
             </h2>
             <label className="block max-w-sm text-xs font-medium text-slate-700">Customer proposal language<select value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></label>
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <label htmlFor="saved-customer-picker" className="block text-xs font-medium text-slate-700">Use a saved customer</label>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <select id="saved-customer-picker" value={selectedCustomerId} onChange={(event) => {
+                  setSelectedCustomerId(event.target.value);
+                  const customer = savedCustomers.find((savedCustomer) => savedCustomer.id === event.target.value);
+                  if (customer) {
+                    setClientName(customer.name);
+                    setClientEmail(customer.email);
+                    setClientPhone(customer.phone);
+                    setJobAddress(customer.job_address);
+                  }
+                }} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                  <option value="">Choose a saved customer</option>
+                  {savedCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.email ? ` · ${customer.email}` : ""}</option>)}
+                </select>
+                <Link href="/customers" className="text-xs font-semibold text-blue-700 underline">Manage saved customers</Link>
+              </div>
+              {selectedCustomerId && <p className="mt-2 text-xs text-slate-500">Changes made here apply to this estimate only; edit the saved contact on the Customers page.</p>}
+              {savedCustomerLoadError && <p role="status" className="mt-2 text-xs text-amber-800">{savedCustomerLoadError}</p>}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="estimate-trade" className="block text-xs font-medium text-slate-700 mb-1">Trade</label>
