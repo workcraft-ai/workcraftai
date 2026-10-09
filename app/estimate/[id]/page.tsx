@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
-import { supabase } from "@/lib/supabase";
 
 interface LineItem {
   id: string;
@@ -56,6 +55,7 @@ export default function ClientEstimatePage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
   const [signatureName, setSignatureName] = useState("");
@@ -67,6 +67,7 @@ export default function ClientEstimatePage() {
   const [ownerPlanLoaded, setOwnerPlanLoaded] = useState(false);
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
   const [wasConverted, setWasConverted] = useState(false);
   const [questionName, setQuestionName] = useState("");
   const [questionEmail, setQuestionEmail] = useState("");
@@ -79,13 +80,38 @@ export default function ClientEstimatePage() {
   const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
+    let isCurrent = true;
     async function fetchEstimateDetails() {
-      if (!id) return;
+      setEstimate(null);
+      setLineItems([]);
+      setLoadError("");
+      setErrorMsg("");
+      setSelectedPackage(null);
+      setSignatureName("");
+      setContractor({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
+      setInvoiceError("");
+      setInvoiceJobId(null);
+      setCreatingInvoice(false);
+      setIsOwner(false);
+      setOwnerHasPro(false);
+      setOwnerPlanLoaded(false);
+      setOwnerAttachments([]);
+      setPhotos([]);
+      setWasConverted(false);
+      setQuestionStatus("");
+      setPaymentSummary({ amountPaidCents: 0, totalCents: 0, available: false });
+      setPaymentError("");
+      if (!id) {
+        setLoadError("Invalid estimate request.");
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const response = await fetch(`/api/proposals/${encodeURIComponent(id)}`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Estimate not found or link has expired.");
+        if (!isCurrent) return;
         const estData = result.estimate as Estimate;
 
         setEstimate(estData);
@@ -96,21 +122,25 @@ export default function ClientEstimatePage() {
         let estimateOwner = false;
         try {
           const ownerResponse = await fetch(`/api/estimates/${encodeURIComponent(id)}`, { cache: "no-store" });
+          if (!isCurrent) return;
           if (ownerResponse.ok) {
             estimateOwner = true;
             setIsOwner(true);
             const ownerData = await ownerResponse.json();
+            if (!isCurrent) return;
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
             const convertedJobId = ownerData.estimate?.converted_job_id;
             setInvoiceJobId(typeof convertedJobId === "string" && convertedJobId ? convertedJobId : null);
             try {
               const entitlementResponse = await fetch("/api/user/entitlements", { cache: "no-store" });
+              if (!isCurrent) return;
               const entitlement = entitlementResponse.ok ? await entitlementResponse.json() : null;
+              if (!isCurrent) return;
               setOwnerHasPro(entitlement?.has_pro === true);
             } catch {
-              setOwnerHasPro(false);
+              if (isCurrent) setOwnerHasPro(false);
             } finally {
-              setOwnerPlanLoaded(true);
+              if (isCurrent) setOwnerPlanLoaded(true);
             }
           }
         } catch { /* Customer proposal access does not depend on owner-only recordings. */ }
@@ -122,13 +152,14 @@ export default function ClientEstimatePage() {
         setLineItems(result.lineItems || []);
       } catch (err: unknown) {
         console.error("Error loading proposal:", (err instanceof Error ? err.message : String(err)));
-        setErrorMsg("Failed to load estimate details.");
+        if (isCurrent) setLoadError("Failed to load estimate details.");
       } finally {
-        setLoading(false);
+        if (isCurrent) setLoading(false);
       }
     }
 
     fetchEstimateDetails();
+    return () => { isCurrent = false; };
   }, [id]);
 
   const selectedPackageName = selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name ?? null;
@@ -200,20 +231,21 @@ export default function ClientEstimatePage() {
     }
     if (!isOwner || !ownerHasPro || !["accepted", "paid"].includes(estimate?.status ?? "")) return;
     setCreatingInvoice(true);
-    setErrorMsg("");
-    const { data: jobId, error } = await supabase.rpc("convert_accepted_estimate_to_job", {
-      p_estimate_id: id,
-      p_scheduled_at: null,
-      p_title: null,
-      p_notes: "",
-    });
-    if (error || typeof jobId !== "string") {
-      setErrorMsg("Could not create the invoice. Please try again.");
+    setInvoiceError("");
+    try {
+      const response = await fetch(`/api/estimates/${encodeURIComponent(id)}/invoice`, { method: "POST", cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || typeof result.job_id !== "string") {
+        setInvoiceError(result.error || "Could not create the invoice. Please try again.");
+        setCreatingInvoice(false);
+        return;
+      }
+      setInvoiceJobId(result.job_id);
+      router.push(`/invoice/${encodeURIComponent(result.job_id)}`);
+    } catch {
+      setInvoiceError("Could not create the invoice. Please try again.");
       setCreatingInvoice(false);
-      return;
     }
-    setInvoiceJobId(jobId);
-    router.push(`/invoice/${encodeURIComponent(jobId)}`);
   };
 
   if (loading) {
@@ -229,13 +261,13 @@ export default function ClientEstimatePage() {
     );
   }
 
-  if (errorMsg || !estimate) {
+  if (loadError || !estimate) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-md text-center space-y-3">
           <div className="text-red-500 text-2xl">⚠️</div>
           <h1 className="text-base font-bold text-slate-900">Unable to View Proposal</h1>
-          <p className="text-xs text-slate-500">{errorMsg || "Invalid estimate request."}</p>
+          <p className="text-xs text-slate-500">{loadError || "Invalid estimate request."}</p>
           <button
             onClick={() => router.push("/dashboard")}
             className="text-xs font-semibold text-blue-600 hover:text-blue-500 underline pt-2 block mx-auto"
@@ -286,6 +318,7 @@ export default function ClientEstimatePage() {
               Dashboard
             </button>
           </div>
+          {invoiceError && <p role="alert" className="basis-full rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">{invoiceError}</p>}
         </div>}
 
         {/* Client Proposal Card */}
