@@ -16,6 +16,7 @@ function getGreetingKey(hour: number): GreetingKey {
 
 interface Estimate {
   id: string;
+  reference_number: string;
   client_name: string;
   client_email: string;
   job_address: string;
@@ -317,6 +318,7 @@ export default function DashboardPage() {
                     <tr key={est.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="p-3.5">
                         <p className="font-semibold text-slate-900">{est.client_name}</p>
+                        <p className="text-[11px] font-medium text-slate-600">{translate(language, "Estimate #")}{est.reference_number}</p>
                         <p className="text-xs text-slate-500">{est.client_email}</p>
                       </td>
                       <td className="p-3.5 text-slate-600">
@@ -353,12 +355,12 @@ export default function DashboardPage() {
                           href={`/estimate/${est.id}`}
                           className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-600 hover:text-blue-500 underline"
                         >
-                          View Link
+                          {translate(language, "View Estimate")}
                         </Link>
                         {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-600 underline" aria-label="Email client is a Pro feature">Email client <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 no-underline">Pro</span></Link>}
-                        {emailEvents[est.id] && <span className="text-[10px] font-semibold uppercase text-slate-500">{estimateEmailEventLabel(emailEvents[est.id])}</span>}
-                        {est.followup_at && <span className="text-[10px] text-slate-500">{est.followup_sent_at ? "Follow-up sent" : `Follow-up ${new Date(est.followup_at).toLocaleDateString(locale)}`}</span>}
-                        {est.proposal_viewed_at && <span className="text-[10px] font-semibold text-green-700">Viewed</span>}
+                        {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
+                        {est.followup_at && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
+                        {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}
 
                         {est.is_archived ? (
                           <button

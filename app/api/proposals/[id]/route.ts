@@ -17,7 +17,7 @@ export async function GET(
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: estimate, error } = await admin
     .from("estimates")
-    .select("id, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
+    .select("id, reference_number, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
     .eq("id", id)
     .maybeSingle();
 

@@ -7,7 +7,7 @@ import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
-type Estimate = { id: string; status: string; created_at: string; markup_percentage: number; tax_rate: number; package_options: Array<{ name: string; total: number }> | null; selected_package: string | null };
+type Estimate = { id: string; reference_number: string; status: string; created_at: string; markup_percentage: number; tax_rate: number; package_options: Array<{ name: string; total: number }> | null; selected_package: string | null };
 type LineItem = { estimate_id: string; quantity: number; unit_price: number };
 type Job = { status: string; quoted_total: number; actual_cost: number; scheduled_at: string | null };
 
@@ -27,7 +27,7 @@ export default function ReportsPage() {
     const pro = entitlement?.has_pro === true;
     setIsPro(pro);
     const [estimateResult, lineResult, jobResult] = await Promise.all([
-      supabase.from("estimates").select("id, status, created_at, markup_percentage, tax_rate, package_options, selected_package").order("created_at", { ascending: false }),
+      supabase.from("estimates").select("id, reference_number, status, created_at, markup_percentage, tax_rate, package_options, selected_package").order("created_at", { ascending: false }),
       supabase.from("line_items").select("estimate_id, quantity, unit_price"),
       pro ? supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at") : Promise.resolve({ data: [], error: null }),
     ]);
@@ -103,7 +103,7 @@ export default function ReportsPage() {
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recent estimates</h2><p className="mt-1 text-xs text-slate-500">Your largest opportunities at a glance</p></div><Link href="/dashboard" className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline">All estimates</Link></div>
-            {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.id.slice(0, 8)}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString(locale)}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate), locale)}</span><Link href={`/estimate/${estimate.id}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
+            {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.reference_number}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString(locale)}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate), locale)}</span><Link href={`/estimate/${estimate.id}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
           </section>
           <p className="text-xs text-slate-500">Estimate reports use saved estimates. Pro job metrics use saved jobs; completed job value uses the estimate total recorded when the job was created.</p>
         </>}
