@@ -122,6 +122,7 @@ const spanishTranslations = {
   "FOLLOW WORKCRAFT AI": "SIGUE A WORKCRAFT AI",
   "Follow us on Facebook": "Síguenos en Facebook",
   "Follow us on LinkedIn": "Síguenos en LinkedIn",
+  "Follow us on Instagram": "Síguenos en Instagram",
   "SUPPORT CENTER": "CENTRO DE SOPORTE",
   "Visit WorkCraft AI Support": "Visita el soporte de WorkCraft AI",
   "Browse common questions or send our team a message.": "Consulta las preguntas frecuentes o envía un mensaje a nuestro equipo.",
