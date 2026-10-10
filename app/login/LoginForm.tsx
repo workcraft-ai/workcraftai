@@ -40,7 +40,12 @@ export default function LoginForm() {
       });
 
       if (signInError) {
-        setError(signInError.message);
+        const code = signInError.code?.toLowerCase() ?? "";
+        if (signInError.status === 429 || code === "over_request_rate_limit") {
+          setError(translate(language, "Too many sign-in requests right now. Wait a few minutes and try again."));
+        } else {
+          setError(translate(language, "Email or password was not accepted. Check your details or reset your password."));
+        }
         return;
       }
 

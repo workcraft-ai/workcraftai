@@ -353,6 +353,16 @@ Object.assign(spanish, {
   " left this month": " restantes este mes",
 });
 
+Object.assign(spanish, {
+  "If an account can be created for this email, we’ll send a confirmation link. If you requested one recently, wait a minute before trying again.": "Si se puede crear una cuenta con este correo, te enviaremos un enlace de confirmación. Si solicitaste uno hace poco, espera un minuto antes de intentarlo de nuevo.",
+  "Signup is temporarily limited. Wait a few minutes and try again.": "Los registros están limitados temporalmente. Espera unos minutos e inténtalo de nuevo.",
+  "Choose a stronger password and try again.": "Elige una contraseña más segura e inténtalo de nuevo.",
+  "Too many sign-in requests right now. Wait a few minutes and try again.": "Hay demasiadas solicitudes de inicio de sesión. Espera unos minutos e inténtalo de nuevo.",
+  "Email or password was not accepted. Check your details or reset your password.": "No se aceptó el correo o la contraseña. Revisa los datos o restablece la contraseña.",
+  "If an account exists for that email, a password reset link is on its way. If you requested one recently, wait a minute before trying again.": "Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña. Si solicitaste uno hace poco, espera un minuto antes de intentarlo de nuevo.",
+  "We could not process this request right now. Please wait a moment and try again.": "No pudimos procesar la solicitud ahora. Espera un momento e inténtalo de nuevo.",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";

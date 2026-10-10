@@ -42,10 +42,15 @@ function ForgotPasswordForm() {
         ...(captchaToken ? { captchaToken } : {}),
       });
 
-      if (resetError) setError(resetError.message);
-      else setMessage("If an account exists for that email, a password reset link is on its way.");
+      if (resetError?.code?.toLowerCase() === "captcha_failed") {
+        setError(translate(language, "Security verification did not complete. Please try again."));
+      } else {
+        // Use the same response for accepted and rate-limited requests so the
+        // page cannot be used to infer whether an address has an account.
+        setMessage("If an account exists for that email, a password reset link is on its way. If you requested one recently, wait a minute before trying again.");
+      }
     } catch {
-      setError(translate(language, "We could not send the reset link. Please try again."));
+      setError(translate(language, "We could not process this request right now. Please wait a moment and try again."));
     } finally {
       setCaptchaToken(null);
       setCaptchaResetSignal((signal) => signal + 1);

@@ -55,6 +55,25 @@ All account caps are enforced server-side with durable Postgres counters and sto
 
 These controls reduce abuse and bound feature use. They do not replace provider usage alerts or periodic restore tests.
 
+## Auth abuse resistance and email verification
+
+The signup, sign-in, and password-reset forms use Cloudflare Turnstile. Supabase remains responsible for short-lived IP-based Auth throttling; the application does not impose permanent lockouts after failed passwords or reset requests. The signup page returns the same confirmation guidance for a newly eligible address and a duplicate-account response. Password-reset requests use a generic response, and Auth provider errors are not rendered directly to users. Keep these behaviors when changing the auth UI.
+
+Verified dashboard state on 2026-10-09:
+
+| Setting | Production | Preview |
+| --- | --- | --- |
+| Auth rate limits | 30 signup/sign-in requests per 5 minutes; 30 verification requests per 5 minutes; 150 token refreshes per 5 minutes | Same values |
+| Per-address auth email cooldown | 60 seconds in SMTP settings | Supabase documents 60 seconds by default |
+| New user signup / email confirmation | Enabled / enabled | Enabled / enabled |
+| Custom SMTP | Enabled; Resend SMTP; minimum interval per user is 60 seconds | Disabled; uses Supabase's built-in email provider |
+
+Dashboard links: [Production Rate Limits](https://supabase.com/dashboard/project/ivioejiiigtbmhpzjuni/auth/rate-limits), [Preview Rate Limits](https://supabase.com/dashboard/project/wuebymyvhzieockrohyp/auth/rate-limits), [Production SMTP](https://supabase.com/dashboard/project/ivioejiiigtbmhpzjuni/auth/smtp), [Preview SMTP](https://supabase.com/dashboard/project/wuebymyvhzieockrohyp/auth/smtp), and each project's Authentication → Sign In / Providers and Authentication → Audit Logs pages.
+
+Preview's built-in mailer is limited to 2 emails per hour project-wide. Do not repeatedly test signup confirmations or password resets there; use a disposable address sparingly. If Preview auth-email delivery needs regular testing, the owner should configure Preview custom SMTP with the approved provider and verify delivery there. Production already uses Resend SMTP. Supabase documents a 60-second default cooldown between auth email sends to one address, while project IP limits and email-provider limits are separate controls. Supabase's documented default custom-SMTP limit is 30 new users per hour. The current project-wide email/hour field was not readable in the dashboard snapshot, so the owner should check its value directly in each project's Rate Limits page before a launch campaign. See [Supabase Auth rate limits](https://supabase.com/docs/guides/auth/rate-limits) and [Supabase production checklist](https://supabase.com/docs/guides/deployment/going-into-prod).
+
+During weekly operations review, inspect Supabase Authentication → Audit Logs and Auth logs for bursts of signup, recovery, and verification requests, repeated `429` responses, and failed CAPTCHA checks. Then inspect Resend's email logs, suppression/bounce/complaint events, and usage for auth verification and recovery messages. Supabase Auth emails sent through Resend SMTP are not the same as estimate-email events in the WorkCraft AI dashboard. Never manually ban an account solely because it received failed login or reset attempts; use CAPTCHA, the configured cooldowns, and provider IP throttling. Escalate suspicious traffic using aggregate timestamps and counts, not customer email addresses or message contents.
+
 ## Stripe event coverage and retry semantics
 
 Stripe webhook requests are verified using the raw request body and the destination-specific signing secret. Durable event IDs prevent duplicate business actions. The state-aware handler acknowledges completed duplicates, returns a retryable non-2xx response while another invocation is processing or a claim is unknown, and recovers stale claims after five minutes. Its RPC is added by `20261008010250_stripe_webhook_state_aware_claims.sql`, applied to Production and Staging, and the handler is deployed to both Preview and Production. A successful duplicate replay returned HTTP 200 with `duplicate: true`. Automatic recovery after a deliberately induced transient non-2xx response still needs a safe Preview test.
