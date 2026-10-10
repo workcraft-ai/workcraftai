@@ -10,6 +10,16 @@ const root = resolve(process.env.RESTORE_ROOT || '');
 const workdir = resolve(process.env.RESTORE_WORKDIR || '');
 if (!process.env.RESTORE_ROOT || !process.env.RESTORE_WORKDIR || root === workdir) throw Error('Separate restore and local-stack directories are required.');
 const container = 'supabase_db_workcraftai-restore-drill';
+try {
+  execFileSync('docker',['inspect',container],{stdio:'ignore'});
+  throw Error('An existing recovery container must not be reused.');
+} catch (error) {
+  if (error.status !== 1) throw error;
+}
+try {
+  if ((await readdir(workdir)).length) throw Error('Recovery work directory must be empty.');
+} catch (error) { if (error.code !== 'ENOENT') throw error; }
+
 async function locate(directory) {
   for (const item of await readdir(directory, {withFileTypes:true})) {
     if (!item.isDirectory()) continue;
