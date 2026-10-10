@@ -36,6 +36,8 @@ const estimateStatuses: EstimateStatus[] = ["pending", "accepted", "paid", "decl
 type EmailAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
 
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
+interface CustomerPreview { id: string; name: string; email: string; updated_at: string; }
+interface JobPreview { id: string; title: string; client_name: string; scheduled_at: string | null; status: "scheduled" | "in_progress"; }
 
 function estimateEmailEventLabel(event: string) {
   switch (event) {
@@ -65,22 +67,46 @@ export default function DashboardPage() {
   const [firstName, setFirstName] = useState("");
   const [greetingKey, setGreetingKey] = useState<GreetingKey | null>(null);
   const [emailAllowance, setEmailAllowance] = useState<EmailAllowance | null>(null);
+  const [customers, setCustomers] = useState<CustomerPreview[]>([]);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [jobs, setJobs] = useState<JobPreview[]>([]);
+  const [jobCount, setJobCount] = useState(0);
+  const [showAllEstimates, setShowAllEstimates] = useState(false);
 
   async function fetchEstimates() {
     try {
-      const { data, error } = await supabase
-        .from("estimates")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const [estimateResult, customerResult] = await Promise.all([
+        supabase.from("estimates").select("*").order("created_at", { ascending: false }),
+        supabase.from("customer_contacts").select("id, name, email, updated_at", { count: "exact" }).order("updated_at", { ascending: false }).limit(3),
+      ]);
 
-      if (error) throw error;
-      setEstimates(data || []);
+      if (estimateResult.error) throw estimateResult.error;
+      setEstimates(estimateResult.data || []);
+      if (!customerResult.error) {
+        setCustomers((customerResult.data ?? []) as CustomerPreview[]);
+        setCustomerCount(customerResult.count ?? customerResult.data?.length ?? 0);
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const fullName = user.user_metadata?.full_name;
         setFirstName(typeof fullName === "string" ? fullName.trim().split(/\s+/)[0] ?? "" : "");
         const entitlement = await getClientProEntitlement();
         setIsPro(entitlement?.has_pro === true);
+        if (entitlement?.has_pro === true) {
+          const { data: jobRows, count, error: jobsError } = await supabase
+            .from("jobs")
+            .select("id, title, client_name, scheduled_at, status", { count: "exact" })
+            .in("status", ["scheduled", "in_progress"])
+            .order("scheduled_at", { ascending: true, nullsFirst: false })
+            .limit(3);
+          if (!jobsError) {
+            setJobs((jobRows ?? []) as JobPreview[]);
+            setJobCount(count ?? jobRows?.length ?? 0);
+          }
+        } else {
+          setJobs([]);
+          setJobCount(0);
+        }
         void fetch("/api/account/usage", { cache: "no-store" }).then(async (response) => {
           if (!response.ok) return;
           const usage = await response.json();
@@ -221,6 +247,7 @@ export default function DashboardPage() {
   const filteredEstimates = estimates.filter((est) =>
     currentTab === "active" ? !est.is_archived : est.is_archived
   );
+  const displayedEstimates = showAllEstimates ? filteredEstimates : filteredEstimates.slice(0, 3);
 
   return (
     <LocalizedTree>
@@ -258,11 +285,27 @@ export default function DashboardPage() {
           </article>)}</div>
         </section>}
 
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="recent-customers-title">
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 id="recent-customers-title" className="text-base font-bold text-slate-900">{translate(language, "Recent customers")}</h2><p className="mt-1 text-sm text-slate-500">{translate(language, "Saved customer contacts, ready to reuse.")}</p></div>
+            {customerCount > 3 && <Link href="/customers" className="inline-flex min-h-12 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "View all")} ({customerCount})</Link>}
+          </div>
+          {customers.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{customers.map((customer) => <div key={customer.id} className="flex min-h-14 items-center gap-3 py-2"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700" aria-hidden="true">{customer.name.trim().charAt(0).toUpperCase() || "?"}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{customer.name}</p>{customer.email && <p className="truncate text-xs text-slate-500">{customer.email}</p>}</div></div>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No saved customers yet.")}</p><Link href="/customers" className="mt-2 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Add your first customer")}</Link></div>}
+        </section>
+
+        {isPro && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="upcoming-jobs-title">
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 id="upcoming-jobs-title" className="text-base font-bold text-slate-900">{translate(language, "Active jobs")}</h2><p className="mt-1 text-sm text-slate-500">{translate(language, "Scheduled and in-progress work at a glance.")}</p></div>
+            {jobCount > 3 && <Link href="/schedule" className="inline-flex min-h-12 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "View all")} ({jobCount})</Link>}
+          </div>
+          {jobs.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{jobs.map((job) => <Link key={job.id} href="/schedule" className="flex min-h-14 items-center justify-between gap-3 py-2"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{job.title}</span><span className="block truncate text-xs text-slate-500">{job.client_name} · {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : translate(language, "No date set")}</span></span><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{translate(language, job.status === "in_progress" ? "In progress" : "Scheduled")}</span></Link>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No upcoming jobs.")}</p><Link href="/schedule" className="mt-2 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Schedule a job")}</Link></div>}
+        </section>}
+
         {/* Dashboard Content Container */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div id="estimates" className="scroll-mt-4 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Header Controls & Filter Tabs */}
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-            <div className="flex space-x-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <button
                 onClick={() => setCurrentTab("active")}
                 className={`inline-flex min-h-12 items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -284,6 +327,7 @@ export default function DashboardPage() {
                 Archived ({estimates.filter((e) => e.is_archived).length})
               </button>
             </div>
+            {filteredEstimates.length > 3 && <button type="button" onClick={() => setShowAllEstimates((showing) => !showing)} className="inline-flex min-h-12 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, showAllEstimates ? "Show recent" : "View all")}{showAllEstimates ? "" : ` (${filteredEstimates.length})`}</button>}
           </div>
 
           {/* Estimates Table */}
@@ -298,6 +342,38 @@ export default function DashboardPage() {
                 : "No archived estimates found."}
             </div>
           ) : (
+            <>
+            <div className="grid gap-3 p-3 lg:hidden">
+              {displayedEstimates.map((est) => (
+                <article key={est.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0"><h3 className="truncate text-base font-bold text-slate-900">{est.client_name}</h3><p className="mt-1 text-xs font-medium text-slate-600">{translate(language, "Estimate #")}{est.reference_number}</p></div>
+                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase ${est.status === "paid" || est.status === "accepted" ? "border-green-200 bg-green-100 text-green-800" : "border-yellow-200 bg-yellow-100 text-yellow-800"}`}>{translate(language, est.status)}</span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-700">{est.job_address || "—"}</p>
+                  <p className="mt-1 text-xs text-slate-500">{translate(language, "Created")}: {new Date(est.created_at).toLocaleDateString(locale)}</p>
+                  {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <p className="mt-2 text-xs font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</p>}
+                  {est.followup_at && <p className="mt-1 text-xs text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</p>}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Link href={`/estimate/${est.id}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-orange-800 px-3 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "View Estimate")}</Link>
+                    {isPro ? <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{sendingId === est.id ? translate(language, "Sending…") : emailEvents[est.id] ? translate(language, "Resend email") : translate(language, "Email client")}</button> : <Link href="/profile" className="inline-flex min-h-12 items-center justify-center gap-1 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-800">{translate(language, "Email client")} <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-orange-800">Pro</span></Link>}
+                  </div>
+                  <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Change estimate status")}
+                    <select aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`} value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"} disabled={statusSavingId !== null} onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
+                      {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
+                    </select>
+                  </label>
+                  <details className="mt-2 border-t border-slate-100 pt-2">
+                    <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-700">{translate(language, "More actions")}</summary>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {est.is_archived ? <button type="button" onClick={() => toggleArchiveStatus(est.id, false)} className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Restore")}</button> : <button type="button" onClick={() => toggleArchiveStatus(est.id, true)} className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Archive")}</button>}
+                      <button type="button" onClick={() => void deleteEstimate(est.id)} className="inline-flex min-h-11 items-center text-sm font-semibold text-red-700 underline">{translate(language, "Delete")}</button>
+                    </div>
+                  </details>
+                </article>
+              ))}
+            </div>
+            <div className="hidden lg:block">
             <EstimateTableScroll>
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
@@ -310,7 +386,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredEstimates.map((est) => (
+                  {displayedEstimates.map((est) => (
                     <tr key={est.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="p-3.5">
                         <p className="font-semibold text-slate-900">{est.client_name}</p>
@@ -386,6 +462,8 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </EstimateTableScroll>
+            </div>
+            </>
           )}
           <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
             Status changes are for your records and reports. They do not create a customer signature or process a payment.

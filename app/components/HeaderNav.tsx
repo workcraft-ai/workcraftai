@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { translate, useLanguage } from "@/app/components/LanguageProvider";
+import MobileBottomNav from "@/app/components/MobileBottomNav";
 
 const appLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -20,19 +21,10 @@ export default function HeaderNav() {
   const [user, setUser] = useState<User | null>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [openMenus, setOpenMenus] = useState({ pathname: "", dropdown: false, mobile: false });
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
-
-  const dropdownOpen = openMenus.pathname === pathname && openMenus.dropdown;
-  const mobileMenuOpen = openMenus.pathname === pathname && openMenus.mobile;
-  const setDropdownOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
-    setOpenMenus((current) => ({ pathname: pathname ?? "", dropdown: typeof next === "function" ? next(current.pathname === pathname && current.dropdown) : next, mobile: current.pathname === pathname && current.mobile }));
-  }, [pathname]);
-  const setMobileMenuOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
-    setOpenMenus((current) => ({ pathname: pathname ?? "", dropdown: current.pathname === pathname && current.dropdown, mobile: typeof next === "function" ? next(current.pathname === pathname && current.mobile) : next }));
-  }, [pathname]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -77,7 +69,6 @@ export default function HeaderNav() {
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setDropdownOpen(false);
-        setMobileMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -86,7 +77,7 @@ export default function HeaderNav() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [setDropdownOpen, setMobileMenuOpen]);
+  }, []);
 
 
   const handleSignOut = async () => {
@@ -124,37 +115,35 @@ export default function HeaderNav() {
       : pathname === href || pathname.startsWith(`${href}/`);
 
   const links = adminRole ? [...appLinks, { href: "/admin", label: "Admin support" }] : appLinks;
-  const renderLinks = (mobile = false) => (
+  const renderLinks = () => (
     <>
       {links.map(({ href, label }) => (
         <Link
           key={href}
           href={href}
           aria-current={isActive(href) ? "page" : undefined}
-          onClick={() => setMobileMenuOpen(false)}
           className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
             isActive(href)
               ? "bg-slate-800 text-orange-300"
             : "text-slate-300 hover:bg-slate-800 hover:text-white"
-          } ${mobile ? "flex min-h-12 w-full items-center" : "inline-flex min-h-12 items-center whitespace-nowrap"}`}
+          } inline-flex min-h-12 items-center whitespace-nowrap`}
         >
           {translate(language, label)}
         </Link>
       ))}
-      {!mobile && (
-        <Link
-          href="/estimate/new"
-          className="inline-flex min-h-12 items-center whitespace-nowrap rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
-        >
-          {translate(language, "+ New estimate")}
-        </Link>
-      )}
+      <Link
+        href="/estimate/new"
+        className="inline-flex min-h-12 items-center whitespace-nowrap rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+      >
+        {translate(language, "+ New estimate")}
+      </Link>
     </>
   );
 
   return (
+    <>
     <div className="relative flex w-full items-center justify-end gap-1 sm:gap-2 lg:w-auto">
-      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="hidden min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 sm:inline-flex" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
+      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
         {language === "en" ? "ES" : "EN"}
       </button>
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
@@ -200,29 +189,8 @@ export default function HeaderNav() {
         )}
       </div>
 
-      <button
-        type="button"
-        aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-        aria-expanded={mobileMenuOpen}
-        aria-controls="mobile-main-navigation"
-        onClick={() => setMobileMenuOpen((open) => !open)}
-        className="inline-flex h-12 min-h-12 w-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 lg:hidden"
-      >
-        {mobileMenuOpen ? (
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" strokeWidth="2" strokeLinecap="round" /></svg>
-        ) : (
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" strokeWidth="2" strokeLinecap="round" /></svg>
-        )}
-      </button>
-
-      {mobileMenuOpen && (
-        <nav id="mobile-main-navigation" aria-label="Mobile navigation" className="absolute right-0 top-full z-40 mt-3 w-64 rounded-xl border border-slate-700 bg-slate-900 p-2 shadow-xl lg:hidden">
-          {renderLinks(true)}
-          <button type="button" onClick={() => { setLanguage(language === "en" ? "es" : "en"); setMobileMenuOpen(false); }} className="mt-2 inline-flex min-h-12 w-full items-center rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
-            {translate(language, language === "en" ? "Spanish" : "English")}
-          </button>
-        </nav>
-      )}
     </div>
+    <MobileBottomNav pathname={pathname} adminRole={adminRole} />
+    </>
   );
 }
