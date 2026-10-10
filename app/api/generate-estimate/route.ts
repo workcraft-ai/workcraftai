@@ -11,7 +11,12 @@ export const maxDuration = 60;
 const MAX_BODY_BYTES = 12_000;
 const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 type GeneratedItem = { description?: unknown; description_es?: unknown; quantity?: unknown; unit?: unknown; suggested_unit_price?: unknown };
-type GeminiProviderError = { code?: unknown; message?: unknown; status?: unknown };
+type GeminiProviderError = {
+  code?: unknown;
+  message?: unknown;
+  status?: unknown;
+  details?: unknown;
+};
 
 const generatedUnits = ["each", "hour", "sq ft", "linear ft", "roofing square", "sheet", "job", "visit", "unknown"] as const;
 
@@ -61,7 +66,17 @@ function geminiProviderErrorSignal(error: GeminiProviderError | undefined) {
         : /invalid_argument|invalid json|unknown name|schema|invalid request/i.test(`${status ?? ""} ${message}`)
           ? "invalid_request"
           : "other";
-  return { providerCode: code, providerStatus: status, providerErrorCategory: category };
+  const providerFields = Array.isArray(error?.details)
+    ? error.details.flatMap((detail: unknown) => {
+      if (!detail || typeof detail !== "object" || !("fieldViolations" in detail) || !Array.isArray(detail.fieldViolations)) return [];
+      return detail.fieldViolations.flatMap((violation: unknown) => {
+        if (!violation || typeof violation !== "object" || !("field" in violation)) return [];
+        const field = violation.field;
+        return typeof field === "string" && /^[A-Za-z0-9_.\-\[\]]{1,160}$/.test(field) ? [field] : [];
+      });
+    }).slice(0, 5)
+    : [];
+  return { providerCode: code, providerStatus: status, providerErrorCategory: category, providerFields };
 }
 
 export async function GET() {
