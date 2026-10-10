@@ -12,6 +12,37 @@ const MAX_BODY_BYTES = 12_000;
 const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 type GeneratedItem = { description?: unknown; description_es?: unknown; quantity?: unknown; unit?: unknown; suggested_unit_price?: unknown };
 
+const generatedUnits = ["each", "hour", "sq ft", "linear ft", "roofing square", "sheet", "job", "visit", "unknown"] as const;
+
+function normalizeGeneratedUnit(value: unknown, description: string): typeof generatedUnits[number] {
+  if (typeof value !== "string") return "unknown";
+  const unit = value.toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (["each", "ea", "unit", "units", "piece", "pieces", "pc", "pcs", "item", "items"].includes(unit)) return "each";
+  if (["hour", "hours", "hr", "hrs", "labor hour", "labour hour"].includes(unit)) return "hour";
+  if (["sq ft", "square feet", "square foot", "sqft", "sf", "square footage"].includes(unit)) return "sq ft";
+  if (["linear ft", "linear feet", "linear foot", "lin ft", "lf", "foot", "feet", "ft"].includes(unit)) return "linear ft";
+  if (["roofing square", "roofing squares", "roof square", "roof squares", "square", "squares", "sq"].includes(unit)) {
+    return /\b(roof|roofing|shingle|underlayment|tear[ -]?off)\b/i.test(description) ? "roofing square" : "unknown";
+  }
+  if (["sheet", "sheets", "panel", "panels"].includes(unit)) return "sheet";
+  if (["job", "project", "flat rate", "lump sum"].includes(unit)) return "job";
+  if (["visit", "service call", "appointment"].includes(unit)) return "visit";
+  return "unknown";
+}
+
+function generatedUnitPrice(item: GeneratedItem): number {
+  // Accept common aliases for older model responses while the response schema below
+  // requires the canonical suggested_unit_price field for new requests.
+  const candidate = item.suggested_unit_price
+    ?? (item as GeneratedItem & { suggestedUnitPrice?: unknown }).suggestedUnitPrice
+    ?? (item as GeneratedItem & { unit_price?: unknown }).unit_price
+    ?? (item as GeneratedItem & { price?: unknown }).price;
+  const value = Number(candidate);
+  return Number.isFinite(value) && value > 0 && value <= 100000000
+    ? Math.round(value * 100) / 100
+    : 0;
+}
+
 export async function GET() {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -161,9 +192,43 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Prepare a draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with proposal_summary and line_items. Write proposal_summary as 1-2 concise customer-facing sentences in ${proposalLanguage === "es" ? "Spanish" : "English"}, describing overall work without prices. Each line item must contain description (concise English string), description_es (faithful Spanish string), quantity (number), unit (one of: each, hour, sq ft, linear ft, roofing square, sheet, job, visit, unknown), and suggested_unit_price (number). Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and state what needs confirmation in both descriptions. Suggest a cautious customer-facing U.S. starting rate per unit in USD before markup and tax, using broad typical labor/material assumptions; it is not a live local supplier quote. Return 0 if the unit or scope is too unclear to price responsibly. Keep rate suggestions rounded to cents and use concise descriptions with the actual material or task. Never use a price from the user's Price Book; WorkCraft AI applies saved contractor rates after this draft.` }] }],
+        contents: [{ role: "user", parts: [{ text: `Prepare a draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn one JSON object matching the response schema. Write proposal_summary as 1-2 concise customer-facing sentences in ${proposalLanguage === "es" ? "Spanish" : "English"}, describing overall work without prices. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and state what needs confirmation in both descriptions. For every line item, choose the best matching canonical unit and provide a cautious U.S. starting rate in USD for that unit, before contractor markup and sales tax, using broad typical labor/material assumptions. These are editable starting estimates, not live local supplier quotes. Include a positive suggested_unit_price whenever a reasonable starting rate can be estimated. Use 0 only when the scope or unit is genuinely too unclear to price responsibly; do not use 0 just because the contractor's Price Book has no match. Keep rates rounded to cents. Never use or invent a price from the user's Price Book; WorkCraft AI applies saved contractor rates after this draft.` }] }],
         generationConfig: {
-          responseMimeType: "application/json",
+          responseFormat: {
+            text: {
+              mimeType: "application/json",
+              schema: {
+                type: "object",
+                properties: {
+                  proposal_summary: { type: "string" },
+                  line_items: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 40,
+                    items: {
+                      type: "object",
+                      properties: {
+                        description: { type: "string" },
+                        description_es: { type: "string" },
+                        quantity: { type: "number", minimum: 0.01 },
+                        unit: { type: "string", enum: generatedUnits },
+                        suggested_unit_price: {
+                          type: "number",
+                          minimum: 0,
+                          maximum: 100000000,
+                          description: "Estimated USD rate for one unit, rounded to cents. Use a positive rate when a reasonable starting price can be estimated; use zero only if pricing is genuinely unclear.",
+                        },
+                      },
+                      required: ["description", "description_es", "quantity", "unit", "suggested_unit_price"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["proposal_summary", "line_items"],
+                additionalProperties: false,
+              },
+            },
+          },
           maxOutputTokens: 3072,
           thinkingConfig: { thinkingLevel: "low" },
         },
@@ -214,18 +279,14 @@ export async function POST(request: Request) {
     await complete("failed", response.status, null, inputTokens, outputTokens);
     return NextResponse.json({ error: "The AI response could not be read. Try a more specific job description." }, { status: 502 });
   }
-  const allowedUnits = new Set(["each", "hour", "sq ft", "linear ft", "roofing square", "sheet", "job", "visit", "unknown"]);
   const line_items = Array.isArray(parsed.line_items) ? parsed.line_items.slice(0, 40).flatMap((rawItem: unknown) => {
     const item = rawItem as GeneratedItem;
     if (!item || typeof item !== "object") return [];
     const description = typeof item.description === "string" ? item.description.trim().slice(0, 240) : "";
     const quantity = Number(item.quantity);
     if (!description || !Number.isFinite(quantity) || quantity <= 0) return [];
-    const unit = typeof item.unit === "string" && allowedUnits.has(item.unit.trim().toLowerCase()) ? item.unit.trim().toLowerCase() : "unknown";
-    const suggestedUnitPrice = Number(item.suggested_unit_price);
-    const unitPrice = unit !== "unknown" && Number.isFinite(suggestedUnitPrice) && suggestedUnitPrice > 0 && suggestedUnitPrice <= 100000000
-      ? Math.round(suggestedUnitPrice * 100) / 100
-      : 0;
+    const unit = normalizeGeneratedUnit(item.unit, description);
+    const unitPrice = generatedUnitPrice(item);
     const descriptionEs = typeof item.description_es === "string" ? item.description_es.trim().slice(0, 240) : "";
     return [{ description, description_es: descriptionEs, quantity, unit, unit_price: unitPrice }];
   }) : [];

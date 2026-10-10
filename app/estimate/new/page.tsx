@@ -299,7 +299,10 @@ export default function CreateEstimatePage() {
       setAiRateConfirmationKey("");
       setProposalSummary(typeof data.proposal_summary === "string" ? data.proposal_summary.trim().slice(0, 1200) : "");
       const aiSuggestionCount = draftLines.filter((item) => item.pricing_source === "ai_suggested").length;
-      setDraftMessage(`${priced.matchedCount} line(s) matched your Price Book. ${aiSuggestionCount} other line(s) have AI starting prices to review. Suggested rates are not live local quotes.`);
+      const unpricedCount = draftLines.filter((item) => item.pricing_source === "unpriced").length;
+      setDraftMessage(language === "es"
+        ? `${priced.matchedCount} partida(s) coincidieron con tu lista de precios; ${aiSuggestionCount} recibieron precios iniciales de IA y ${unpricedCount} aún necesitan precio. Revisa las tarifas antes de compartir. Los precios de IA no son cotizaciones locales en tiempo real.`
+        : `${priced.matchedCount} line(s) matched your Price Book; ${aiSuggestionCount} received AI starting prices and ${unpricedCount} still need a price. Review rates before sharing. AI suggestions are not live local quotes.`);
       setPromptText("");
     } catch (err: unknown) {
       void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {
