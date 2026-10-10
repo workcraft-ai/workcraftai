@@ -5,6 +5,7 @@ import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
 import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
+import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -130,8 +131,8 @@ export async function POST(request: Request) {
 
   async function sendPastDueBillingNotice(userId: string, eventId: string) {
     const apiKey = process.env.RESEND_API_KEY;
-    const sender = process.env.RESEND_FROM_EMAIL;
-    if (!apiKey || !sender) throw new Error("Past-due billing email is not configured.");
+    const sender = getWorkCraftNoReplySender();
+    if (!apiKey) throw new Error("Past-due billing email is not configured.");
 
     const { data, error } = await admin.auth.admin.getUserById(userId);
     if (error) throw new Error("Could not load the account email for a past-due notice.");

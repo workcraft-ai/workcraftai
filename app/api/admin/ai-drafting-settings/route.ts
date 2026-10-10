@@ -11,24 +11,29 @@ export async function GET() {
 
   const today = new Date().toISOString().slice(0, 10);
   const month = `${today.slice(0, 7)}-01`;
-  const [{ data: settings, error: settingsError }, { data: usage, error: usageError }, { data: globalUsage, error: globalUsageError }, { data: monthlyUsage, error: monthlyUsageError }] = await Promise.all([
+  const todayStart = `${today}T00:00:00.000Z`;
+  const tomorrowStart = new Date(Date.parse(todayStart) + 24 * 60 * 60 * 1000).toISOString();
+  const monthStart = `${month}T00:00:00.000Z`;
+  const [monthYear, monthNumber] = month.split("-").map(Number);
+  const nextMonthStart = new Date(Date.UTC(monthYear, monthNumber, 1)).toISOString();
+  const [{ data: settings, error: settingsError }, { data: globalUsage, error: globalUsageError }, { count: todayAttempts, error: todayAttemptsError }, { count: todaySucceeded, error: todaySucceededError }, { count: todayFailed, error: todayFailedError }, { count: monthAttempts, error: monthAttemptsError }] = await Promise.all([
     access.admin.from("tradeflow_app_settings").select("ai_drafting_enabled, ai_daily_generation_limit, ai_monthly_generation_limit, ai_global_daily_generation_limit, updated_at").eq("singleton", true).single(),
-    access.admin.from("tradeflow_ai_daily_usage").select("attempts_started, succeeded, failed").eq("usage_date", today),
     access.admin.from("tradeflow_ai_global_daily_usage").select("attempts_started").eq("usage_date", today).maybeSingle(),
-    access.admin.from("tradeflow_ai_monthly_usage").select("attempts_started").eq("usage_month", month),
+    access.admin.from("tradeflow_ai_generation_events").select("id", { count: "exact", head: true }).gte("created_at", todayStart).lt("created_at", tomorrowStart),
+    access.admin.from("tradeflow_ai_generation_events").select("id", { count: "exact", head: true }).gte("created_at", todayStart).lt("created_at", tomorrowStart).eq("outcome", "succeeded"),
+    access.admin.from("tradeflow_ai_generation_events").select("id", { count: "exact", head: true }).gte("created_at", todayStart).lt("created_at", tomorrowStart).eq("outcome", "failed"),
+    access.admin.from("tradeflow_ai_generation_events").select("id", { count: "exact", head: true }).gte("created_at", monthStart).lt("created_at", nextMonthStart),
   ]);
-  if (settingsError || usageError || globalUsageError || monthlyUsageError) {
-    console.error("Could not read AI drafting settings:", settingsError?.message ?? usageError?.message ?? globalUsageError?.message ?? monthlyUsageError?.message);
+  if (settingsError || globalUsageError || todayAttemptsError || todaySucceededError || todayFailedError || monthAttemptsError) {
+    console.error("Could not read AI drafting settings:", settingsError?.message ?? globalUsageError?.message ?? todayAttemptsError?.message ?? todaySucceededError?.message ?? todayFailedError?.message ?? monthAttemptsError?.message);
     return NextResponse.json({ error: "Could not load AI drafting settings. Apply the AI cost controls migration." }, { status: 503 });
   }
 
-  const totals = (usage ?? []).reduce((result, row) => ({
-    attempts_started: result.attempts_started + row.attempts_started,
-    succeeded: result.succeeded + row.succeeded,
-    failed: result.failed + row.failed,
-  }), { attempts_started: 0, succeeded: 0, failed: 0 });
-  const monthAttempts = (monthlyUsage ?? []).reduce((sum, row) => sum + row.attempts_started, 0);
-  return NextResponse.json({ ...settings, today: { ...totals, global_attempts_started: globalUsage?.attempts_started ?? 0 }, this_month: { attempts_started: monthAttempts } }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({
+    ...settings,
+    today: { attempts_started: todayAttempts ?? 0, succeeded: todaySucceeded ?? 0, failed: todayFailed ?? 0, global_attempts_started: globalUsage?.attempts_started ?? 0 },
+    this_month: { attempts_started: monthAttempts ?? 0 },
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {

@@ -8,6 +8,7 @@ import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 import { isEstimateQuotaLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
@@ -87,6 +88,8 @@ export default function CreateEstimatePage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [savedCustomerLoadError, setSavedCustomerLoadError] = useState("");
   const [trade, setTrade] = useState("Plumbing");
+  const [estimateTrades, setEstimateTrades] = useState(() => DEFAULT_ESTIMATE_TRADES.map((option) => ({ ...option })));
+  const estimateTradesRef = useRef(estimateTrades);
   const [requireDeposit, setRequireDeposit] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(20);
   const [taxRate, setTaxRate] = useState(0);
@@ -166,7 +169,7 @@ export default function CreateEstimatePage() {
   const restoreFields = (draft: Partial<LocalEstimateDraft>) => {
     setClientName(draft.clientName ?? ""); setClientEmail(draft.clientEmail ?? "");
     setClientPhone(draft.clientPhone ?? ""); setJobAddress(draft.jobAddress ?? "");
-    if (draft.trade) setTrade(draft.trade);
+    if (draft.trade) setTrade(estimateTradesRef.current.some((option) => option.value === draft.trade) ? draft.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value);
     setRequireDeposit(isProSubscriber && draft.requireDeposit === true);
     setDepositPercentage(Number(draft.depositPercentage) || 20);
     setPromptText(draft.promptText ?? "");
@@ -207,7 +210,7 @@ export default function CreateEstimatePage() {
         startTransition(() => {
           if (Array.isArray(template.line_items) && template.line_items.length) setLineItems(template.line_items.map((item: LineItemInput) => ({ ...item, unit: item.unit || "each" })));
           if (Array.isArray(template.package_options)) setPackageOptions(template.package_options);
-          if (template.trade) setTrade(template.trade);
+          if (template.trade) setTrade(estimateTradesRef.current.some((option) => option.value === template.trade) ? template.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value);
           if (typeof template.require_deposit === "boolean") setRequireDeposit(template.require_deposit);
           if (template.deposit_percentage) setDepositPercentage(Number(template.deposit_percentage));
         });
@@ -219,6 +222,15 @@ export default function CreateEstimatePage() {
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        void fetch("/api/estimate/trades", { cache: "no-store" }).then(async (response) => {
+          if (!response.ok) return;
+          const result = await response.json();
+          const options = parseEstimateTradeOptions(result.trades);
+          if (!options) return;
+          estimateTradesRef.current = options;
+          setEstimateTrades(options);
+          setTrade((current) => options.some((option) => option.value === current) ? current : options[0].value);
+        }).catch(() => {});
         void fetch("/api/account/usage", { cache: "no-store" }).then(async (response) => {
           if (!response.ok) return;
           const usage = await response.json();
@@ -625,7 +637,7 @@ export default function CreateEstimatePage() {
                   onChange={(e) => setTrade(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {['Plumbing', 'Electrical', 'Roofing', 'HVAC', 'Painting', 'Carpentry', 'General contracting', 'Other'].map((option) => <option key={option}>{option}</option>)}
+                  {estimateTrades.map((option) => <option key={option.value} value={option.value}>{language === "es" ? option.label_es : option.value}</option>)}
                 </select>
               </div>
               <div>

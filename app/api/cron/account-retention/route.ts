@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { deleteTradeFlowAccount } from "@/lib/account-deletion";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
+import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 export const maxDuration = 60;
@@ -26,10 +27,10 @@ export async function GET(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const resendKey = process.env.RESEND_API_KEY;
-  const sender = process.env.RESEND_FROM_EMAIL;
+  const sender = getWorkCraftNoReplySender();
   const appOrigin = getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
   const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@workcraftai.com";
-  if (!cronSecret || !supabaseUrl || !serviceKey || !resendKey || !sender || !appOrigin) {
+  if (!cronSecret || !supabaseUrl || !serviceKey || !resendKey || !appOrigin) {
     return NextResponse.json({ error: "Account retention service is not configured." }, { status: 503 });
   }
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {

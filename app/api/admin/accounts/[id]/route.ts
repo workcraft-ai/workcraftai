@@ -25,6 +25,28 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     console.error("Admin account detail lookup failed:", subscriptionError?.message ?? notesError?.message ?? auditError?.message ?? questionsError?.message ?? emailsError?.message ?? lifecycleError?.message ?? adminError?.message ?? proGrantsError?.message);
     return NextResponse.json({ error: "Could not load account support history." }, { status: 502 });
   }
+  let aiUsage: { daily_date: string; daily_used: number; daily_limit: number; monthly_month: string; monthly_used: number; monthly_limit: number } | null = null;
+  if (access.role === "super_admin") {
+    const today = new Date().toISOString().slice(0, 10);
+    const month = `${today.slice(0, 7)}-01`;
+    const [{ data: dailyUsage, error: dailyUsageError }, { data: monthlyUsage, error: monthlyUsageError }, { data: aiSettings, error: aiSettingsError }] = await Promise.all([
+      access.admin.from("tradeflow_ai_daily_usage").select("attempts_started").eq("user_id", id).eq("usage_date", today).maybeSingle(),
+      access.admin.from("tradeflow_ai_monthly_usage").select("attempts_started").eq("user_id", id).eq("usage_month", month).maybeSingle(),
+      access.admin.from("tradeflow_app_settings").select("ai_daily_generation_limit, ai_monthly_generation_limit").eq("singleton", true).single(),
+    ]);
+    if (dailyUsageError || monthlyUsageError || aiSettingsError) {
+      console.error("Admin AI allowance lookup failed:", dailyUsageError?.message ?? monthlyUsageError?.message ?? aiSettingsError?.message);
+      return NextResponse.json({ error: "Could not load this account’s AI allowance." }, { status: 502 });
+    }
+    aiUsage = {
+      daily_date: today,
+      daily_used: dailyUsage?.attempts_started ?? 0,
+      daily_limit: aiSettings.ai_daily_generation_limit,
+      monthly_month: month,
+      monthly_used: monthlyUsage?.attempts_started ?? 0,
+      monthly_limit: aiSettings.ai_monthly_generation_limit,
+    };
+  }
   const user = userData.user;
   const now = Date.now();
   const proGrantHistory = (proGrants ?? []).map((grant) => ({
@@ -54,6 +76,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       subscription_updated_at: subscription?.updated_at ?? null,
       active_pro_grant: activeProGrant,
     },
+    ai_usage: aiUsage,
     pro_grants: proGrantHistory,
     notes: notes ?? [],
     audit: audit ?? [],

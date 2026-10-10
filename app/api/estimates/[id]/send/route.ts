@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
+import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveEstimateEmail } from "@/lib/email-quota";
 
 function escapeHtml(value: string) {
@@ -25,8 +26,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!hasPro) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
 
   const apiKey = process.env.RESEND_API_KEY;
-  const sender = process.env.RESEND_ESTIMATE_FROM_EMAIL;
-  if (!apiKey || !sender) return NextResponse.json({ error: "Estimate email sending is not configured. Set RESEND_API_KEY and RESEND_ESTIMATE_FROM_EMAIL." }, { status: 503 });
+  const sender = getWorkCraftNoReplySender();
+  if (!apiKey) return NextResponse.json({ error: "Estimate email sending is not configured. Set RESEND_API_KEY." }, { status: 503 });
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Email sending is temporarily unavailable." }, { status: 503 });
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });

@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { sameOrigin } from "@/lib/admin-support";
 import { emailAddressFromConfig } from "@/lib/email-address";
+import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 export const runtime = "nodejs";
@@ -87,9 +88,9 @@ export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const apiKey = process.env.RESEND_API_KEY;
-  const sender = process.env.RESEND_FROM_EMAIL;
+  const sender = getWorkCraftNoReplySender();
   const recipient = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL);
-  if (!supabaseUrl || !serviceKey || !apiKey || !sender || !recipient) {
+  if (!supabaseUrl || !serviceKey || !apiKey || !recipient) {
     return supportResponse(request, { error: "The support form is temporarily unavailable. Please try again later." }, 503);
   }
 
