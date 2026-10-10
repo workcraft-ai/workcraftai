@@ -32,6 +32,8 @@ type ProGrant = { id: string; grant_type: "temporary" | "permanent"; reason: str
 type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_monthly_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number }; this_month: { attempts_started: number } };
 type AppEmailSettings = { daily_limit: number; today: { emails_started: number } };
 
+const ADMIN_MFA_REQUIRED_EVENT = "workcraft:admin-mfa-required";
+
 function date(value: string | null) {
   return value ? new Date(value).toLocaleString() : "Never";
 }
@@ -48,7 +50,12 @@ function adminPlanStatus(account: AccountDetail["account"]) {
 async function requestJson(url: string, options?: RequestInit) {
   const response = await fetch(url, { ...options, headers: { "Content-Type": "application/json", ...options?.headers }, cache: "no-store" });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || "The request could not be completed.");
+  if (!response.ok) {
+    if (result.code === "mfa_required" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(ADMIN_MFA_REQUIRED_EVENT));
+    }
+    throw new Error(result.error || "The request could not be completed.");
+  }
   return result;
 }
 
@@ -121,22 +128,35 @@ export default function AdminPage() {
     void requestJson("/api/admin/me").then((result) => {
       setRole(result.role);
       setMfaRequired(Boolean(result.mfa_required));
-      if (result.mfa_required) {
-        void createClient().auth.mfa.listFactors().then(({ data }) => {
-          if (!data) return;
-          const verified = data.totp.find((factor) => factor.status === "verified");
-          if (verified) {
-            setMfaFactorId(verified.id);
-            setMfaVerifiedFactor(true);
-          }
-        });
-      }
       setAccessState("ready");
     }).catch((cause) => {
       setAccessState(cause instanceof Error && cause.message.includes("not authorized") ? "denied" : "error");
       setError(cause instanceof Error ? cause.message : "Admin access could not be checked.");
     });
   }, []);
+
+  useEffect(() => {
+    const handleMfaRequired = () => {
+      setError("");
+      setMfaRequired(true);
+    };
+    window.addEventListener(ADMIN_MFA_REQUIRED_EVENT, handleMfaRequired);
+    return () => window.removeEventListener(ADMIN_MFA_REQUIRED_EVENT, handleMfaRequired);
+  }, []);
+
+  useEffect(() => {
+    if (!mfaRequired) return;
+    let cancelled = false;
+    void createClient().auth.mfa.listFactors().then(({ data }) => {
+      if (cancelled || !data) return;
+      const verified = data.totp.find((factor) => factor.status === "verified");
+      if (verified) {
+        setMfaFactorId(verified.id);
+        setMfaVerifiedFactor(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [mfaRequired]);
 
   useEffect(() => {
     if (role !== "super_admin") return;
@@ -231,6 +251,7 @@ export default function AdminPage() {
       const result = await requestJson("/api/admin/me");
       setMfaRequired(Boolean(result.mfa_required));
       setMfaVerifiedFactor(true);
+      setError("");
       setMfaQrCode("");
       setMfaSecret("");
       setMfaCode("");
