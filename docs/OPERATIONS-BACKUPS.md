@@ -49,8 +49,8 @@ In the GitHub repository `workcraft-ai/workcraftai`, open **Settings → Secrets
 | Secret | Value |
 | --- | --- |
 | `PROD_SUPABASE_DB_URL` | Production database connection URI from Supabase **Connect**. Use the Session pooler if direct IPv6 access is unavailable. URL-encode special characters in the database password. |
-| `PROD_SUPABASE_URL` | Production Supabase project URL. |
-| `PROD_SUPABASE_SERVICE_ROLE_KEY` | Production service-role key; used only by the scheduled workflow to read private Storage objects. Never use the publishable/anon key here. |
+| `PROD_SUPABASE_URL` | `https://ivioejiiigtbmhpzjuni.supabase.co`; the workflow rejects other projects. |
+| `PROD_SUPABASE_SERVICE_ROLE_KEY` | Production service-role key; used only by the scheduled workflow to verify admin access and read private Storage objects. Never use the publishable/anon key here. |
 | `RCLONE_CONFIG_B64` | Base64 text of the authorized rclone config file containing the `drive` remote. |
 | `RESTIC_PASSWORD` | The random encryption password created above. |
 
@@ -58,7 +58,7 @@ This repository is public. Anonymous readers cannot access Actions secrets, and 
 
 ## Start and verify backups
 
-After saving the secrets, open **Actions → Encrypted off-site backup → Run workflow** on `main`. Select `include_storage: true` for the initial full snapshot. Confirm the run finishes green and its summary says Auth account data was included and media was included. Subsequent daily runs back up database and Auth account data; Sunday runs include media.
+After saving the secrets, open **Actions → Encrypted off-site backup → Run workflow** on `main`. Select `include_storage: true` for the initial full snapshot. Confirm the run finishes green and its summary says Auth account data was included and media was included. The media step verifies the expected Production URL and actual admin access, then compares downloaded objects with the source database count. A zero/partial download from wrong credentials fails before encryption. Concurrent uploads/deletions can also cause a count mismatch; retry after activity settles and investigate repeated failures. Subsequent daily runs back up database and Auth account data; Sunday runs include media.
 
 Confirm the encrypted repository exists with rclone (the object names are Restic's encrypted repository files, not readable SQL or photos):
 
@@ -129,3 +129,7 @@ Restore into a **new recovery Supabase project first**. Do not overwrite the liv
 Run **Actions → Encrypted off-site backup → Run workflow → main**, with **restore_drill** checked. This forces private media inclusion, encrypts the snapshot, restores it from Google Drive into the temporary runner and imports it into a fresh localhost-only Supabase stack. It includes durable Auth users/identities/MFA factors, current application schema/data, migration history, private Storage ownership policies and the files. The report checks schema compatibility, RLS, owner references, downloaded file sizes and public-access denial. It never writes Production or Staging, changes Vercel, or creates a paid cloud project.
 
 The organization currently uses both active free project slots. No third paid project or pause of an existing project was authorized. The local drill provides structural recovery evidence; password/MFA sign-in and full application acceptance must still be completed against a compatible recovery environment before claiming a tested cutover. Keep the database/auth versions compatible and preserve separate provider configuration. Restore plaintext and credentials are removed even on failure; diagnostic SQL is not published in logs.
+
+## October 10 recovery evidence and open media gap
+
+[Run 38091235906](https://github.com/workcraft-ai/workcraftai/actions/runs/38091235906) decrypted the actual encrypted Google Drive snapshot and restored 57 users, 57 identities, one MFA factor, 10 estimates, three jobs and 40 migrations into an isolated local stack. RLS, ownership references and private Storage policies passed. However, the downloaded manifest contained zero files while Production contained three Storage objects and three attachment records. This run proves database/Auth structural recovery, **not complete media recovery**. The owner must check the GitHub Production Storage URL and server credential, then rerun the full drill with the project/admin/source-count guards. A separate local synthetic PNG passed upload/download and public-access denial. Password/MFA login and full application recovery remain separate acceptance checks.
