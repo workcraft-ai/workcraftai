@@ -95,3 +95,20 @@ body {
   main { min-height: 0 !important; padding: 0 !important; }
   article, section, .rounded-xl, .rounded-2xl { box-shadow: none !important; }
 }
+
+/* App-style phone navigation. Reserve room for the fixed tabs and iPhone safe area. */
+.mobile-app-nav {
+  min-height: calc(4.25rem + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 1023px) {
+  body:has(.mobile-app-nav) {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+  .mobile-app-nav { display: none !important; }
+  body:has(.mobile-app-nav) { padding-bottom: 0 !important; }
+}

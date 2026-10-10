@@ -487,6 +487,25 @@ Object.assign(spanish, {
   "Enter a valid roof surface area, or clear the measurement field.": "Ingresa una superficie válida del techo o borra el campo de medida.",
 });
 
+Object.assign(spanish, {
+  "Home": "Inicio",
+  "Jobs": "Trabajos",
+  "More": "Más",
+  "More tools": "Más herramientas",
+  "Close more navigation": "Cerrar el menú Más",
+  "Active jobs": "Trabajos activos",
+  "Scheduled and in-progress work at a glance.": "Un resumen de los trabajos programados y en curso.",
+  "No upcoming jobs.": "No hay próximos trabajos.",
+  "Schedule a job": "Programar un trabajo",
+  "More actions": "Más acciones",
+  "View all": "Ver todo",
+  "Show recent": "Ver recientes",
+  "Recent customers": "Clientes recientes",
+  "Saved customer contacts, ready to reuse.": "Contactos guardados listos para reutilizar.",
+  "Open": "Abrir",
+  "Add your first customer": "Agrega tu primer cliente",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";
