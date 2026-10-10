@@ -14,7 +14,7 @@ const questions = [
   },
   {
     question: "Are AI suggested prices guaranteed?",
-    answer: "No. They are broad starting estimates, not live local supplier quotes. A clear match in your Price Book replaces the AI rate. Review the unit, quantity, labor, material, taxes, and final rate before sharing the estimate.",
+    answer: "No. They are broad starting estimates, not live local supplier quotes. Exact or high-confidence Price Book matches can apply automatically; possible matches are shown for you to choose. Review the unit, quantity, labor, material, taxes, and final rate before sharing the estimate.",
   },
   {
     question: "Where can I find my estimate reference number?",

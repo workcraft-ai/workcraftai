@@ -13,20 +13,32 @@ test("CSV import rejects missing prices and malformed quoting", () => {
   assert.throws(() => parsePriceBookCsv('Name,Price\n"Faucet,25'), /unclosed quotation/);
 });
 
-test("contractor price book rates only override clear trade and unit matches", () => {
+test("a weak single-word Price Book match is suggested instead of auto-applied", () => {
   const result = applyPriceBookRates(
     [{ description: "Faucet replacement / installation", quantity: 2, unit_price: 225 }],
     [{ name: "Faucet installation", trade: "Plumbing", unit: "each", unit_price: 310 }],
     "Plumbing",
   );
-  assert.equal(result.lines[0].unit_price, 310);
+  assert.equal(result.lines[0].unit_price, 225);
+  assert.equal(result.matchedCount, 0);
+  assert.equal(result.suggestionsByIndex[0][0].name, "Faucet installation");
+});
+
+test("clear multi-word matches auto-apply after unit aliases are normalized", () => {
+  const result = applyPriceBookRates(
+    [{ description: "Install asphalt shingles", quantity: 20, unit: "roofing square", unit_price: 0 }],
+    [{ name: "Asphalt shingle installation", trade: "Roofing", unit: "square", unit_price: 475 }],
+    "Roofing",
+  );
+  assert.equal(result.lines[0].unit_price, 475);
   assert.equal(result.matchedCount, 1);
+  assert.deepEqual(result.suggestionsByIndex, {});
 });
 
 test("hourly and measurement-based rates require the same units", () => {
   const result = applyPriceBookRates(
-    [{ description: "Wiring work (hour)", quantity: 4, unit_price: 0 }],
-    [{ name: "Wiring work", trade: "Electrical", unit: "hours", unit_price: 125 }],
+    [{ description: "Electrical panel wiring", quantity: 4, unit: "hour", unit_price: 0 }],
+    [{ name: "Electrical panel wiring", trade: "Electrical", unit: "hours", unit_price: 125 }],
     "Electrical",
     true,
   );
@@ -42,4 +54,18 @@ test("do not apply ambiguous or incompatible Price Book rates", () => {
   ], "Plumbing");
   assert.equal(result.lines[0].unit_price, 225);
   assert.equal(result.matchedCount, 0);
+});
+
+test("Price Book descriptions can surface compatible suggestions but never bypass unit checks", () => {
+  const result = applyPriceBookRates(
+    [
+      { description: "Replace leaking kitchen faucet", quantity: 1, unit: "each", unit_price: 0 },
+      { description: "Replace leaking kitchen faucet", quantity: 1, unit: "unknown", unit_price: 0 },
+    ],
+    [{ name: "Fixture service", description: "Kitchen faucet repair or replacement", trade: "Plumbing", unit: "each", unit_price: 290 }],
+    "Plumbing",
+  );
+  assert.equal(result.matchedCount, 0);
+  assert.equal(result.suggestionsByIndex[0][0].unit_price, 290);
+  assert.equal(result.suggestionsByIndex[1], undefined);
 });

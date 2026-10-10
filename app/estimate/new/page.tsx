@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
+import { estimateDraftReviewNotes } from "@/lib/estimateDraftReview.mjs";
 import { isEstimateQuotaLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
@@ -19,6 +20,13 @@ interface LineItemInput {
   unit?: string;
   unit_price: number;
   pricing_source?: "price_book" | "ai_suggested" | "unpriced" | "manual";
+  quantity_source?: "ai_estimated" | "contractor_measurement";
+  pricing_assumption?: string;
+  pricing_assumption_es?: string;
+  review_note?: string;
+  review_note_es?: string;
+  review_notes?: string[];
+  price_book_suggestions?: PriceBookSuggestion[];
 }
 
 interface PriceBookItem {
@@ -29,6 +37,16 @@ interface PriceBookItem {
   unit: string;
   unit_price: number;
 }
+
+type PriceBookSuggestion = {
+  id?: string;
+  name: string;
+  description?: string;
+  trade: string;
+  unit: string;
+  unit_price: number;
+  match_score: number;
+};
 
 interface SavedCustomer {
   id: string;
@@ -62,6 +80,8 @@ interface LocalEstimateDraft {
   proposalLanguage: "en" | "es";
   proposalDisplayMode?: "detailed" | "summary";
   proposalSummary?: string;
+  roofAreaSqFt?: string;
+  reviewPromptContext?: string;
 }
 
 interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
@@ -97,6 +117,8 @@ export default function CreateEstimatePage() {
   const [proposalLanguage, setProposalLanguage] = useState<"en" | "es">("en");
   const [proposalDisplayMode, setProposalDisplayMode] = useState<"detailed" | "summary">("detailed");
   const [proposalSummary, setProposalSummary] = useState("");
+  const [roofAreaSqFt, setRoofAreaSqFt] = useState("");
+  const [reviewPromptContext, setReviewPromptContext] = useState("");
   const [attachments, setAttachments] = useState<EstimateAttachment[]>([]);
   const [connectionOnline, setConnectionOnline] = useState(true);
   const [recording, setRecording] = useState(false);
@@ -121,6 +143,7 @@ export default function CreateEstimatePage() {
   const [packageOptions, setPackageOptions] = useState<EstimatePackage[]>([]);
   const [zeroRateConfirmationKey, setZeroRateConfirmationKey] = useState("");
   const [aiRateConfirmationKey, setAiRateConfirmationKey] = useState("");
+  const [draftReviewConfirmationKey, setDraftReviewConfirmationKey] = useState("");
 
   const [saving, setSaving] = useState(false);
 
@@ -133,7 +156,7 @@ export default function CreateEstimatePage() {
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
       depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
-      proposalDisplayMode, proposalSummary, savedAt: new Date().toISOString(),
+      proposalDisplayMode, proposalSummary, roofAreaSqFt, reviewPromptContext, savedAt: new Date().toISOString(),
     };
     void saveOfflineEstimateDraft(session.user.id, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
       .then(() => setDraftStorageMessage("Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
@@ -179,6 +202,8 @@ export default function CreateEstimatePage() {
     setProposalLanguage(draft.proposalLanguage === "es" ? "es" : "en");
     setProposalDisplayMode(draft.proposalDisplayMode === "summary" ? "summary" : "detailed");
     setProposalSummary(draft.proposalSummary ?? "");
+    setRoofAreaSqFt(draft.roofAreaSqFt ?? "");
+    setReviewPromptContext(draft.reviewPromptContext ?? "");
   };
 
   const deleteDraftFromDevice = async () => {
@@ -277,7 +302,12 @@ export default function CreateEstimatePage() {
       const res = await fetch("/api/generate-estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptText, trade, proposal_language: proposalLanguage }),
+        body: JSON.stringify({
+          prompt: promptText,
+          trade,
+          proposal_language: proposalLanguage,
+          ...(/roof/i.test(trade) && Number(roofAreaSqFt) > 0 ? { roof_area_sq_ft: Number(roofAreaSqFt) } : {}),
+        }),
       });
 
       const data = await res.json();
@@ -301,14 +331,19 @@ export default function CreateEstimatePage() {
       if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
       const priced = applyPriceBookRates(data.line_items, priceBookItems, trade);
       const priceBookMatches = new Set<number>(priced.matchedIndexes);
+      const generatedScopeContext = promptText;
       const draftLines = priced.lines.map((item: LineItemInput, index: number) => ({
         ...item,
         unit: item.unit || "each",
         pricing_source: priceBookMatches.has(index) ? "price_book" as const : Number(item.unit_price) > 0 ? "ai_suggested" as const : "unpriced" as const,
+        review_notes: [],
+        price_book_suggestions: priceBookMatches.has(index) ? [] : priced.suggestionsByIndex[index] ?? [],
       }));
       setLineItems(draftLines);
+      setReviewPromptContext(generatedScopeContext);
       setZeroRateConfirmationKey("");
       setAiRateConfirmationKey("");
+      setDraftReviewConfirmationKey("");
       setProposalSummary(typeof data.proposal_summary === "string" ? data.proposal_summary.trim().slice(0, 1200) : "");
       const aiSuggestionCount = draftLines.filter((item) => item.pricing_source === "ai_suggested").length;
       const unpricedCount = draftLines.filter((item) => item.pricing_source === "unpriced").length;
@@ -351,6 +386,19 @@ export default function CreateEstimatePage() {
     setSelectedPriceBookItemId("");
   };
 
+  const applyPriceBookSuggestion = (lineIndex: number, suggestion: PriceBookSuggestion) => {
+    setLineItems((current) => current.map((item, index) => index === lineIndex ? {
+      ...item,
+      unit: suggestion.unit,
+      unit_price: Number(suggestion.unit_price),
+      pricing_source: "price_book",
+      pricing_assumption: undefined,
+      pricing_assumption_es: undefined,
+      price_book_suggestions: [],
+    } : item));
+    setAiRateConfirmationKey("");
+  };
+
   const saveTemplate = async () => {
     if (!templateName.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -379,6 +427,12 @@ export default function CreateEstimatePage() {
   ) => {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
+    if (field === "description" || field === "unit") updated[index].price_book_suggestions = [];
+    if (field === "description" || field === "quantity" || field === "unit") {
+      updated[index].review_notes = [];
+      updated[index].review_note = undefined;
+      updated[index].review_note_es = undefined;
+    }
     setLineItems(updated);
   };
 
@@ -394,6 +448,23 @@ export default function CreateEstimatePage() {
   const aiSuggestedLineItems = lineItems.filter((item) => item.description.trim() && item.pricing_source === "ai_suggested");
   const aiRateReviewKey = JSON.stringify(aiSuggestedLineItems.map(({ description, quantity, unit, unit_price }) => [description.trim(), Number(quantity), unit || "each", Number(unit_price)]));
   const aiRatesConfirmed = aiSuggestedLineItems.length === 0 || aiRateConfirmationKey === aiRateReviewKey;
+  const unresolvedUnitLineItems = lineItems.filter((item) => item.description.trim() && /^(unknown|unspecified|n\/a)$/i.test(item.unit?.trim() ?? ""));
+  const reviewContext = /roof/i.test(trade) && Number(roofAreaSqFt) > 0
+    ? `${reviewPromptContext}\nRoof surface area: ${roofAreaSqFt} sq ft.`
+    : reviewPromptContext;
+  const deterministicReviewNotes = estimateDraftReviewNotes(reviewContext, trade, lineItems, language);
+  const reviewNotesByIndex = lineItems.map((item, index) => [...new Set([
+    ...(deterministicReviewNotes[index] ?? []),
+    ...(item.review_notes ?? []),
+    ...(language === "es"
+      ? [item.review_note_es?.trim() || item.review_note?.trim() || ""]
+      : [item.review_note?.trim() || ""]),
+  ].filter(Boolean))]);
+  const reviewNoteLineItems = lineItems.flatMap((item, index) => item.description.trim() && reviewNotesByIndex[index].length
+    ? [{ ...item, review_notes: reviewNotesByIndex[index] }]
+    : []);
+  const draftReviewKey = JSON.stringify(reviewNoteLineItems.map(({ description, quantity, unit, review_notes }) => [description.trim(), Number(quantity), unit || "", review_notes]));
+  const draftReviewConfirmed = reviewNoteLineItems.length === 0 || draftReviewConfirmationKey === draftReviewKey;
 
   const startVoiceNote = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setDraftMessage("Voice recording is not supported by this browser."); return; }
@@ -430,6 +501,12 @@ export default function CreateEstimatePage() {
       alert("Line item quantities must be greater than zero and prices cannot be negative.");
       return;
     }
+    if (nonEmptyLineItems.some((item) => /^(unknown|unspecified|n\/a)$/i.test(item.unit?.trim() ?? ""))) {
+      alert(language === "es"
+        ? "Elige una unidad válida para cada partida marcada antes de guardar la cotización."
+        : "Choose a valid unit for each flagged line item before saving the estimate.");
+      return;
+    }
     if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {
       alert(language === "es" ? "Agrega un resumen del trabajo para el cliente o elige partidas detalladas." : "Add a customer-facing work summary or choose detailed line items.");
       return;
@@ -440,6 +517,7 @@ export default function CreateEstimatePage() {
     }
     if (!zeroRateConfirmed) return;
     if (!aiRatesConfirmed) return;
+    if (!draftReviewConfirmed) return;
 
     setSaving(true);
     let createdEstimateId: string | null = null;
@@ -804,6 +882,14 @@ export default function CreateEstimatePage() {
                 </div>
                 {item.pricing_source === "ai_suggested" && <p className="text-[11px] font-medium text-amber-800">AI suggested starting price · review this rate and its unit before sharing.</p>}
                 {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">Price Book rate applied.</p>}
+                {item.quantity_source === "contractor_measurement" && <p className="text-[11px] font-medium text-blue-800">Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity.</p>}
+                {item.pricing_source === "ai_suggested" && (item.pricing_assumption || item.pricing_assumption_es) && <p className="text-[11px] text-slate-600"><strong>AI pricing assumption to verify:</strong> {language === "es" ? item.pricing_assumption_es || item.pricing_assumption : item.pricing_assumption}</p>}
+                {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">Choose a recognized unit before saving this estimate.</p>}
+                {reviewNotesByIndex[index].map((note, noteIndex) => <p key={`${index}-review-${noteIndex}`} role="note" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">{note}</p>)}
+                {!!item.price_book_suggestions?.length && <div className="rounded-md border border-blue-200 bg-blue-50/70 p-2">
+                  <p className="text-[11px] font-semibold text-blue-950">Possible Price Book matches · choose one to apply; none was applied automatically.</p>
+                  <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-10 items-center rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">Use {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}</button>)}</div>
+                </div>}
                 <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={`Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>
               ))}
@@ -826,16 +912,37 @@ export default function CreateEstimatePage() {
             </label>
           </div>}
 
+          {unresolvedUnitLineItems.length > 0 && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950">
+            <p role="alert" className="font-semibold">Choose a recognized unit for every flagged line item before saving.</p>
+            <p className="mt-1">Choose a unit in each highlighted line item. Units affect both quantities and rates.</p>
+          </div>}
+
+          {reviewNoteLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p role="alert" className="font-semibold">Review the flagged quantities and possible scope overlap before saving.</p>
+            <label className="mt-2 flex items-start gap-2">
+              <input id="draft-review-confirmation" type="checkbox" required checked={draftReviewConfirmed} onChange={(event) => setDraftReviewConfirmationKey(event.target.checked ? draftReviewKey : "")} className="mt-0.5" />
+              <span>I checked the flagged quantities, units, and included work against this job.</span>
+            </label>
+          </div>}
+
           {isProSubscriber && <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
               <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
             </div>
-            <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Your Price Book rates replace AI rates when a clear match exists. AI rates are broad estimates, not live local quotes.</p>
+            <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
             {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input type="text" aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} placeholder="Describe the work and measurements" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-slate-700">Job scope and details
+                <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe measurements, material or grade, access, existing conditions, and what is included or excluded." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </label>
+              {/roof/i.test(trade) && <label className="block max-w-xs text-xs font-medium text-slate-700">Measured roof surface area (sq. ft., optional)
+                <input type="number" min="1" max="10000000" step="1" inputMode="decimal" value={roofAreaSqFt} onChange={(event) => setRoofAreaSqFt(event.target.value)} placeholder="e.g. 2,000" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
+              </label>}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+              </div>
             </div>
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
           </section>}
