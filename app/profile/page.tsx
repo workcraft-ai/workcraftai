@@ -271,7 +271,7 @@ export default function ProfilePage() {
             </div>
             <div className="rounded-lg bg-slate-50 p-4">
               <h3 className="text-sm font-bold text-slate-900">Private media storage</h3>
-              <p role="status" className={`mt-1 text-xs leading-5 ${usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 0 ? "font-semibold text-red-800" : usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 10 * 1048576 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{Math.max(usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes, 0) / 1048576} MB left to upload this month · {(usageSnapshot.media.retained_bytes / 1048576).toFixed(1)} of {(usageSnapshot.media.retained_limit_bytes / 1048576).toFixed(0)} MB stored · {usageSnapshot.media.file_count} of {usageSnapshot.media.file_limit} files</p>
+              <p role="status" className={`mt-1 text-xs leading-5 ${usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 0 ? "font-semibold text-red-800" : usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes <= 10 * 1048576 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{`${(Math.max(usageSnapshot.media.monthly_limit_bytes - usageSnapshot.media.monthly_used_bytes, 0) / 1048576).toFixed(2)} MB left to upload this month · ${(usageSnapshot.media.retained_bytes / 1048576).toFixed(2)} of ${(usageSnapshot.media.retained_limit_bytes / 1048576).toFixed(0)} MB stored · ${usageSnapshot.media.file_count} of ${usageSnapshot.media.file_limit} files`}</p>
             </div>
           </>}
         </div>}

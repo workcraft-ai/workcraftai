@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import EstimateTableScroll from "@/app/components/EstimateTableScroll";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
@@ -297,7 +298,7 @@ export default function DashboardPage() {
                 : "No archived estimates found."}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <EstimateTableScroll>
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
                   <tr>
@@ -384,7 +385,7 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </EstimateTableScroll>
           )}
           <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
             Status changes are for your records and reports. They do not create a customer signature or process a payment.
