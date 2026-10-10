@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
+import { getInvoiceSubscriptionId } from "@/lib/stripe-invoice.mjs";
 import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
 import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
@@ -13,12 +14,6 @@ function getPeriodEnd(subscription: Stripe.Subscription) {
   const periodEnds = subscription.items.data.map((item) => item.current_period_end);
   const latestPeriodEnd = Math.max(0, ...periodEnds);
   return latestPeriodEnd ? new Date(latestPeriodEnd * 1000).toISOString() : null;
-}
-
-function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
-  if (invoice.parent?.type !== "subscription_details" || !invoice.parent.subscription_details) return null;
-  const subscription = invoice.parent.subscription_details.subscription;
-  return typeof subscription === "string" ? subscription : subscription.id;
 }
 
 export async function POST(request: Request) {

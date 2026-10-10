@@ -74,6 +74,10 @@ try {
     if(match[1].split(',').some(c=>!available.has(c.trim().replaceAll('"','')))) throw Error('Source Auth columns are incompatible with the local restore version.');
   }
   const files=await Promise.all(['roles.sql','schema.sql','data.sql','migration-history-schema.sql','migration-history-data.sql'].map(f=>readFile(join(backup,'database',f),'utf8')));
+  phase = 'check separate Auth export';
+  if (/^COPY\s+"?auth"?\./m.test(files[2])) {
+    throw Error('Create a new snapshot with Auth excluded from the general data dump; durable Auth is restored separately.');
+  }
   phase = 'import database and durable Auth records';
   await importSql([files[0],files[1],'SET session_replication_role = replica;',auth,files[2]]);
   // A new local stack already has an empty managed migration-history schema.
