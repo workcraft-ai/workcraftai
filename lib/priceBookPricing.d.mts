@@ -1,4 +1,5 @@
 export type PriceBookRate = {
+  id?: string;
   name: string;
   description?: string;
   trade: string;
@@ -13,4 +14,10 @@ export function applyPriceBookRates<T extends DraftLine>(
   rates: PriceBookRate[],
   trade: string,
   zeroUnmatched?: boolean,
-): { lines: T[]; matchedCount: number; unmatchedCount: number; matchedIndexes: number[] };
+): {
+  lines: T[];
+  matchedCount: number;
+  unmatchedCount: number;
+  matchedIndexes: number[];
+  suggestionsByIndex: Record<number, Array<PriceBookRate & { match_score: number }>>;
+};
