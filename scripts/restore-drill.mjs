@@ -44,15 +44,21 @@ function query(sql) {
   return execFileSync('docker',['exec','-i',container,'psql','-U','supabase_admin','-d','postgres','-At','-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
 }
 async function importSql(parts) {
-  const child = spawn('docker',['exec','-i',container,'psql','-U','supabase_admin','-d','postgres','-1','-v','ON_ERROR_STOP=1'],{stdio:['pipe','ignore','pipe']});
+  const child = spawn('docker',['exec','-i',container,'psql','-U','supabase_admin','-d','postgres','-1','-q','-v','ON_ERROR_STOP=1','-v','VERBOSITY=sqlstate'],{stdio:['pipe','pipe','pipe']});
   let diagnostic=''; child.stderr.on('data',value=>{diagnostic+=value.toString()});
+  let output=''; child.stdout.on('data',value=>{output+=value.toString()});
   const complete = new Promise((res,rej)=>{child.on('error',rej);child.on('close',code=>res(code));});
   // Keep SQL and any row-level error details out of GitHub's public logs.
   child.stdin.on('error',()=>{});
-  for(const part of parts) child.stdin.write(part+'\n');
+  for(const [index,part] of parts.entries()) child.stdin.write(`\\echo WORKCRAFT_RESTORE_PART_${index}\n${part}\n`);
   child.stdin.end();
   if(await complete !== 0) {
     await writeFile(join(workdir,'restore-diagnostic.log'),diagnostic,{mode:0o600});
+    // SQLSTATE contains only a standardized error code. No SQL text, values,
+    // Auth hashes, object paths or credentials are exposed in runner logs.
+    const sqlstate=diagnostic.match(/ERROR:\s+([A-Z0-9]{5})(?:\s|$)/)?.[1] ?? 'unknown';
+    const lastPart=[...output.matchAll(/^WORKCRAFT_RESTORE_PART_(\d+)$/gm)].at(-1)?.[1] ?? 'unknown';
+    console.error(`Restore import failed in part ${lastPart}; SQLSTATE ${sqlstate}.`);
     throw Error('Restore import failed. Private diagnostics were saved only in the temporary runner directory.');
   }
 }
