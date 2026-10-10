@@ -55,6 +55,11 @@ export default function ClientEstimatePage() {
   const router = useRouter();
   const id = params?.id as string;
 
+  const [shareNotice, setShareNotice] = useState("");
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareDays, setShareDays] = useState("30");
+  const customerSuffix = () => { const token = new URL(window.location.href).searchParams.get("token"); return token ? `?token=${encodeURIComponent(token)}` : ""; };
+
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +117,7 @@ export default function ClientEstimatePage() {
       }
       setLoading(true);
       try {
-        const response = await fetch(`/api/proposals/${encodeURIComponent(id)}`, { cache: "no-store" });
+        const response = await fetch(`/api/proposals/${encodeURIComponent(id)}${customerSuffix()}`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Estimate not found or link has expired.");
         if (!isCurrent) return;
@@ -151,7 +156,7 @@ export default function ClientEstimatePage() {
         setSignatureName(estData.signature_name || "");
         const savedPackageIndex = Array.isArray(estData.package_options) ? estData.package_options.findIndex((option: EstimatePackage) => option.name === estData.selected_package) : -1;
         if (savedPackageIndex >= 0) setSelectedPackage(savedPackageIndex);
-        if (!estimateOwner) void fetch(`/api/estimates/${id}/view`, { method: "POST" });
+        if (!estimateOwner) void fetch(`/api/estimates/${id}/view${customerSuffix()}`, { method: "POST" });
 
         setLineItems(result.lineItems || []);
       } catch (err: unknown) {
@@ -187,15 +192,27 @@ export default function ClientEstimatePage() {
   const total = estimateMoney.totalCents / 100;
   const depositAmount = estimateMoney.depositCents / 100;
 
+  const manageShare = async (action: "copy" | "replace" | "disable") => {
+    setShareBusy(true); setShareNotice("");
+    try {
+      const response = await fetch(`/api/estimates/${id}/share`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action, expiresInDays: shareDays === "none" ? null : Number(shareDays)})});
+      const result = await response.json();
+      if (!response.ok) throw new Error("Could not update the customer link. Refresh and try again.");
+      if (result.url) { await navigator.clipboard.writeText(result.url); setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied."); }
+      else setShareNotice("Customer sharing is disabled. Existing Stripe checkout sessions may remain open.");
+    } catch (error) {setShareNotice(error instanceof Error ? error.message : "Could not copy the customer link.");}
+    finally {setShareBusy(false);}
+  };
+
   const sendQuestion = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSendingQuestion(true); setQuestionStatus("");
     try {
-      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/questions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: questionName, email: questionEmail, message: questionMessage, company_website: questionHoneypot }) });
+      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/questions${customerSuffix()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: questionName, email: questionEmail, message: questionMessage, company_website: questionHoneypot }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Your question could not be sent.");
       setQuestionStatus(result.emailSent
         ? "Your question was sent to the contractor. They can reply to your email address."
-        : "Your question was saved. The contractor can see it in WorkCraft AI; email notification is not currently available.");
+        : result.notificationPending ? "Your question was saved; email notification is pending." : "Your question was saved. The contractor can see it in WorkCraft AI; email notification is not currently available.");
       setQuestionName(""); setQuestionEmail(""); setQuestionMessage("");
     } catch (error) { setQuestionStatus(error instanceof Error ? error.message : "Your question could not be sent."); }
     finally { setSendingQuestion(false); }
@@ -204,7 +221,7 @@ export default function ClientEstimatePage() {
   const startCustomerPayment = async (kind: "deposit" | "balance") => {
     setStartingPayment(true); setPaymentError("");
     try {
-      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/checkout`, {
+      const response = await fetch(`/api/proposals/${encodeURIComponent(id)}/checkout${customerSuffix()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind }),
@@ -225,7 +242,7 @@ export default function ClientEstimatePage() {
     }
     setPaying(true);
     try {
-      const approval = await fetch(`/api/estimates/${id}/accept`, {
+      const approval = await fetch(`/api/estimates/${id}/accept${customerSuffix()}`, {
         method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ signatureName, selectedPackage: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name }),
@@ -340,6 +357,18 @@ export default function ClientEstimatePage() {
           </div>
           {invoiceError && <p role="alert" className="basis-full rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">{invoiceError}</p>}
         </div>}
+
+        {isOwner && <section className="print:hidden rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <h2 className="text-sm font-bold">Customer sharing</h2>
+          <p className="text-xs text-slate-600">Replacing a link disables previous customer links. Your saved estimate stays in your account.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs">Link expiration<select value={shareDays} onChange={e=>setShareDays(e.target.value)} className="ml-2 min-h-12 rounded border px-2"><option value="7">7 days</option><option value="30">30 days</option><option value="none">No expiration</option></select></label>
+            <button disabled={shareBusy} onClick={()=>void manageShare("copy")} className="min-h-12 rounded-lg border px-3 text-xs font-semibold">Copy customer link</button>
+            <button disabled={shareBusy} onClick={()=>void manageShare("replace")} className="min-h-12 rounded-lg border px-3 text-xs font-semibold">Replace customer link</button>
+            <button disabled={shareBusy} onClick={()=>void manageShare("disable")} className="min-h-12 rounded-lg border px-3 text-xs font-semibold">Disable customer link</button>
+          </div>
+          {shareNotice && <p role="status" className="break-words text-xs text-slate-700">{shareNotice}</p>}
+        </section>}
 
         {/* Client Proposal Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">

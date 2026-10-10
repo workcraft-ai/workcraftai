@@ -1,3 +1,4 @@
+import { customerShareUrl } from "@/lib/proposal-sharing";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
@@ -5,7 +6,8 @@ import { NextResponse } from "next/server";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
-import { releaseAppEmail, reserveEstimateEmail } from "@/lib/email-quota";
+import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
+import { createHash } from "node:crypto";
 
 function escapeHtml(value: string) {
   const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -40,8 +42,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Could not prepare this estimate email. Please try again." }, { status: 503 });
   }
 
-  const origin = new URL(request.url).origin;
-  const link = `${origin}/estimate/${encodeURIComponent(id)}`;
+  let link: string;
+  try { link = await customerShareUrl(admin, id); }
+  catch { return NextResponse.json({error:"Customer sharing is disabled or expired. Replace the customer link before sending."},{status:409}); }
   const estimateMoney = calculateEstimateMoney(estimate, items ?? []);
   const rows = (items ?? []).map((item, index) => {
     const amount = estimateMoney.lineItemCents[index] / 100;
@@ -58,22 +61,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const markup = estimateMoney.markupCents / 100;
   const tax = estimateMoney.taxCents / 100;
   const total = estimateMoney.totalCents / 100;
-  const { reservation, error: reserveError } = await reserveEstimateEmail(admin, user.id, id);
-  if (reserveError) {
-    if (reserveError.message.includes("WORKCRAFT_PRO_REQUIRED")) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
-    console.error("Estimate email quota reservation failed:", reserveError.message);
-    return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
-  }
-  if (!reservation) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
-  if (!reservation.allowed) {
-    const message = reservation.reason === "account_daily_limit"
-      ? "You’ve reached your Pro email limit for today. It resets at 00:00 UTC."
-      : reservation.reason === "account_monthly_limit"
-        ? "You’ve reached your Pro email limit for this month. It resets on the first day of next month (UTC)."
-        : "WorkCraft AI has reached its daily email capacity. Please try again tomorrow.";
-    return NextResponse.json({ error: message }, { status: 429 });
-  }
-  if (!reservation.reservation_id) return NextResponse.json({ error: "Could not prepare this email. Please try again." }, { status: 503 });
   const businessName = typeof user.user_metadata?.business_name === "string" && user.user_metadata.business_name.trim() ? user.user_metadata.business_name.trim() : "your contractor";
   const safeBusinessName = businessName.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").slice(0, 120);
   const brandColor = typeof user.user_metadata?.brand_color === "string" && /^#[0-9a-f]{6}$/i.test(user.user_metadata.brand_color) ? user.user_metadata.brand_color : "#c85b2d";
@@ -83,42 +70,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const proposalEmailContent = summaryMode
     ? `<section style="margin:24px 0;padding:18px;background:#f8f7f2;border:1px solid #e5e7eb;border-radius:10px"><h2 style="font-size:16px">${spanish ? "Resumen del trabajo" : "Work summary"}</h2><p style="line-height:1.6">${escapeHtml(estimate.proposal_summary || "")}</p><p style="border-top:1px solid #e5e7eb;padding-top:12px;font-weight:bold">${spanish ? "Total de la cotización" : "Estimate total"}: $${total.toFixed(2)}</p></section>`
     : `<table style="border-collapse:collapse;width:100%"><thead><tr><th style="padding:10px;text-align:left">${spanish ? "Descripción" : "Description"}</th><th style="padding:10px;text-align:center">${spanish ? "Cant. / unidad" : "Qty / Unit"}</th><th style="padding:10px;text-align:right">${spanish ? "Tarifa" : "Rate"}</th><th style="padding:10px;text-align:right">${spanish ? "Importe" : "Amount"}</th></tr></thead><tbody>${rows}<tr><td colspan="3" style="padding:10px">${spanish ? "Subtotal" : "Subtotal"}</td><td style="padding:10px;text-align:right">$${subtotal.toFixed(2)}</td></tr>${markup ? `<tr><td colspan="3" style="padding:10px">${spanish ? "Recargo" : "Markup"} (${Number(estimate.markup_percentage)}%)</td><td style="padding:10px;text-align:right">$${markup.toFixed(2)}</td></tr>` : ""}${tax ? `<tr><td colspan="3" style="padding:10px">${spanish ? "Impuesto" : "Tax"} (${Number(estimate.tax_rate)}%)</td><td style="padding:10px;text-align:right">$${tax.toFixed(2)}</td></tr>` : ""}<tr><td colspan="3" style="padding:12px;font-weight:bold">${spanish ? "Total de la cotización" : "Estimate total"}</td><td style="padding:12px;text-align:right;font-weight:bold">$${total.toFixed(2)}</td></tr></tbody></table>`;
-  let emailResponse: Response;
+  const recipientKey = createHash("sha256").update(estimate.client_email.trim().toLowerCase()).digest("hex").slice(0, 16);
   try {
-    emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(10_000),
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `estimate-send-${id}-${new Date(estimate.updated_at).getTime()}` },
-      body: JSON.stringify({
+    const queued = await enqueueNotification(admin, {
+      user_id: user.id, estimate_id: id, source: "estimate",
+      send_key: `estimate-send-${id}-${new Date(estimate.updated_at).getTime()}-${recipientKey}`,
+      payload: {
       from: sender,
       reply_to: contractorReplyEmail,
       to: [estimate.client_email],
       subject: spanish ? `Tu cotización ${estimate.reference_number} de ${safeBusinessName}` : `Your estimate ${estimate.reference_number} from ${safeBusinessName}`,
       text: spanish ? `Hola ${estimate.client_name}, tu cotización ${estimate.reference_number} está lista.${summaryMode ? `\n\n${estimate.proposal_summary || ""}\n\nTotal: $${total.toFixed(2)}.` : ""} Revísala aquí: ${link}` : `Hi ${estimate.client_name}, your estimate ${estimate.reference_number} is ready.${summaryMode ? `\n\n${estimate.proposal_summary || ""}\n\nEstimate total: $${total.toFixed(2)}.` : ""} View it here: ${link}`,
-      html: `<div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:auto">${logoUrl}<h1 style="font-size:22px;color:${brandColor}">${escapeHtml(businessName)} · ${spanish ? "Tu cotización está lista" : "Your estimate is ready"}</h1><p>${spanish ? "Hola" : "Hi"} ${safeName},</p><p style="font-size:13px;color:#68736c">${spanish ? "Referencia de cotización" : "Estimate reference"}: <strong>${escapeHtml(estimate.reference_number)}</strong></p><p>${spanish ? "Aquí está la cotización para" : "Here is the estimate for"} ${escapeHtml(estimate.job_address || (spanish ? "tu proyecto" : "your project"))}.</p>${proposalEmailContent}<p style="margin:24px 0"><a href="${link}" style="background:${brandColor};color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">${spanish ? "Revisar cotización" : "Review estimate"}</a></p><p style="font-size:12px;color:#68736c">${spanish ? "Enviado con WorkCraft AI" : "Sent with WorkCraft AI"}</p></div>`,
-      }),
+      html: `<html lang="${spanish ? "es" : "en"}"><body><div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:auto">${logoUrl}<h1 style="font-size:22px;color:${brandColor}">${escapeHtml(businessName)} · ${spanish ? "Tu cotización está lista" : "Your estimate is ready"}</h1><p>${spanish ? "Hola" : "Hi"} ${safeName},</p><p style="font-size:13px;color:#68736c">${spanish ? "Referencia de cotización" : "Estimate reference"}: <strong>${escapeHtml(estimate.reference_number)}</strong></p><p>${spanish ? "Aquí está la cotización para" : "Here is the estimate for"} ${escapeHtml(estimate.job_address || (spanish ? "tu proyecto" : "your project"))}.</p>${proposalEmailContent}<p style="margin:24px 0"><a href="${link}" style="background:${brandColor};color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">${spanish ? "Revisar cotización" : "Review estimate"}</a></p><p style="font-size:12px;color:#68736c">${spanish ? "Enviado con WorkCraft AI" : "Sent with WorkCraft AI"}</p></div></body></html>`,
+      },
     });
-  } catch (error) {
-    console.error("Estimate email provider request failed:", error instanceof Error ? error.name : "unknown error");
-    return NextResponse.json({ error: "The email service did not respond. Please retry shortly." }, { status: 502 });
+    const processed = queued.status === "sent" ? null : await processNotifications(admin, [queued.id], 1);
+    const sent = queued.status === "sent" || processed?.sent === 1;
+    return NextResponse.json({success: true, notificationPending: !sent}, {status: sent ? 200 : 202});
+  } catch {
+    return NextResponse.json({error: "Could not prepare this estimate email. Please try again."}, {status: 503});
   }
-  const responseData = await emailResponse.json().catch(() => ({}));
-  if (!emailResponse.ok) {
-    if (emailResponse.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
-    console.error("Estimate email provider rejected request:", emailResponse.status);
-    return NextResponse.json({ error: "Could not send the estimate email. Please try again." }, { status: 502 });
-  }
-
-  const { error: eventError } = await admin.from("estimate_email_events").insert({ user_id: user.id, estimate_id: id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "sent" });
-  if (eventError) console.error("Estimate email event could not be recorded:", eventError.message);
-  const followupAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from("estimates").update({ followup_at: followupAt, followup_sent_at: null, followup_claimed_at: null }).eq("id", id).eq("user_id", user.id);
-  return NextResponse.json({
-    success: true,
-    emailId: responseData.id,
-    emailQuota: {
-      remainingToday: Math.max((reservation.account_daily_limit ?? 0) - (reservation.account_daily_used ?? 0), 0),
-      remainingThisMonth: Math.max((reservation.account_monthly_limit ?? 0) - (reservation.account_monthly_used ?? 0), 0),
-    },
-  });
 }

@@ -10,6 +10,11 @@ on:
         type: boolean
         required: false
         default: false
+      restore_drill:
+        description: "Decrypt this full snapshot and test recovery in an isolated local Supabase stack (no paid project)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -84,6 +89,26 @@ jobs:
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-schema.sql" --schema supabase_migrations
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-data.sql" --use-copy --data-only --schema supabase_migrations
 
+      - name: Export private Storage policies
+        env:
+          DATABASE_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+          BACKUP_ROOT: ${{ runner.temp }}/workcraftai-backup
+        run: |
+          set -euo pipefail
+          # Export only policy definitions, not managed Storage table definitions.
+          docker run --rm --env DATABASE_URL --entrypoint sh postgres:17-alpine \
+            -ec 'exec psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1' \
+            > "$BACKUP_ROOT/database/storage-policies.sql" <<'SQL'
+          SELECT 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;';
+          SELECT format('DROP POLICY IF EXISTS %I ON storage.objects; CREATE POLICY %I ON storage.objects AS %s FOR %s TO %s%s%s;',
+            policyname, policyname, permissive, cmd,
+            (SELECT string_agg(quote_ident(r), ', ') FROM unnest(roles) r),
+            CASE WHEN qual IS NULL THEN '' ELSE ' USING (' || qual || ')' END,
+            CASE WHEN with_check IS NULL THEN '' ELSE ' WITH CHECK (' || with_check || ')' END)
+          FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
+          ORDER BY policyname;
+          SQL
+
       - name: Export recoverable Auth accounts
         env:
           DATABASE_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
@@ -111,9 +136,11 @@ jobs:
         id: media
         env:
           INCLUDE_STORAGE: ${{ inputs.include_storage }}
+          RESTORE_DRILL: ${{ inputs.restore_drill }}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             include_storage="${INCLUDE_STORAGE:-false}"
+            if [[ "$RESTORE_DRILL" == "true" ]]; then include_storage="true"; fi
           elif [[ "$(date -u +%u)" == "7" ]]; then
             include_storage="true"
           else
@@ -152,8 +179,20 @@ jobs:
             echo "- Repository: restricted Google Drive folder; Restic client-side encryption"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Decrypt snapshot and run isolated restore drill
+        if: inputs.restore_drill == true
+        env:
+          RESTORE_ROOT: ${{ runner.temp }}/workcraftai-restore
+          RESTORE_WORKDIR: ${{ runner.temp }}/workcraftai-restore-stack
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RESTORE_ROOT" "$RESTORE_WORKDIR"
+          restic restore latest --host workcraftai-production --tag full-media --target "$RESTORE_ROOT"
+          node scripts/restore-drill.mjs
+
       - name: Remove temporary credentials and unencrypted backup files
         if: always()
         run: |
           rm -rf "$RUNNER_TEMP/workcraftai-backup" "$RUNNER_TEMP/restic-cache"
+          rm -rf "$RUNNER_TEMP/workcraftai-restore" "$RUNNER_TEMP/workcraftai-restore-stack"
           rm -f "$RUNNER_TEMP/rclone.conf" "$RUNNER_TEMP/restic-password"

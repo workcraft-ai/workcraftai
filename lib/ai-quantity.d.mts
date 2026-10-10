@@ -1,0 +1,1 @@
+export function measuredDraftQuantity(value:{quantity:number;unit:string;quantityBasis:unknown;roofArea:number|null;description:string;prompt:string}):{quantity:number;source:"ai_estimated"|"contractor_measurement"};

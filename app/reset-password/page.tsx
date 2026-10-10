@@ -59,7 +59,7 @@ export default function ResetPasswordPage() {
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <Logo className="h-10 w-10" />
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight text-white">Choose a new password</h1>
-        <p className="mt-2 text-center text-sm text-slate-400">Use at least 8 characters for your new password.</p>
+        <p className="mt-2 text-center text-sm text-[#c8d1ca]">Use at least 8 characters for your new password.</p>
       </div>
 
       <section className="mx-auto mt-8 w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 px-4 py-8 shadow sm:px-10">
@@ -77,7 +77,7 @@ export default function ResetPasswordPage() {
             {loading ? "Updating password…" : "Update password"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-400"><button type="button" onClick={() => void handleBackToSignIn()} disabled={leavingReset} className="font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50">{leavingReset ? "Ending reset session…" : "Back to sign in"}</button></p>
+        <p className="mt-6 text-center text-sm text-[#c8d1ca]"><button type="button" onClick={() => void handleBackToSignIn()} disabled={leavingReset} className="font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50">{leavingReset ? "Ending reset session…" : "Back to sign in"}</button></p>
       </section>
     </main>
     </LocalizedTree>

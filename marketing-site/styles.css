@@ -18,7 +18,7 @@
 .dashboard-mock-links{display:flex;align-items:center;gap:5px;color:#d5d4ca;font-size:7px;font-weight:700;white-space:nowrap;}
 .dashboard-mock-links>span{padding:7px 8px;border:1px solid #526057;border-radius:6px;}
 .dashboard-mock-links .mock-active{border-color:#415146;background:#273a30;color:#ff9c4a;}
-.dashboard-mock-links i{padding:8px 10px;border-radius:7px;background:#ef4b00;color:#fff;font-size:7px;font-style:normal;}
+.dashboard-mock-links i{padding:8px 10px;border-radius:7px;background:#a23e20;color:#fff;font-size:7px;font-style:normal;}
 .dashboard-mock-content{padding:13px 10px 12px;background:var(--paper);}
 .dashboard-mock-welcome,.dashboard-mock-tools,.dashboard-mock-list{width:84%;margin-inline:auto;}
 .dashboard-mock-welcome{min-height:54px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border:1px solid #e0e2dc;border-radius:8px;background:#fff;box-shadow:0 2px 3px #19292312;}
@@ -97,3 +97,16 @@
 .payment-faq-note{margin:22px 0 0;color:#56615a;font-size:11px;text-align:center}
 .payment-faq-note a{color:#a94727;font-weight:700;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:650px){.payment-faq-section{padding-top:58px;padding-bottom:60px}.payment-faq-list{grid-template-columns:1fr;gap:9px}.payment-faq-item{padding-inline:15px}.payment-faq-item summary{min-height:54px;font-size:12px}.payment-faq-item p{font-size:11px}}
+
+/* Readable secondary text and generous standalone navigation targets. */
+.footer-app-link,.footer-bottom a,.text-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:48px;padding:8px 12px;font-size:12px}
+.footer-bottom{gap:12px;flex-wrap:wrap;font-size:12px}
+.footer-tagline,.footer-top p,.dashboard-mock-content small,.dashboard-mock-row time,.dashboard-mock-table-head,.art-caption{color:#56615a}
+.about-copy>p:not(.eyebrow){color:#545f58}
+.dashboard-mock-tabs>span,.dashboard-mock-row>span{color:#56615a}
+.hero-note{color:#56615a}
+a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3px}
+
+/* Standalone header navigation uses the same touch targets on all layouts. */
+.site-header .brand,.footer-main .brand{display:inline-flex;align-items:center;min-height:48px}
+.main-nav>a,.language-toggle{min-height:48px;min-width:48px;display:inline-flex;align-items:center;justify-content:center}

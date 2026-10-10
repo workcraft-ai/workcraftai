@@ -1,0 +1,16 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(9);
+insert into auth.users(id,email,raw_user_meta_data) values('a8000000-0000-4000-8000-000000000001','share-owner@example.test','{}'),('a8000000-0000-4000-8000-000000000002','share-other@example.test','{}');
+insert into public.estimates(id,user_id,client_name,client_email) values('b8000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001','Fixture','customer@example.test');
+select ok(not has_table_privilege('authenticated','private.proposal_share_secrets','SELECT'),'encrypted tokens are private');
+select ok(not has_function_privilege('anon','public.workcraft_get_proposal_share_secret(uuid)','EXECUTE'),'public callers cannot retrieve a share token');
+select ok(not has_function_privilege('authenticated','public.workcraft_set_proposal_share(uuid,uuid,text,text,timestamptz,boolean)','EXECUTE'),'browser callers cannot bypass owner verification');
+set local role service_role;
+select is(public.workcraft_set_proposal_share('b8000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000002',repeat('a',64),'encrypted_fixture',now()+interval '7 days',false),false,'wrong owner cannot replace link');
+select is(public.workcraft_set_proposal_share('b8000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001',repeat('a',64),'encrypted_fixture',now()+interval '7 days',false),true,'owner can replace legacy link');
+select is((select share_token_hash from public.estimates where id='b8000000-0000-4000-8000-000000000001'),repeat('a',64),'only hash is stored on estimate');
+select is(public.workcraft_set_proposal_share('b8000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001',null,null,null,true),true,'owner can revoke');
+select ok((select share_revoked_at is not null from public.estimates where id='b8000000-0000-4000-8000-000000000001'),'revocation is recorded');
+select is(public.workcraft_set_proposal_share('b8000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001',repeat('b',64),'encrypted_new',null,false),true,'replacement clears revocation');
+select * from finish();rollback;

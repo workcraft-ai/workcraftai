@@ -52,6 +52,7 @@ export async function createConnectedCheckout(input: {
   paymentId: string;
   stripeAccountId: string;
   origin: string;
+  shareToken?: string | null;
 }) {
   const stripe = getStripeClient();
   const title = input.kind === "deposit" ? "Estimate down payment" : "Estimate payment";
@@ -81,8 +82,8 @@ export async function createConnectedCheckout(input: {
         payment_kind: input.kind,
       },
     },
-    success_url: `${input.origin}/estimate/${encodeURIComponent(input.estimate.id)}?checkout=success`,
-    cancel_url: `${input.origin}/estimate/${encodeURIComponent(input.estimate.id)}?checkout=cancelled`,
+    success_url: `${input.origin}/estimate/${encodeURIComponent(input.estimate.id)}?checkout=success${input.shareToken ? `&token=${encodeURIComponent(input.shareToken)}` : ""}`,
+    cancel_url: `${input.origin}/estimate/${encodeURIComponent(input.estimate.id)}?checkout=cancelled${input.shareToken ? `&token=${encodeURIComponent(input.shareToken)}` : ""}`,
   }, {
     stripeAccount: input.stripeAccountId,
     idempotencyKey: `workcraft-customer-payment-${input.paymentId}`,

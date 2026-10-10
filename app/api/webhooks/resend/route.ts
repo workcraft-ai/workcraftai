@@ -56,30 +56,11 @@ export async function POST(request: Request) {
   }
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
-  const { data: sentEvents, error: lookupError } = await admin.from("estimate_email_events")
-    .select("user_id, estimate_id, recipient")
-    .eq("provider_email_id", emailId)
-    .in("event", ["sent", "follow_up_sent"])
-    .order("created_at", { ascending: false })
-    .limit(1);
-  if (lookupError) {
-    console.error("Resend event lookup failed:", lookupError.message);
-    return NextResponse.json({ error: "Email event processing is temporarily unavailable." }, { status: 503 });
-  }
-  const sent = sentEvents?.[0];
-  if (!sent) return NextResponse.json({ received: true, ignored: true });
-
-  const { error: insertError } = await admin.from("estimate_email_events").insert({
-    user_id: sent.user_id,
-    estimate_id: sent.estimate_id,
-    recipient: sent.recipient,
-    provider_email_id: emailId,
-    provider_event_id: headers["svix-id"],
-    event: status,
+  const { error } = await admin.rpc("workcraft_record_email_delivery", {
+    p_event_id: headers["svix-id"], p_email_id: emailId, p_event: status,
   });
-  if (insertError?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
-  if (insertError) {
-    console.error("Resend event could not be recorded:", insertError.message);
+  if (error) {
+    console.error("Resend event persistence failed.");
     return NextResponse.json({ error: "Email event processing is temporarily unavailable." }, { status: 503 });
   }
   return NextResponse.json({ received: true });

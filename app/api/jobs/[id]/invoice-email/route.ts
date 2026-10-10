@@ -1,3 +1,4 @@
+import { customerShareUrl } from "@/lib/proposal-sharing";
 import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -7,7 +8,9 @@ import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
-import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
+import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
+import type { EmailReservation } from "@/lib/email-quota";
 
 export const dynamic = "force-dynamic";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,19 +46,12 @@ export async function POST(
   const contractorReplyEmail = user.email?.trim();
   if (!contractorReplyEmail) return jsonError("Add an email address to your account before sending invoices.", 400);
 
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  if (contentLength > 2048) return jsonError("Invalid request body.", 413);
-  let requestedRecipient = "";
-  let requestedLanguage: "en" | "es" | null = null;
-  try {
-    const body = await request.json();
-    if (!body || typeof body !== "object" || Array.isArray(body)) return jsonError("Invalid request body.", 400);
-    requestedRecipient = typeof body.recipient === "string" ? body.recipient.trim() : "";
-    requestedLanguage = body.language === "es" ? "es" : body.language === "en" ? "en" : null;
-    if (requestedRecipient.length > 254) return jsonError("Enter a valid customer email address.", 400);
-  } catch {
-    return jsonError("Invalid request body.", 400);
-  }
+  const parsed = await readLimitedJsonObject(request, 2048);
+  if (!parsed.ok) return jsonError("Invalid request body.", parsed.reason === "too_large" ? 413 : 400);
+  const body = parsed.value;
+  const requestedRecipient = typeof body.recipient === "string" ? body.recipient.trim() : "";
+  const requestedLanguage: "en" | "es" | null = body.language === "es" ? "es" : body.language === "en" ? "en" : null;
+  if (requestedRecipient.length > 254) return jsonError("Enter a valid customer email address.", 400);
 
   let hasPro = false;
   try {
@@ -112,9 +108,8 @@ export async function POST(
 
   const appOrigin = getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
   if (job.estimate_id && !appOrigin) return jsonError("Invoice email service is temporarily unavailable.", 503);
-  const estimateLink = job.estimate_id && appOrigin
-    ? `${appOrigin}/estimate/${encodeURIComponent(job.estimate_id)}`
-    : null;
+  const shareAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, {auth:{persistSession:false}});
+  const estimateLink = job.estimate_id && appOrigin ? await customerShareUrl(shareAdmin,job.estimate_id).catch(()=>null) : null;
   const spanish = estimate
     ? estimate.proposal_language === "es"
     : requestedLanguage === "es" || (requestedLanguage === null && user.user_metadata?.app_language === "es");
@@ -177,70 +172,25 @@ export async function POST(
     : `Hi ${customerName},\n\nHere is the invoice for your job: ${title}.${estimate?.reference_number ? `\nEstimate reference: ${estimate.reference_number}.` : ""}${textRows ? `\n\n${textRows}` : ""}\n\n${totalLabel}: ${amount(invoiceTotalForEmail)}.${estimateLink ? `\n\nView estimate and payment options: ${estimateLink}` : ""}\n\nReply to this email to contact your contractor.`;
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
-  const { reservation, error: reserveError } = await reserveAppEmail(admin, "invoice", user.id, undefined, job.id);
-  if (reserveError) {
-    if (reserveError.message.includes("WORKCRAFT_PRO_REQUIRED")) return jsonError("Sending invoice emails requires an active Pro plan.", 403);
-    console.error("Invoice email quota reservation failed:", reserveError.message);
+  try {
+    const queued = await enqueueNotification(admin, {
+      user_id: user.id, job_id: job.id, estimate_id: job.estimate_id,
+      source: "invoice",
+      send_key: `invoice-send-${job.id}-${new Date(job.updated_at).getTime()}-${createHash("sha256").update(recipient.toLowerCase()).digest("hex").slice(0, 16)}`,
+      payload: { from: getWorkCraftNoReplySender(), reply_to: contractorReplyEmail, to: [recipient],
+        subject: spanish ? `Factura de ${title} · ${contractorName}` : `Invoice for ${title} · ${contractorName}`, text, html },
+    });
+    const result = queued.status === "sent" ? null : await processNotifications(admin, [queued.id], 1);
+    const sent = queued.status === "sent" || Boolean(result?.sent);
+    const reservation = result?.results[0]?.quota as EmailReservation | undefined;
+    return NextResponse.json({ success: true, queued: !sent, statusUpdated: sent, emailId: queued.provider_email_id,
+      ...(reservation ? {emailQuota: {
+        remainingToday: Math.max((reservation.account_daily_limit ?? 0) - (reservation.account_daily_used ?? 0), 0),
+        remainingThisMonth: Math.max((reservation.account_monthly_limit ?? 0) - (reservation.account_monthly_used ?? 0), 0),
+      }} : {}),
+    }, {status: sent ? 200 : 202, headers: {"Cache-Control":"private, no-store"}});
+  } catch {
+    console.error("Invoice notification remains pending or could not be queued.");
     return jsonError("Could not prepare this invoice email. Please try again.", 503);
   }
-  if (!reservation) return jsonError("Could not prepare this invoice email. Please try again.", 503);
-  if (!reservation.allowed) {
-    const message = reservation.reason === "account_daily_limit"
-      ? "You’ve reached your Pro email limit for today. It resets at 00:00 UTC."
-      : reservation.reason === "account_monthly_limit"
-        ? "You’ve reached your Pro email limit for this month. It resets on the first day of next month (UTC)."
-        : "WorkCraft AI has reached its daily email capacity. Please try again tomorrow.";
-    return NextResponse.json({ error: message }, { status: 429, headers: { "Cache-Control": "private, no-store" } });
-  }
-  if (!reservation.reservation_id) return jsonError("Could not prepare this invoice email. Please try again.", 503);
-
-  const sender = getWorkCraftNoReplySender();
-  let emailResponse: Response;
-  try {
-    emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `invoice-send-${job.id}-${new Date(job.updated_at).getTime()}-${createHash("sha256").update(recipient.toLowerCase()).digest("hex").slice(0, 16)}`,
-      },
-      body: JSON.stringify({
-        from: sender,
-        reply_to: contractorReplyEmail,
-        to: [recipient],
-        subject: spanish ? `Factura de ${title} · ${contractorName}` : `Invoice for ${title} · ${contractorName}`,
-        text,
-        html,
-      }),
-    });
-  } catch (error) {
-    console.error("Invoice email provider request failed:", error instanceof Error ? error.name : "unknown error");
-    return jsonError("The email service did not respond. Delivery may be uncertain; wait briefly before retrying.", 502);
-  }
-  if (!emailResponse.ok) {
-    if (emailResponse.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
-    console.error("Invoice email provider rejected request:", emailResponse.status);
-    return jsonError("Could not send the invoice email. Please try again.", 502);
-  }
-  const responseData = await emailResponse.json().catch(() => ({}));
-
-  const { data: updatedJob, error: updateError } = await supabase
-    .from("jobs")
-    .update({ invoice_status: "sent", client_email: recipient, updated_at: new Date().toISOString() })
-    .eq("id", job.id)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (updateError || !updatedJob) console.error("Invoice email was accepted but invoice status could not be updated.", updateError?.message ?? "job not returned");
-
-  return NextResponse.json({
-    success: true,
-    statusUpdated: Boolean(updatedJob),
-    emailId: typeof responseData.id === "string" ? responseData.id : null,
-    emailQuota: {
-      remainingToday: Math.max((reservation.account_daily_limit ?? 0) - (reservation.account_daily_used ?? 0), 0),
-      remainingThisMonth: Math.max((reservation.account_monthly_limit ?? 0) - (reservation.account_monthly_used ?? 0), 0),
-    },
-  }, { headers: { "Cache-Control": "private, no-store" } });
 }

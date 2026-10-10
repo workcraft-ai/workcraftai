@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+const mediaOrigin = (() => {
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+    return url.protocol === "https:" && url.hostname.endsWith(".supabase.co") ? ` ${url.origin}` : "";
+  } catch { return ""; }
+})();
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -40,7 +47,7 @@ const securityHeaders = [
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://r.stripe.com https://m.stripe.network https://challenges.cloudflare.com",
       "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com",
-      "media-src 'self' blob:",
+      `media-src 'self' blob:${mediaOrigin}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
     ].join("; "),

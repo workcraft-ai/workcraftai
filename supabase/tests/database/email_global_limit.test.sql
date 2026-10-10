@@ -129,7 +129,7 @@ select throws_ok(
 );
 select throws_ok(
   $$select public.update_workcraft_email_daily_limit(91, 'a5000000-0000-4000-8000-000000000003', 'email-quota-admin@example.test', 'Invalid high limit')$$,
-  '22023', 'APP_EMAIL_LIMIT_MUST_BE_BETWEEN_1_AND_90', 'the cap cannot exceed the provider safety ceiling'
+  '22023', 'APP_EMAIL_LIMIT_MUST_BE_BETWEEN_1_AND_75', 'the cap cannot exceed the provider safety ceiling'
 );
 select is(
   (select count(*) from public.tradeflow_admin_audit_log where actor_user_id = 'a5000000-0000-4000-8000-000000000003' and action = 'app_email_daily_limit_updated' and outcome = 'succeeded'),
