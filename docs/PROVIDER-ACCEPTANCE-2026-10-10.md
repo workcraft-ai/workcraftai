@@ -18,15 +18,15 @@ Preview Stripe tests used the owner's authorized shared Test-mode account and de
 | Production estimate delivery | Passed | October 10 21:46 UTC message delivered; contractor Reply-To confirmed and sent/delivered correlated to the Production event ledger. |
 | Fresh invoice send-from-app | Open | Owner cannot sign in now. Route inspection confirmed owner/Pro guards, shared quotas, branded English/Spanish message and contractor Reply-To; this is not inbox acceptance. |
 | Database/Auth encrypted recovery | Passed structurally | Actual Google Drive snapshot decrypted and restored 57 users, 57 identities, one MFA factor, 10 estimates, three jobs and 40 migrations in an isolated local stack. RLS, owner relationships and private Storage policies passed. |
-| Production media recovery | Action required | Run 38091235906 downloaded zero files while Production contained three Storage objects and three attachment records. Check GitHub Production Storage URL/service credential and rerun with project/admin/source-count guards. |
-| Nonempty media recovery fixture | Passed locally | Synthetic PNG uploaded, downloaded with matching bytes and remained inaccessible publicly. This does not prove the Production files were backed up. |
+| Production media recovery | Passed | After the owner corrected Storage secrets, guarded run 38092126519 backed up and restored all 3 private files; byte counts and public-access denial passed. Snapshot db1f793c is encrypted in Google Drive. |
+| Nonempty media recovery fixture | Passed locally | Synthetic PNG uploaded, downloaded with matching byte counts and remained inaccessible publicly. This does not prove the Production files were backed up. |
 | Password/MFA and full app recovery | Open | Requires compatible recovery configuration and owner-controlled sign-in acceptance. No paid project or pause of either existing project was authorized. |
 
 ## Provider destinations and retained evidence
 
-Both dedicated Test-mode Stripe destinations target `https://workcraftai-2najy4m4h-workcraftai.vercel.app/api/webhooks/stripe`. Signing secrets and live destinations were not changed. Required CI passed before PRs 106 and 107 merged; release `e7758b1f3d4a0c19586b85f227dd61bfd3b2ddc2` reached Ready for both Production sites. Live app/Auth/database health passed.
+Both dedicated Test-mode Stripe destinations target `https://workcraftai-2najy4m4h-workcraftai.vercel.app/api/webhooks/stripe`. Signing secrets and live destinations were not changed. Required CI passed before PRs 106–108 merged; release `7ef57575bd3884a42bcfabbe1131f7a45b493b73` reached Ready for both Production sites. Live app/Auth/database health passed.
 
-The dedicated Staging estimate was `6f3c645c-fced-49a6-82d8-5e4c8b8ed926`. Test payment rows `00861010-0001-4000-8000-000000000001` and `00861010-0001-4000-8000-000000000002`, the canceled subscription row and the obsolete queued notice were removed after evidence collection; processed event ledgers were retained. The admin grant was not changed.
+The dedicated Staging estimate was `6f3c645c-fced-49a6-82d8-5e4c8b8ed926`. Test payment rows `00861010-0001-4000-8000-000000000001` and `00861010-0001-4000-8000-000000000002`, the canceled subscription row and the obsolete queued notice were removed after evidence collection; processed event ledgers were retained. The remaining incomplete test subscription was terminated, and its fixture-only Staging row was removed. The admin grant was not changed.
 
 Representative processed events:
 
@@ -37,11 +37,11 @@ Representative processed events:
 
 Production estimate Resend message `01a127c8-6b62-7150-a41a-11eabf696a55` used `WorkCraft AI <no-reply@workcraftai.com>` and the contractor's address as Reply-To. Delivery was correlated at 21:46:51 UTC. Recipient addresses, message bodies and private proposal tokens are intentionally omitted.
 
-Recovery evidence: [encrypted restore run 38091235906](https://github.com/workcraft-ai/workcraftai/actions/runs/38091235906). Earlier failed drills exposed empty Storage-policy export and duplicate Auth import; corrected exports now forward Docker stdin and select non-Auth data schemas explicitly. Raw diagnostic SQL and account hashes are never published.
+Recovery evidence: [guarded full encrypted restore run 38092126519](https://github.com/workcraft-ai/workcraftai/actions/runs/38092126519), which resolved the earlier zero-file gap in run 38091235906. Earlier failed drills exposed empty Storage-policy export and duplicate Auth import; corrected exports now forward Docker stdin and select non-Auth data schemas explicitly. Raw diagnostic SQL and account hashes are never published.
 
 ## Next acceptance steps
 
-1. Correct/check GitHub Production Storage credentials and run `include_storage: true`, `restore_drill: true` on main. Require source/download/recovery file counts to agree before treating media recovery as passed.
+1. Repeat full encrypted restore drills periodically and after recovery-tool changes. The initial database/Auth/private-media drill passed; password/MFA sign-in and full recovery-app acceptance remain open.
 2. When the owner can sign in, send one disposable invoice to the owner's inbox and verify Resend delivery and contractor Reply-To.
 3. Configure approved Preview mail credentials before testing a fresh past-due notice to the owner's inbox. Never enable delivery of obsolete queued fixtures.
 4. Complete effective subscriber downgrade and password/MFA/full app recovery acceptance independently of the state/structural tests above.
