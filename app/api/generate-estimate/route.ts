@@ -161,7 +161,11 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: `Draft scope and quantities only for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with a line_items array. Each item must contain description (string), quantity (number), and unit_price (number). Always set unit_price to 0; WorkCraft AI will apply the contractor's saved Price Book rates where a clear match exists. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and say what needs confirmation in the description. Use concise descriptions that name the actual fixture, material, or task so it can be matched to a saved service.` }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048 },
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingLevel: "low" },
+        },
       }),
       signal: generationSignal,
     });
