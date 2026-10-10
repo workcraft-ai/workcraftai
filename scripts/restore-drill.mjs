@@ -41,10 +41,10 @@ function cli(args) {
   return execFileSync('supabase',[...args,'--workdir',workdir],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
 }
 function query(sql) {
-  return execFileSync('docker',['exec','-i',container,'psql','-U','postgres','-d','postgres','-At','-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
+  return execFileSync('docker',['exec','-i',container,'psql','-U','supabase_admin','-d','postgres','-At','-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
 }
 async function importSql(parts) {
-  const child = spawn('docker',['exec','-i',container,'psql','-U','postgres','-d','postgres','-1','-v','ON_ERROR_STOP=1'],{stdio:['pipe','ignore','pipe']});
+  const child = spawn('docker',['exec','-i',container,'psql','-U','supabase_admin','-d','postgres','-1','-v','ON_ERROR_STOP=1'],{stdio:['pipe','ignore','pipe']});
   let diagnostic=''; child.stderr.on('data',value=>{diagnostic+=value.toString()});
   const complete = new Promise((res,rej)=>{child.on('error',rej);child.on('close',code=>res(code));});
   // Keep SQL and any row-level error details out of GitHub's public logs.
