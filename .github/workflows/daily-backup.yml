@@ -85,7 +85,11 @@ jobs:
           mkdir -p "$BACKUP_ROOT/database"
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/roles.sql" --role-only
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/schema.sql"
-          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/data.sql" --use-copy --data-only -x "storage.buckets_vectors" -x "storage.vector_indexes"
+          # CLI data dumps include Auth even though schema dumps exclude it.
+          # Durable Auth is exported once below; sessions/reset tokens stay out.
+          # Use explicit schemas: this CLI quotes exclude-table wildcards as
+          # literal identifiers, so -x "auth.*" does not exclude Auth tables.
+          supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/data.sql" --use-copy --data-only --schema public,private,storage,supabase_functions -x "storage.buckets_vectors" -x "storage.vector_indexes"
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-schema.sql" --schema supabase_migrations
           supabase db dump --db-url "$PROD_SUPABASE_DB_URL" -f "$BACKUP_ROOT/database/migration-history-data.sql" --use-copy --data-only --schema supabase_migrations
 

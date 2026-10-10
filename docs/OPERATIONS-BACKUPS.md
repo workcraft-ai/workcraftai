@@ -4,7 +4,7 @@ This runbook covers the repository-managed backup workflow for Supabase Producti
 
 ## What the workflow protects
 
-- A database dump runs daily at 04:00 UTC. It includes database roles, schema, application data, and the Supabase migration history. Because Supabase's normal CLI dump excludes its managed Auth schema, a separate PostgreSQL 17 `pg_dump` exports `auth.users`, `auth.identities`, and `auth.mfa_factors` into `database/auth-users.sql`.
+- A database dump runs daily at 04:00 UTC. It includes database roles, schema, application data, and the Supabase migration history. CLI schema dumps exclude managed Auth definitions, but CLI data dumps include Auth rows. `data.sql` explicitly selects the current application/private/Storage/hook schemas (`public,private,storage,supabase_functions`); a separate PostgreSQL 17 `pg_dump` exports `auth.users`, `auth.identities`, and `auth.mfa_factors` exactly once into `database/auth-users.sql`. Update that schema list if a future feature adds another application schema. CLI 2.119.0 quotes table-exclusion wildcards, so `-x "auth.*"` is not sufficient.
 - The Auth export preserves user IDs, account metadata, password hashes, login identities, and enrolled MFA factors. It intentionally excludes active sessions, refresh tokens, one-time codes, and Supabase's internal Auth migration history; users will need to sign in again after recovery.
 - Every Sunday at 04:00 UTC, the snapshot also downloads private estimate photos and voice notes from `estimate-media`. A manual run from the `main` branch can include Storage on demand.
 - Restic encrypts file contents and repository metadata on the GitHub runner before data is uploaded. Google Drive stores encrypted Restic repository objects; it is not the encryption layer.
