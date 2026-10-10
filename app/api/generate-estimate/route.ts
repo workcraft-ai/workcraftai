@@ -11,6 +11,7 @@ export const maxDuration = 60;
 const MAX_BODY_BYTES = 12_000;
 const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 type GeneratedItem = { description?: unknown; description_es?: unknown; quantity?: unknown; unit?: unknown; suggested_unit_price?: unknown };
+type GeminiProviderError = { code?: unknown; message?: unknown; status?: unknown };
 
 const generatedUnits = ["each", "hour", "sq ft", "linear ft", "roofing square", "sheet", "job", "visit", "unknown"] as const;
 
@@ -41,6 +42,26 @@ function generatedUnitPrice(item: GeneratedItem): number {
   return Number.isFinite(value) && value > 0 && value <= 100000000
     ? Math.round(value * 100) / 100
     : 0;
+}
+
+function geminiProviderErrorSignal(error: GeminiProviderError | undefined) {
+  const message = typeof error?.message === "string" ? error.message : "";
+  const status = typeof error?.status === "string" && /^[A-Z0-9_]{1,40}$/.test(error.status)
+    ? error.status
+    : null;
+  const code = typeof error?.code === "number" && Number.isInteger(error.code) && error.code >= 100 && error.code <= 599
+    ? error.code
+    : null;
+  const category = /api.?key|credential|unauthorized|permission denied/i.test(message)
+    ? "authentication"
+    : /quota|rate.?limit|resource_exhausted/i.test(`${status ?? ""} ${message}`)
+      ? "quota_or_rate_limit"
+      : /model.{0,40}(not found|unavailable|unsupported)|not found.{0,40}model/i.test(message)
+        ? "model"
+        : /invalid_argument|invalid json|unknown name|schema|invalid request/i.test(`${status ?? ""} ${message}`)
+          ? "invalid_request"
+          : "other";
+  return { providerCode: code, providerStatus: status, providerErrorCategory: category };
 }
 
 export async function GET() {
@@ -254,7 +275,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cloud AI request timed out or could not connect. Try again later." }, { status: 502 });
   }
 
-  let generated: { error?: { message?: string }; candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } };
+  let generated: { error?: GeminiProviderError; candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } };
   try {
     generated = await response.json();
   } catch {
@@ -268,7 +289,12 @@ export async function POST(request: Request) {
     : generated.usageMetadata.candidatesTokenCount + (generated.usageMetadata.thoughtsTokenCount ?? 0));
   if (!response.ok) {
     await complete("failed", response.status, null, inputTokens, outputTokens);
-    console.error("Cloud AI provider rejected request:", response.status);
+    console.error("Cloud AI provider rejected request:", {
+      requestId: request.headers.get("x-vercel-id"),
+      model,
+      httpStatus: response.status,
+      ...geminiProviderErrorSignal(generated.error),
+    });
     return NextResponse.json({ error: "Cloud AI could not complete this draft. Try again later." }, { status: 502 });
   }
 
