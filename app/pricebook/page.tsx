@@ -10,7 +10,7 @@ import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
 import type { ImportedPriceBookItem } from "@/lib/priceBookCsv.mjs";
 
 type PriceItem = { id: string; name: string; description: string; trade: string; unit: string; unit_price: number };
-type EstimateLine = { description: string; quantity: number; unit_price: number };
+type EstimateLine = { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number };
 type EstimateTemplate = { id: string; name: string; trade: string; line_items: EstimateLine[]; package_options?: { name: string; description: string; total: number }[]; require_deposit: boolean; deposit_percentage: number };
 
 const trades = ["Plumbing", "Electrical", "Roofing", "HVAC", "Painting", "Carpentry", "General", "Other"];

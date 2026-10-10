@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 const MAX_BODY_BYTES = 12_000;
 const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
-type GeneratedItem = { description?: unknown; quantity?: unknown; unit_price?: unknown };
+type GeneratedItem = { description?: unknown; description_es?: unknown; quantity?: unknown; unit?: unknown; suggested_unit_price?: unknown };
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -104,6 +104,7 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: "The request is invalid or too large." }, { status: 400 });
   const prompt = typeof payload.prompt === "string" ? payload.prompt.trim().slice(0, 6000) : "";
   const trade = typeof payload.trade === "string" ? payload.trade.trim().slice(0, 80) || "General contracting" : "General contracting";
+  const proposalLanguage = payload.proposal_language === "es" ? "es" : "en";
   if (!prompt) return NextResponse.json({ error: "Describe the job to draft an estimate." }, { status: 400 });
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -160,10 +161,10 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Draft scope and quantities only for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with a line_items array. Each item must contain description (string), quantity (number), and unit_price (number). Always set unit_price to 0; WorkCraft AI will apply the contractor's saved Price Book rates where a clear match exists. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and say what needs confirmation in the description. Use concise descriptions that name the actual fixture, material, or task so it can be matched to a saved service.` }] }],
+        contents: [{ role: "user", parts: [{ text: `Prepare a draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with proposal_summary and line_items. Write proposal_summary as 1-2 concise customer-facing sentences in ${proposalLanguage === "es" ? "Spanish" : "English"}, describing overall work without prices. Each line item must contain description (concise English string), description_es (faithful Spanish string), quantity (number), unit (one of: each, hour, sq ft, linear ft, roofing square, sheet, job, visit, unknown), and suggested_unit_price (number). Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and state what needs confirmation in both descriptions. Suggest a cautious customer-facing U.S. starting rate per unit in USD before markup and tax, using broad typical labor/material assumptions; it is not a live local supplier quote. Return 0 if the unit or scope is too unclear to price responsibly. Keep rate suggestions rounded to cents and use concise descriptions with the actual material or task. Never use a price from the user's Price Book; WorkCraft AI applies saved contractor rates after this draft.` }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          maxOutputTokens: 2048,
+          maxOutputTokens: 3072,
           thinkingConfig: { thinkingLevel: "low" },
         },
       }),
@@ -207,19 +208,26 @@ export async function POST(request: Request) {
   }
 
   const text = generated.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("");
-  let parsed: { line_items?: unknown[] };
+  let parsed: { line_items?: unknown[]; proposal_summary?: unknown };
   try { parsed = JSON.parse(text || "{}"); }
   catch {
     await complete("failed", response.status, null, inputTokens, outputTokens);
     return NextResponse.json({ error: "The AI response could not be read. Try a more specific job description." }, { status: 502 });
   }
+  const allowedUnits = new Set(["each", "hour", "sq ft", "linear ft", "roofing square", "sheet", "job", "visit", "unknown"]);
   const line_items = Array.isArray(parsed.line_items) ? parsed.line_items.slice(0, 40).flatMap((rawItem: unknown) => {
     const item = rawItem as GeneratedItem;
     if (!item || typeof item !== "object") return [];
     const description = typeof item.description === "string" ? item.description.trim().slice(0, 240) : "";
     const quantity = Number(item.quantity);
     if (!description || !Number.isFinite(quantity) || quantity <= 0) return [];
-    return [{ description, quantity, unit_price: 0 }];
+    const unit = typeof item.unit === "string" && allowedUnits.has(item.unit.trim().toLowerCase()) ? item.unit.trim().toLowerCase() : "unknown";
+    const suggestedUnitPrice = Number(item.suggested_unit_price);
+    const unitPrice = unit !== "unknown" && Number.isFinite(suggestedUnitPrice) && suggestedUnitPrice > 0 && suggestedUnitPrice <= 100000000
+      ? Math.round(suggestedUnitPrice * 100) / 100
+      : 0;
+    const descriptionEs = typeof item.description_es === "string" ? item.description_es.trim().slice(0, 240) : "";
+    return [{ description, description_es: descriptionEs, quantity, unit, unit_price: unitPrice }];
   }) : [];
   if (!line_items.length) {
     await complete("failed", response.status, 0, inputTokens, outputTokens);
@@ -229,6 +237,7 @@ export async function POST(request: Request) {
   await complete("succeeded", response.status, line_items.length, inputTokens, outputTokens);
   return NextResponse.json({
     line_items,
+    proposal_summary: typeof parsed.proposal_summary === "string" ? parsed.proposal_summary.trim().slice(0, 1200) : "",
     remaining_daily_generations: reservation.remaining,
     remaining_monthly_generations: reservation.remaining_monthly,
   });

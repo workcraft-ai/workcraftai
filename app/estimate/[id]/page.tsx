@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { LocalizedTree, type Language } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 interface LineItem {
@@ -12,6 +12,7 @@ interface LineItem {
   description: string;
   description_es?: string | null;
   quantity: number;
+  unit?: string;
   unit_price: number;
 }
 
@@ -28,6 +29,8 @@ interface Estimate {
   tax_rate: number;
   markup_percentage: number;
   proposal_language: Language;
+  proposal_display_mode?: "detailed" | "summary";
+  proposal_summary?: string | null;
   created_at: string;
   package_options?: EstimatePackage[];
   signature_name?: string | null;
@@ -38,7 +41,7 @@ interface Estimate {
 interface ContractorBrand { businessName: string; phone: string; address: string; logoUrl: string; brandColor: string; }
 interface ProposalPhoto { id: string; url: string; }
 interface OwnerAttachment { id: string; media_type: "photo" | "voice"; url: string; }
-interface PaymentSummary { amountPaidCents: number; totalCents: number; available: boolean; }
+interface PaymentSummary { amountPaidCents: number; totalCents: number; packageTotalsCents?: Record<string, number>; available: boolean; }
 
 interface EstimatePackage {
   name: string;
@@ -164,7 +167,20 @@ export default function ClientEstimatePage() {
   }, [id]);
 
   const selectedPackageName = selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name ?? null;
-  const estimateMoney = calculateEstimateMoney(estimate ?? {}, lineItems, selectedPackageName);
+  const calculatedEstimateMoney = calculateEstimateMoney(estimate ?? {}, lineItems, selectedPackageName);
+  const summaryTotalCents = selectedPackageName
+    ? paymentSummary.packageTotalsCents?.[selectedPackageName] ?? paymentSummary.totalCents
+    : paymentSummary.totalCents;
+  const estimateMoney = estimate?.proposal_display_mode === "summary"
+    ? {
+      ...calculatedEstimateMoney,
+      subtotalCents: summaryTotalCents,
+      markupCents: 0,
+      taxCents: 0,
+      totalCents: summaryTotalCents,
+      depositCents: estimate.require_deposit ? Math.round(summaryTotalCents * Number(estimate.deposit_percentage || 0) / 100) : 0,
+    }
+    : calculatedEstimateMoney;
   const subtotal = estimateMoney.subtotalCents / 100;
   const markupAmount = estimateMoney.markupCents / 100;
   const taxAmount = estimateMoney.taxCents / 100;
@@ -216,6 +232,9 @@ export default function ClientEstimatePage() {
       });
       const approvalData = await approval.json();
       if (!approval.ok) throw new Error(approvalData.error || "Approval could not be recorded.");
+      if (typeof approvalData.acceptedTotalCents === "number" && Number.isSafeInteger(approvalData.acceptedTotalCents)) {
+        setPaymentSummary((current) => ({ ...current, totalCents: approvalData.acceptedTotalCents }));
+      }
       setEstimate((current) => current ? { ...current, signature_name: signatureName.trim(), selected_package: selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name, accepted_at: new Date().toISOString(), status: "accepted" } : current);
 
       setPaying(false);
@@ -392,16 +411,19 @@ export default function ClientEstimatePage() {
           </div>
 
           {/* Scope of Work Table */}
-          <div className="space-y-3">
+          {estimate.proposal_display_mode === "summary" ? <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Work summary</h2>
+            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{estimate.proposal_summary}</p>
+          </section> : <div className="space-y-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Scope of Work
             </h2>
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[520px] text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
                   <tr>
                     <th className="p-3">Description</th>
-                    <th className="p-3 text-center">Qty</th>
+                    <th className="p-3 text-center">Qty / Unit</th>
                     <th className="p-3 text-right">Rate</th>
                     <th className="p-3 text-right">Amount</th>
                   </tr>
@@ -413,7 +435,7 @@ export default function ClientEstimatePage() {
                         {estimate.proposal_language === "es" ? item.description_es || item.description : item.description}
                       </td>
                       <td className="p-3 text-center text-slate-600">
-                        {item.quantity}
+                        {item.quantity} {item.unit ? translate(estimate.proposal_language, item.unit) : ""}
                       </td>
                       <td className="p-3 text-right text-slate-600">
                         ${Number(item.unit_price).toFixed(2)}
@@ -427,10 +449,13 @@ export default function ClientEstimatePage() {
               </table>
             </div>
             {estimate.proposal_language === "es" && (lineItems.some((item) => !item.description_es) || estimate.package_options?.some((option) => !option.description_es)) && <p className="text-xs text-slate-500">Some work descriptions remain in the contractor’s original language because Spanish wording was not provided.</p>}
-          </div>
+          </div>}
 
           {/* Deposit & Summary Box */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-3 text-sm">
+            {estimate.proposal_display_mode === "summary" ? <div className="flex justify-between items-center font-bold text-slate-900">
+              <span>Estimate total</span><span>${total.toFixed(2)}</span>
+            </div> : <>
             <div className="flex justify-between items-center text-slate-600">
               <span>Subtotal</span>
               <span className="font-semibold text-slate-900">${subtotal.toFixed(2)}</span>
@@ -438,6 +463,7 @@ export default function ClientEstimatePage() {
             {markupAmount > 0 && <div className="flex justify-between items-center text-slate-600"><span>Markup ({estimate.markup_percentage}%)</span><span>${markupAmount.toFixed(2)}</span></div>}
             {taxAmount > 0 && <div className="flex justify-between items-center text-slate-600"><span>Tax ({estimate.tax_rate}%)</span><span>${taxAmount.toFixed(2)}</span></div>}
             <div className="flex justify-between items-center border-t border-slate-200 pt-2 font-bold text-slate-900"><span>Total</span><span>${total.toFixed(2)}</span></div>
+            </>}
 
             {estimate.require_deposit && (
               <div className="flex justify-between items-center text-green-700 font-semibold pt-2 border-t border-slate-200">

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
@@ -11,6 +11,7 @@ interface LineItemInput {
   description: string;
   description_es?: string;
   quantity: number;
+  unit?: string;
   unit_price: number;
 }
 
@@ -24,6 +25,7 @@ interface EstimatePackage {
 export default function EditEstimatePage() {
   const router = useRouter();
   const params = useParams();
+  const { language } = useLanguage();
   const id = params?.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,8 @@ export default function EditEstimatePage() {
   const [taxRate, setTaxRate] = useState(0);
   const [markupPercentage, setMarkupPercentage] = useState(0);
   const [proposalLanguage, setProposalLanguage] = useState<"en" | "es">("en");
+  const [proposalDisplayMode, setProposalDisplayMode] = useState<"detailed" | "summary">("detailed");
+  const [proposalSummary, setProposalSummary] = useState("");
 
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemInput[]>([]);
@@ -70,6 +74,8 @@ export default function EditEstimatePage() {
         setTaxRate(Number(estimate.tax_rate) || 0);
         setMarkupPercentage(Number(estimate.markup_percentage) || 0);
         setProposalLanguage(estimate.proposal_language === "es" ? "es" : "en");
+        setProposalDisplayMode(estimate.proposal_display_mode === "summary" ? "summary" : "detailed");
+        setProposalSummary(typeof estimate.proposal_summary === "string" ? estimate.proposal_summary : "");
         const { data: { user } } = await supabase.auth.getUser();
         const entitlement = user ? await getClientProEntitlement() : null;
         const activePro = entitlement?.has_pro === true;
@@ -79,10 +85,11 @@ export default function EditEstimatePage() {
         setPackageOptions(activePro && Array.isArray(estimate.package_options) ? estimate.package_options : []);
 
         setLineItems(
-          items.map((i: { description: string; description_es?: string; quantity: number; unit_price: number }) => ({
+        items.map((i: { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number }) => ({
             description: i.description,
             description_es: i.description_es || "",
             quantity: i.quantity,
+            unit: i.unit || "each",
             unit_price: i.unit_price,
           }))
         );
@@ -97,7 +104,7 @@ export default function EditEstimatePage() {
   }, [id, router]);
 
   const handleAddItem = () => {
-    setLineItems([...lineItems, { description: "", description_es: "", quantity: 1, unit_price: 0 }]);
+    setLineItems([...lineItems, { description: "", description_es: "", quantity: 1, unit: "each", unit_price: 0 }]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -136,6 +143,14 @@ export default function EditEstimatePage() {
       alert("Line item quantities must be greater than zero and prices cannot be negative.");
       return;
     }
+    if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {
+      alert(translate(language, "Add a customer-facing work summary or choose detailed line items."));
+      return;
+    }
+    if (proposalSummary.trim().length > 1200) {
+      alert(translate(language, "The work summary must be 1,200 characters or less."));
+      return;
+    }
     if (!zeroRateConfirmed) return;
     setSaving(true);
 
@@ -153,8 +168,10 @@ export default function EditEstimatePage() {
           tax_rate: taxRate,
           markup_percentage: markupPercentage,
           proposal_language: proposalLanguage,
+          proposal_display_mode: proposalDisplayMode,
+          proposal_summary: proposalSummary.trim() || null,
           package_options: isPro ? packageOptions : [],
-          lineItems: nonEmptyLineItems.map((item) => ({ ...item, description: item.description.trim(), description_es: item.description_es?.trim() || null })),
+          lineItems: nonEmptyLineItems.map((item) => ({ description: item.description.trim(), description_es: item.description_es?.trim() || null, quantity: item.quantity, unit: item.unit?.trim() || "each", unit_price: item.unit_price })),
         }),
       });
 
@@ -164,7 +181,8 @@ export default function EditEstimatePage() {
       // Return to the dashboard so the contractor can review and share the updated proposal.
       router.push("/dashboard");
     } catch (err: unknown) {
-      alert("Error updating estimate: " + (err instanceof Error ? err.message : String(err)));
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`${language === "es" ? "Error al actualizar la cotización: " : "Error updating estimate: "}${translate(language, message)}`);
     } finally {
       setSaving(false);
     }
@@ -263,6 +281,19 @@ export default function EditEstimatePage() {
             </div>
           </div>
 
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
+            <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
+              <legend className="sr-only">Proposal detail</legend>
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
+            </fieldset>
+            {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
+              <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+              <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
+            </label>}
+          </section>
+
           {/* Line Items Editor */}
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <h2 className="text-sm font-semibold text-slate-900">Estimate pricing</h2>
@@ -315,6 +346,15 @@ export default function EditEstimatePage() {
                       )
                     }
                     className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
+                  />
+                  <input
+                    aria-label={`Line item ${index + 1} unit`}
+                    type="text"
+                    maxLength={40}
+                    value={item.unit || "each"}
+                    onChange={(e) => handleItemChange(index, "unit", e.target.value)}
+                    placeholder="Unit"
+                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
                   />
                   <input
                     aria-label={`Line item ${index + 1} rate`}
