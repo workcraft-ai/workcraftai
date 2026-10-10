@@ -111,7 +111,7 @@ export async function POST(request: Request) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Cloud drafting is temporarily unavailable." }, { status: 503 });
 
-  const model = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: reservationRows, error: reservationError } = await admin.rpc("reserve_workcraft_ai_generation", {
     p_user_id: user.id,
