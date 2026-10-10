@@ -37,7 +37,7 @@ jobs:
 
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
-          version: 2.114.0
+          version: 2.119.0
 
       - name: Install backup tools
         run: |
@@ -96,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           # Export only policy definitions, not managed Storage table definitions.
-          docker run --rm --env DATABASE_URL --entrypoint sh postgres:17-alpine \
+          docker run --rm --interactive --env DATABASE_URL --entrypoint sh postgres:17-alpine \
             -ec 'exec psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1' \
             > "$BACKUP_ROOT/database/storage-policies.sql" <<'SQL'
           SELECT 'ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;';
@@ -108,6 +108,8 @@ jobs:
           FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects'
           ORDER BY policyname;
           SQL
+          test -s "$BACKUP_ROOT/database/storage-policies.sql"
+          grep -q "CREATE POLICY" "$BACKUP_ROOT/database/storage-policies.sql"
 
       - name: Export recoverable Auth accounts
         env:

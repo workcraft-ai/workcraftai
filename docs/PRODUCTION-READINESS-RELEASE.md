@@ -17,7 +17,11 @@ Updated October 10, 2026. This is the current checklist; earlier audits remain h
 
 Three forward-only migrations were applied to Staging first and Production second. Recorded versions were reconciled only after exact migration-name and SQL-hash comparisons: `20261010181731`, `20261010181741`, `20261010181745`. Latest version is `20261010181745_revocable_proposal_sharing`; both environments have 40 versions. No existing customer records were used as write-test fixtures.
 
-Vercel project and environment-name metadata is accessible. Private values are redacted. The owner approved rotating `CRON_SECRET`; Vercel Production was updated and the owner confirmed the matching GitHub repository Actions secret was saved. A new deployment is required to load the value. Availability workflow runs every 15 minutes and calls `/api/cron/notifications`; follow-ups accept authorized GET or POST.
+Release `611a806bdea822d773d7fcf9cf876caed387ebf1` reached Ready for both Production sites and passed app/Auth/database health. Vercel project and environment-name metadata is accessible; private values are redacted. The owner approved rotating `CRON_SECRET`; Vercel Production was updated and the owner confirmed the matching GitHub repository Actions secret was saved. The deployed notification endpoint accepts that secret (HTTP 200). Availability workflow runs every 15 minutes and calls `/api/cron/notifications`; follow-ups accept authorized GET or POST.
+
+The first full encrypted snapshot including durable Auth records and private media completed (`daeb5473`, workflow run `38076309317`). Decryption passed, but recovery stopped because the Storage policy exporter had saved an empty file: Docker was not forwarding heredoc stdin. The follow-up adds `--interactive`, verifies nonempty policy output before encryption, and pins the same Supabase CLI version used by CI/local verification. The exact corrected exporter recovered three policies from the disposable local database. A fresh full workflow run is still required; the failed drill is not recovery acceptance.
+
+The owner enabled the Send Email Hook and attempted a reset without receiving mail. No corresponding recent recovery request or outbox record was observed during investigation. The reset form previously presented network/provider errors as neutral success; the follow-up keeps account/cooldown responses neutral but displays a localized service error for connection/configuration/provider failures. Hook activation alone is not proof of signed-hook delivery.
 
 ## Provider and owner acceptance
 
