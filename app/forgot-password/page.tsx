@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import TurnstileCaptcha, { TURNSTILE_ENABLED } from "@/app/components/TurnstileCaptcha";
 
 export default function ForgotPasswordPage() {
   return <Suspense fallback={<main className="min-h-screen bg-slate-950" />}><ForgotPasswordForm /></Suspense>;
@@ -16,6 +17,9 @@ function ForgotPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
+  const { language } = useLanguage();
   const searchParams = useSearchParams();
   const expiredLink = searchParams.get("error") === "expired";
 
@@ -25,14 +29,28 @@ function ForgotPasswordForm() {
     setError(null);
     setMessage(null);
 
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/confirm?next=%2Freset-password`,
-    });
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      setError(translate(language, "Complete the security check to continue."));
+      setLoading(false);
+      return;
+    }
 
-    if (resetError) setError(resetError.message);
-    else setMessage("If an account exists for that email, a password reset link is on its way.");
-    setLoading(false);
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/confirm?next=%2Freset-password`,
+        ...(captchaToken ? { captchaToken } : {}),
+      });
+
+      if (resetError) setError(resetError.message);
+      else setMessage("If an account exists for that email, a password reset link is on its way.");
+    } catch {
+      setError(translate(language, "We could not send the reset link. Please try again."));
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaResetSignal((signal) => signal + 1);
+      setLoading(false);
+    }
   };
 
   return (
@@ -62,7 +80,8 @@ function ForgotPasswordForm() {
               placeholder="you@example.com"
             />
           </div>
-          <button type="submit" disabled={loading} className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
+          <TurnstileCaptcha onToken={setCaptchaToken} resetSignal={captchaResetSignal} />
+          <button type="submit" disabled={loading || (TURNSTILE_ENABLED && !captchaToken)} className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
             {loading ? "Sending link…" : "Send reset link"}
           </button>
         </form>

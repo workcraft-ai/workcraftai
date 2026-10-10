@@ -5,13 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import TurnstileCaptcha, { TURNSTILE_ENABLED } from "@/app/components/TurnstileCaptcha";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
+  const { language } = useLanguage();
 
   const router = useRouter();
 
@@ -21,21 +25,34 @@ export default function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      setError(translate(language, "Complete the security check to continue."));
       setLoading(false);
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        ...(captchaToken ? { options: { captchaToken } } : {}),
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError(translate(language, "We could not sign you in. Please try again."));
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaResetSignal((signal) => signal + 1);
+      setLoading(false);
+    }
   };
 
   return (
@@ -115,9 +132,11 @@ export default function LoginForm() {
               </div>
             </div>
 
+            <TurnstileCaptcha onToken={setCaptchaToken} resetSignal={captchaResetSignal} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (TURNSTILE_ENABLED && !captchaToken)}
               className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 transition-colors"
             >
               {loading ? "Signing in..." : "Sign In"}

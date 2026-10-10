@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import TurnstileCaptcha, { TURNSTILE_ENABLED } from "@/app/components/TurnstileCaptcha";
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,9 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
+  const { language } = useLanguage();
 
   const router = useRouter();
 
@@ -27,30 +31,40 @@ export default function SignupForm() {
       return;
     }
 
-    setLoading(true);
-
-    const supabase = createClient();
-
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm`,
-      },
-    });
-
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      setError(translate(language, "Complete the security check to continue."));
       return;
     }
 
-    if (data.user && !data.session) {
-      setMessage(true);
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          ...(captchaToken ? { captchaToken } : {}),
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (data.user && !data.session) {
+        setMessage(true);
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      setError(translate(language, "We could not create your account. Please try again."));
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaResetSignal((signal) => signal + 1);
       setLoading(false);
-    } else {
-      router.push("/dashboard");
-      router.refresh();
     }
   };
 
@@ -171,9 +185,11 @@ export default function SignupForm() {
               </div>
             </div>
 
+            <TurnstileCaptcha onToken={setCaptchaToken} resetSignal={captchaResetSignal} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (TURNSTILE_ENABLED && !captchaToken)}
               className="w-full flex justify-center py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50"
             >
               {loading ? "Creating Account..." : "Sign Up"}
