@@ -9,6 +9,14 @@ const questions = [
     answer: "Sign in and choose New estimate. Add the customer and job details, review the line items and totals, then save. You can find saved estimates on your dashboard.",
   },
   {
+    question: "How much detail can I show on a proposal?",
+    answer: "Choose detailed line items or a summary with the total only. In summary mode, the customer sees your work summary and final total; the detailed line items stay in your account.",
+  },
+  {
+    question: "Are AI suggested prices guaranteed?",
+    answer: "No. They are broad starting estimates, not live local supplier quotes. A clear match in your Price Book replaces the AI rate. Review the unit, quantity, labor, material, taxes, and final rate before sharing the estimate.",
+  },
+  {
     question: "Where can I find my estimate reference number?",
     answer: "Each saved estimate has a readable reference such as WC-2026-0001. You can see it in your estimate list, on the proposal, and in estimate emails. The full ID in a share link remains in place for secure access.",
   },

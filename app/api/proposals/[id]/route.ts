@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 import { getProAccess } from "@/lib/pro-access";
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 export async function GET(
   _request: Request,
@@ -17,7 +18,7 @@ export async function GET(
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const { data: estimate, error } = await admin
     .from("estimates")
-    .select("id, reference_number, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
+    .select("id, reference_number, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -39,13 +40,17 @@ export async function GET(
     brandColor: typeof metadata.brand_color === "string" && /^#[0-9a-f]{6}$/i.test(metadata.brand_color) ? metadata.brand_color : "#c85b2d",
   };
 
-  const { data: lineItems, error: itemError } = await admin
-    .from("line_items")
-    .select("id, description, description_es, quantity, unit_price")
-    .eq("estimate_id", id);
-  if (itemError) {
-    console.error("Proposal line item lookup failed:", itemError.message);
-    return NextResponse.json({ error: "Unable to load proposal details." }, { status: 500 });
+  let lineItems: Array<Record<string, unknown>> = [];
+  if (estimate.proposal_display_mode !== "summary") {
+    const { data, error: itemError } = await admin
+      .from("line_items")
+      .select("id, description, description_es, quantity, unit, unit_price")
+      .eq("estimate_id", id);
+    if (itemError) {
+      console.error("Proposal line item lookup failed:", itemError.message);
+      return NextResponse.json({ error: "Unable to load proposal details." }, { status: 500 });
+    }
+    lineItems = (data ?? []) as Array<Record<string, unknown>>;
   }
 
   const { data: attachments } = await admin.from("estimate_attachments")
@@ -67,10 +72,18 @@ export async function GET(
   const paymentSummary = {
     amountPaidCents: paidCents(paymentData.payments),
     totalCents: paymentData.totalCents,
+    packageTotalsCents: Object.fromEntries((Array.isArray(estimate.package_options) ? estimate.package_options : []).flatMap((option) => {
+      if (!option || typeof option !== "object" || typeof option.name !== "string") return [];
+      const totalCents = calculateEstimateMoney({ tax_rate: estimate.tax_rate }, [], option.name).totalCents;
+      return [[option.name, totalCents]];
+    })),
     available: hasPro && connectedAccount?.charges_enabled === true,
   };
 
-  const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) => key !== "user_id" && key !== "converted_job_id"));
+  const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) =>
+    key !== "user_id" && key !== "converted_job_id"
+      && !(estimate.proposal_display_mode === "summary" && ["tax_rate", "markup_percentage"].includes(key))
+  ));
   return NextResponse.json({ estimate: publicEstimate, converted: Boolean(estimate.converted_job_id), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean), paymentSummary }, {
     headers: {
       "Cache-Control": "private, no-store",

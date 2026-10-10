@@ -9,6 +9,7 @@ type LineItemInput = {
   description: string;
   description_es?: string | null;
   quantity: number;
+  unit?: string;
   unit_price: number;
 };
 
@@ -33,6 +34,7 @@ function validLineItems(value: unknown): value is LineItemInput[] {
       Number.isFinite(candidate.unit_price) &&
       candidate.unit_price >= 0 &&
       candidate.unit_price <= 100000000 &&
+      (candidate.unit === undefined || (typeof candidate.unit === "string" && candidate.unit.trim().length > 0 && candidate.unit.length <= 40)) &&
       (candidate.description_es === undefined || candidate.description_es === null || (typeof candidate.description_es === "string" && candidate.description_es.length <= 240));
     if (!valid) return false;
     subtotalCents += Math.round(Number(candidate.quantity) * Number(candidate.unit_price) * 100);
@@ -64,7 +66,7 @@ export async function GET(
 
   const { data: lineItems, error: itemError } = await supabase
     .from("line_items")
-    .select("id, description, description_es, quantity, unit_price")
+    .select("id, description, description_es, quantity, unit, unit_price")
     .eq("estimate_id", id);
 
   if (itemError) {
@@ -122,7 +124,7 @@ export async function PUT(
 
   const { data: existing, error: lookupError } = await supabase
     .from("estimates")
-    .select("id, status, require_deposit, deposit_percentage, package_options")
+    .select("id, status, require_deposit, deposit_percentage, package_options, proposal_display_mode, proposal_summary")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -132,6 +134,16 @@ export async function PUT(
   }
   if (!existing) return jsonError("Estimate not found.", 404);
   if (["accepted", "paid"].includes(String(existing.status).toLowerCase())) return jsonError("Approved estimates cannot be edited. Create a new estimate if the terms need to change.", 409);
+
+  const proposalDisplayMode = body.proposal_display_mode === undefined
+    ? (existing.proposal_display_mode === "summary" ? "summary" : "detailed")
+    : body.proposal_display_mode === "summary" ? "summary" : "detailed";
+  const proposalSummary = body.proposal_summary === undefined
+    ? String(existing.proposal_summary ?? "").trim()
+    : typeof body.proposal_summary === "string" ? body.proposal_summary.trim() : "";
+  if (proposalSummary.length > 1200 || (proposalDisplayMode === "summary" && !proposalSummary)) {
+    return jsonError("Add a customer-facing summary of 1,200 characters or less, or choose detailed line items.", 400);
+  }
 
   let isPro = false;
   try { isPro = (await getServerProAccess(user.id)).hasPro; }
@@ -162,6 +174,8 @@ export async function PUT(
     deposit_percentage: isPro ? depositPercentage : existing.deposit_percentage,
     package_options: isPro ? requestedPackages : existing.package_options ?? [],
     proposal_language: proposalLanguage,
+    proposal_display_mode: proposalDisplayMode,
+    proposal_summary: proposalSummary || null,
   };
   if (body.tax_rate !== undefined) estimateUpdate.tax_rate = taxRate;
   if (body.markup_percentage !== undefined) estimateUpdate.markup_percentage = markupPercentage;

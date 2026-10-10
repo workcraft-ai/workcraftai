@@ -8,13 +8,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function validLineItems(value: unknown): value is Array<{ description: string; description_es?: string | null; quantity: number; unit_price: number }> {
+function validLineItems(value: unknown): value is Array<{ description: string; description_es?: string | null; quantity: number; unit?: string; unit_price: number }> {
   if (!Array.isArray(value) || value.length < 1 || value.length > 100) return false;
   let subtotalCents = 0;
   return value.every((item) => {
     if (!isRecord(item)) return false;
     const valid = typeof item.description === "string" && item.description.trim().length > 0 && item.description.length <= 240
       && (item.description_es === undefined || item.description_es === null || (typeof item.description_es === "string" && item.description_es.length <= 240))
+      && (item.unit === undefined || (typeof item.unit === "string" && item.unit.trim().length > 0 && item.unit.length <= 40))
       && typeof item.quantity === "number" && Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000
       && typeof item.unit_price === "number" && Number.isFinite(item.unit_price) && item.unit_price >= 0 && item.unit_price <= 100000000;
     if (!valid) return false;
@@ -54,12 +55,15 @@ export async function POST(request: Request) {
   const markupPercentage = body.markup_percentage === undefined ? 0 : Number(body.markup_percentage);
   const lineItems = body.lineItems;
   const packages = body.package_options ?? [];
+  const proposalDisplayMode = body.proposal_display_mode === "summary" ? "summary" : "detailed";
+  const proposalSummary = typeof body.proposal_summary === "string" ? body.proposal_summary.trim() : "";
 
   if (!clientName || clientName.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320
     || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(lineItems) || !validPackages(packages)
     || !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100
     || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100
-    || !Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500) {
+    || !Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500
+    || proposalSummary.length > 1200 || (proposalDisplayMode === "summary" && !proposalSummary)) {
     return NextResponse.json({ error: "Check customer details, line items, tax, and deposit values." }, { status: 400 });
   }
 
@@ -76,6 +80,8 @@ export async function POST(request: Request) {
       tax_rate: taxRate,
       markup_percentage: markupPercentage,
       proposal_language: body.proposal_language === "es" ? "es" : "en",
+      proposal_display_mode: proposalDisplayMode,
+      proposal_summary: proposalSummary || null,
     },
     p_line_items: lineItems,
   });
