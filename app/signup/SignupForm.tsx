@@ -27,7 +27,7 @@ export default function SignupForm() {
     setMessage(false);
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(translate(language, "Passwords do not match."));
       return;
     }
 
@@ -49,7 +49,27 @@ export default function SignupForm() {
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        const code = signUpError.code?.toLowerCase() ?? "";
+        const alreadyRegistered =
+          code === "user_already_exists" ||
+          code === "email_exists" ||
+          code === "over_email_send_rate_limit";
+
+        if (alreadyRegistered) {
+          // Match the successful confirmation state so this page doesn't reveal
+          // whether an email address already has an account.
+          setMessage(true);
+        } else if (code === "captcha_failed") {
+          setError(translate(language, "Security verification did not complete. Please try again."));
+        } else if (code === "weak_password") {
+          setError(translate(language, "Choose a stronger password and try again."));
+        } else if (signUpError.status === 429 || code === "over_request_rate_limit") {
+          setError(translate(language, "Signup is temporarily limited. Wait a few minutes and try again."));
+        } else {
+          // Supabase error text can disclose account state and may change between
+          // providers. Keep server details out of the public response.
+          setError(translate(language, "We could not create your account. Please try again."));
+        }
         return;
       }
 
@@ -103,18 +123,17 @@ export default function SignupForm() {
                 className="rounded-md bg-green-900/30 border border-green-500/50 p-3 text-xs text-green-200"
               >
                 <p>
-                  Check your email for a confirmation link to complete registration.
+                  If an account can be created for this email, we’ll send a confirmation link. If you requested one recently, wait a minute before trying again.
                 </p>
                 <p className="mt-2">
                   If you already have an account, you can{" "}
                   <Link href="/login" className="font-semibold underline">
                     sign in
                   </Link>{" "}
-                  or{" "}
+                  ·{" "}
                   <Link href="/forgot-password" className="font-semibold underline">
                     reset your password
-                  </Link>
-                  .
+                  </Link>.
                 </p>
               </div>
             )}
