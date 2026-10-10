@@ -1,3 +1,4 @@
+import { customerShareAllowed } from "@/lib/proposal-sharing";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
@@ -24,6 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const admin = getServiceSupabase();
+    if (!(await customerShareAllowed(admin, id, request))) return errorResponse("Proposal not found or link expired.", 404);
     const data = await getEstimatePaymentData(admin, id);
     const estimate = data.estimate;
     if (!estimate) return errorResponse("Estimate not found.", 404);
@@ -89,6 +91,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const session = await createConnectedCheckout({
+      shareToken: new URL(request.url).searchParams.get("token"),
       estimate,
       amountCents,
       kind,

@@ -1,3 +1,4 @@
+import { customerShareAllowed } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
@@ -5,7 +6,7 @@ import { getProAccess } from "@/lib/pro-access";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -16,6 +17,7 @@ export async function GET(
   }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  if (!(await customerShareAllowed(admin, id, request, true))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const { data: estimate, error } = await admin
     .from("estimates")
     .select("id, reference_number, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at")
@@ -74,7 +76,7 @@ export async function GET(
     totalCents: paymentData.totalCents,
     packageTotalsCents: Object.fromEntries((Array.isArray(estimate.package_options) ? estimate.package_options : []).flatMap((option) => {
       if (!option || typeof option !== "object" || typeof option.name !== "string") return [];
-      const totalCents = calculateEstimateMoney({ tax_rate: estimate.tax_rate }, [], option.name).totalCents;
+      const totalCents = calculateEstimateMoney(estimate, [], option.name).totalCents;
       return [[option.name, totalCents]];
     })),
     available: hasPro && connectedAccount?.charges_enabled === true,

@@ -5,9 +5,10 @@ export type PriceBookRate = {
   trade: string;
   unit: string;
   unit_price: number;
+  pricing_basis?: string;
 };
 
-export type DraftLine = { description: string; quantity: number; unit?: string; unit_price: number };
+export type DraftLine = { description: string; quantity: number; unit?: string; unit_price: number; pricing_basis?: string };
 
 export function applyPriceBookRates<T extends DraftLine>(
   lines: T[],

@@ -174,7 +174,7 @@ export default function CustomersPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <h2 id="saved-customer-list-title" className="font-semibold"><span>Your customers</span> ({contacts.length})</h2>
               <label className="sr-only" htmlFor="customer-search">Search customers</label>
-              <input id="customer-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customers" className="min-h-11 w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              <input id="customer-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customers" className="min-h-12 w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             </div>
             {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading customers…</p> : visibleContacts.length === 0 ? (
               <div className="p-8 text-center">
@@ -192,8 +192,8 @@ export default function CustomersPage() {
                       {contact.job_address && <p className="text-sm text-slate-600">{contact.job_address}</p>}
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => editContact(contact)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
-                      <button type="button" onClick={() => void deleteContact(contact)} className="inline-flex min-h-11 items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button>
+                      <button type="button" onClick={() => editContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
+                      <button type="button" onClick={() => void deleteContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button>
                     </div>
                   </article>
                 ))}

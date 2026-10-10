@@ -38,24 +38,28 @@ export async function updateSession(request: NextRequest) {
   const path = url.pathname;
 
   // Protect internal routes: Redirect unauthenticated users to /login
+  const internalRoots = ["/dashboard", "/customers", "/schedule", "/pricebook", "/reports", "/profile", "/admin", "/invoice"];
   const isProtectedRoute =
-    path.startsWith("/dashboard") ||
-    path.startsWith("/schedule") ||
-    path.startsWith("/pricebook") ||
-    path.startsWith("/reports") ||
-    path.startsWith("/invoice") ||
+    internalRoots.some((root) => path === root || path.startsWith(`${root}/`)) ||
     path === "/estimate/new" ||
     (path.startsWith("/estimate") && path.endsWith("/edit"));
 
+  const redirectWithSession = () => {
+    const response = NextResponse.redirect(url);
+    for (const cookie of supabaseResponse.cookies.getAll()) response.cookies.set(cookie);
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  };
+
   if (!user && isProtectedRoute) {
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectWithSession();
   }
 
   // Redirect authenticated users away from /login or /signup to /dashboard
   if (user && (path === "/login" || path === "/signup")) {
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return redirectWithSession();
   }
 
   return supabaseResponse;

@@ -19,6 +19,7 @@ interface LineItemInput {
   quantity: number;
   unit?: string;
   unit_price: number;
+  pricing_basis?: string;
   pricing_source?: "price_book" | "ai_suggested" | "unpriced" | "manual";
   quantity_source?: "ai_estimated" | "contractor_measurement";
   pricing_assumption?: string;
@@ -36,6 +37,7 @@ interface PriceBookItem {
   trade: string;
   unit: string;
   unit_price: number;
+  pricing_basis?: string;
 }
 
 type PriceBookSuggestion = {
@@ -45,6 +47,7 @@ type PriceBookSuggestion = {
   trade: string;
   unit: string;
   unit_price: number;
+  pricing_basis?: string;
   match_score: number;
 };
 
@@ -288,7 +291,7 @@ export default function CreateEstimatePage() {
       } else {
         setRequireDeposit(false); setPackageOptions([]);
       }
-      const { data } = await supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price").order("name");
+      const { data } = await supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name");
       setPriceBookItems((data ?? []) as PriceBookItem[]);
     })();
   }, []);
@@ -658,8 +661,8 @@ export default function CreateEstimatePage() {
             <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
             <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
               <legend className="sr-only">Proposal detail</legend>
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
             </fieldset>
             {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
               <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
@@ -671,9 +674,9 @@ export default function CreateEstimatePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-sm font-semibold text-slate-800">Unfinished estimate</h2><p className="mt-1 text-xs text-slate-600">Save or restore a draft in this browser on this device.</p></div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
-                <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
-                <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-11 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
+                <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
+                <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
+                <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-12 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
               </div>
             </div>
             {draftStorageMessage && <p role="status" className="mt-3 text-xs text-slate-600">{draftStorageMessage}</p>}
@@ -697,7 +700,7 @@ export default function CreateEstimatePage() {
                     setClientPhone(customer.phone);
                     setJobAddress(customer.job_address);
                   }
-                }} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                }} className="min-h-12 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
                   <option value="">Choose a saved customer</option>
                   {savedCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.email ? ` · ${customer.email}` : ""}</option>)}
                 </select>
@@ -795,7 +798,7 @@ export default function CreateEstimatePage() {
                 });
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
-              }} /></label> : <Link href="/profile" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
+              }} /></label> : <Link href="/profile" className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
               {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
@@ -809,8 +812,8 @@ export default function CreateEstimatePage() {
                 Scope & Line Items
               </h2>
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
-                <button type="button" onClick={handleAddItem} className="inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600">+ Add line item</button>
+                <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
+                <button type="button" onClick={handleAddItem} className="inline-flex min-h-12 items-center rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-600">+ Add line item</button>
               </div>
             </div>
 
@@ -821,7 +824,7 @@ export default function CreateEstimatePage() {
                   <option value="">Choose a saved item</option>
                   {priceBookItems.map((item) => <option key={item.id} value={item.id}>{item.name} · ${Number(item.unit_price).toFixed(2)} / {item.unit}</option>)}
                 </select>
-                <button type="button" onClick={addSelectedPriceBookItem} disabled={!selectedPriceBookItemId} className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Add selected item</button>
+                <button type="button" onClick={addSelectedPriceBookItem} disabled={!selectedPriceBookItemId} className="inline-flex min-h-12 items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">Add selected item</button>
               </> : <p className="text-xs text-slate-600">Your price book is empty. <Link href="/pricebook" className="font-semibold text-blue-700 underline">Add your rates</Link></p>}
             </div>}
 
@@ -941,7 +944,7 @@ export default function CreateEstimatePage() {
                 <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
               </label>}
               <div className="flex flex-col gap-2 sm:flex-row">
-                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
               </div>
             </div>
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
@@ -951,7 +954,7 @@ export default function CreateEstimatePage() {
             <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Template name<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
-              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
+              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
               {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
             </div>
           </details>

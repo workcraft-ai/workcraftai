@@ -1,3 +1,4 @@
+import { customerShareAllowed } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
@@ -21,6 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (signatureName.length < 2) return NextResponse.json({ error: "Enter your full name to approve this estimate." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
+  if (!(await customerShareAllowed(admin, id, request, false))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const { data: acceptedTotalCents, error } = await admin.rpc("workcraft_accept_estimate_once", {
     p_estimate_id: id,
     p_signature_name: signatureName,

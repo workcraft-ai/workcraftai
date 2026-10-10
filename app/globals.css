@@ -85,7 +85,7 @@ body {
 
   label:has(input[type="checkbox"]),
   label:has(input[type="radio"]) {
-    min-height: 44px;
+    min-height: 48px;
     padding-block: 6px;
   }
 }

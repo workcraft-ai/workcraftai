@@ -1,0 +1,5 @@
+import test from "node:test";import assert from "node:assert/strict";import {measuredDraftQuantity} from "../lib/ai-quantity.mjs";
+const base={quantity:50,unit:"sq ft",quantityBasis:"specified_area",roofArea:2000,description:"Replace damaged decking",prompt:"Replace 50 sq ft of decking on a 2000 sq ft roof"};
+test("partial roofing repair never receives the full roof quantity",()=>{assert.equal(measuredDraftQuantity(base).quantity,50);assert.equal(measuredDraftQuantity({...base,quantityBasis:"full_roof"}).quantity,50);});
+test("full-roof coverage converts the supplied area to roofing squares",()=>{assert.deepEqual(measuredDraftQuantity({...base,description:"Install shingles",prompt:"Replace roof",quantityBasis:"full_roof",unit:"roofing square"}),{quantity:20,source:"contractor_measurement"});});
+test("unverified and count quantities are not replaced",()=>{for(const quantityBasis of [undefined,"count","unverified"]){assert.equal(measuredDraftQuantity({...base,quantityBasis}).quantity,50);}});

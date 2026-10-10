@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type AppEmailSource = "follow_up" | "support" | "proposal_question" | "account_retention" | "invoice";
+export type AppEmailSource = "estimate" | "follow_up" | "support" | "proposal_question" | "account_retention" | "invoice" | "billing" | "auth";
 export type EmailReservation = {
   allowed: boolean;
   reason: "allowed" | "platform_daily_limit" | "account_daily_limit" | "account_monthly_limit";

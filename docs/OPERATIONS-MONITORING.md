@@ -1,3 +1,5 @@
+> Current implementation and acceptance status: [release checklist](PRODUCTION-READINESS-RELEASE.md). Historical delivery observations below are not new failed tests.
+
 # WorkCraft AI monitoring and incident checklist
 
 Last refreshed: 2026-10-10. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
@@ -7,7 +9,7 @@ Last refreshed: 2026-10-10. This runbook contains no credentials or customer dat
 | Area | Verified state | Remaining evidence |
 | --- | --- | --- |
 | Public availability | UptimeRobot has HTTP monitors for `https://workcraftai.com/` and `https://app.workcraftai.com/api/health` (app monitor ID `804206941`). The app health endpoint is **Up** at a five-minute interval; it checks the app, Supabase Auth, and database. The owner confirmed receipt of both UptimeRobot test emails at the monitored support inbox. | Verify outage and recovery notifications, then inspect provider quota and error alerts. |
-| Database migrations | Production and Staging each report the same 37 migration versions through `20261010115121_invoice_email_quota_and_tracking`. The latest migrations add admin AI usage reset/trade configuration and Pro invoice email quota/tracking. The state-aware Stripe claim RPC is installed in both projects with an empty `search_path`; only `service_role` can execute it. | Reconfirm histories after future migrations. |
+| Database migrations | Production and Staging each report the same 40 migration versions through `20261010181745_revocable_proposal_sharing`. The latest migrations add admin AI usage reset/trade configuration and Pro invoice email quota/tracking. The state-aware Stripe claim RPC is installed in both projects with an empty `search_path`; only `service_role` can execute it. | Reconfirm histories after future migrations. |
 | Vercel | Connected Vercel metadata confirms the `workcraftai-app` project and a Ready Production deployment for the current `main` commit. The Vercel CLI is not installed locally, so detailed environment settings remain unverified. | Confirm provider usage/error alert settings and recheck the Vercel plan before commercial launch. |
 | Stripe | Preview Test-mode connected-account destination targets the current branch Preview URL. Connected checkout completion, payment success, refund, and expiration deliveries returned HTTP 200. A connected ACH PaymentIntent moved from `processing` to `succeeded`; `payment_intent.succeeded` returned HTTP 200. Replaying the event returned HTTP 200 with `duplicate: true`. The state-aware route is deployed to Preview and Production; its migration is present in both databases. | Verify `checkout.session.async_payment_succeeded`, recovery after a transient non-2xx response, subscription lifecycle and payment-failure delivery, and the billing notice. Stripe CLI's synthetic Checkout async event did not reach the connected-account destination. Never use a live payment. |
 | Resend | The production webhook is enabled for delivered, delayed, bounced, and complained events; recent webhook callbacks succeeded. Automated app email now uses `WorkCraft AI <no-reply@workcraftai.com>`; estimate email keeps the contractor's address as Reply-To. The previous dashboard send attempt produced no new estimate message in Resend, so delivery and Reply-To remain unverified. The bilingual transactional past-due email is deployed to Preview and Production but not delivery-tested. | After the unified sender deploys, send one estimate to an owner-controlled inbox; inspect the Resend event and message headers. Test the billing notice against a Preview Test-mode subscription. Confirm provider quota/error alerts. |
@@ -25,7 +27,7 @@ The UptimeRobot free plan currently checks every five minutes. Monitors are conf
 1. `https://workcraftai.com/`
 2. `https://app.workcraftai.com/api/health`
 
-Both monitors currently show **Up**, 100% uptime, and no incidents in the last 24 hours. The owner confirmed both UptimeRobot test emails arrived at `support@workcraftai.com`. Actual outage/recovery delivery remains untested. A health monitor does not detect a bad Stripe signing secret, Resend quota exhaustion, Gemini provider failure, or a subscription billing issue.
+Both monitors currently show **Up**, 100% uptime, and no incidents in the last 24 hours. The owner confirmed both UptimeRobot test emails arrived at `support@workcraftai.com`. The owner has confirmed monitoring delivery; provider-native configuration should still be reviewed periodically. A health monitor does not detect a bad Stripe signing secret, Resend quota exhaustion, Gemini provider failure, or a subscription billing issue.
 
 ## Provider usage and error alerts
 
@@ -43,13 +45,13 @@ Configure provider-native alerts where available. Confirm each by checking the d
 
 ## Backups and usage limits
 
-The encrypted backup workflow stores its Restic repository in the owner-controlled Google Drive account. Daily snapshots include database data plus a separate Auth account export; private estimate media is included weekly. Drive storage is shared with Gmail and Photos; low space or an expired OAuth grant can fail a run. The first successful full backup and a restore drill into a separate recovery project are still required. Configure these GitHub Actions repository secrets without sharing them in chat or committing them: `PROD_SUPABASE_DB_URL`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `RCLONE_CONFIG_B64`, and `RESTIC_PASSWORD`. Enable GitHub Actions failure notifications and investigate before the last known-good backup ages out. Restic retains 30 daily snapshots; changes to media since the previous full-media run may not be recoverable.
+The encrypted backup workflow stores its Restic repository in the owner-controlled Google Drive account. Daily snapshots include database data plus a separate Auth account export; private estimate media is included weekly. Drive storage is shared with Gmail and Photos; low space or an expired OAuth grant can fail a run. Successful database/Auth and full-media snapshots are recorded. The isolated encrypted restore drill remains required; see the backup runbook. Configure these GitHub Actions repository secrets without sharing them in chat or committing them: `PROD_SUPABASE_DB_URL`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_SERVICE_ROLE_KEY`, `RCLONE_CONFIG_B64`, and `RESTIC_PASSWORD`. Enable GitHub Actions failure notifications and investigate before the last known-good backup ages out. Restic retains 30 daily snapshots; changes to media since the previous full-media run may not be recoverable.
 
 The app also has durable application-level controls:
 
 - Free accounts can save 10 estimates per UTC day and 50 per UTC month. Pro accounts can save 50 per day and 500 per month.
 - Pro cloud AI has a 5/day and 50/month account limit; the platform-wide ceiling remains 250 attempts per UTC day. Attempts count when admitted, including provider failures.
-- Pro estimate emails, follow-ups, proposal-question alerts, and invoice emails share a 5/day and 100/month account allowance. All app mail shares the 75/day global Resend ceiling (admin-adjustable up to 90); support and retention messages use only that shared platform pool.
+- Pro estimate emails, follow-ups, proposal-question alerts, and invoice emails share a 5/day and 100/month account allowance. All app mail shares the 75/day global Resend ceiling (admin-adjustable up to 75); support and retention messages use only that shared platform pool.
 - Pro private media permits 100 MB uploaded per UTC month, 250 MB retained, and 100 files. Deleting media frees retained capacity but not the monthly upload allowance.
 - Public support submissions are rate-limited.
 
@@ -100,3 +102,13 @@ Review aggregate Vercel function counts/errors, Supabase Auth/API and Storage us
 3. For email issues, inspect Resend domain status, usage, suppression state, and the message delivery event.
 4. For payment or subscription issues, inspect the matching Stripe event and delivery attempt before changing local subscription or payment records.
 5. For suspected abuse, preserve timestamps and aggregate counts, then restrict the affected integration using its provider controls. Rotate credentials only when exposure is indicated; do not copy customer content into incident notes.
+
+## Notification worker and signed Auth email hook
+
+The availability workflow calls `GET /api/cron/notifications` with the encrypted repository `CRON_SECRET` every 15 minutes. It retries bounded outbox batches; leases, backoff and provider idempotency prevent parallel duplicate sends. Follow-ups also accept authenticated GET or POST. Quota-denied mail remains queued, so a queued response is not a sent/delivered response. Auth links expire from the queue after ten minutes. Other ambiguous sends stop within Resend's 24-hour idempotency window. Sent/failed payloads are scrubbed and terminal rows are pruned after 90 days.
+
+The 100/day provider allocation is app 75, Auth 20, billing 5 (UTC). Per-account 5/day and 100/month customer-email limits remain unchanged. Auth only participates when the **Send Email Hook** is enabled; custom SMTP alone bypasses the shared counter. Do not describe aggregate Auth usage as bounded before activation.
+
+Activation: generate a signing secret in Supabase Production → Authentication → Hooks → Send Email Hook, set the same secret as server-only `SUPABASE_SEND_EMAIL_HOOK_SECRET` in Vercel Production, redeploy, then enable the HTTPS hook `https://app.workcraftai.com/api/auth/email-hook`. Keep the Supabase-generated versioned secret intact. Test one signup/reset to an owner-controlled inbox; verify signature acceptance and delivery. Save hook/SMTP settings securely for recovery. If activation fails, revert to the previous SMTP configuration while diagnosing it; never leave signup unable to send confirmation mail.
+
+DMARC is pending at `_dmarc.workcraftai.com`; start with `v=DMARC1; p=none` and inspect reports before enforcement. Add a reporting address only after confirming a monitored mailbox. SPF/DKIM and DMARC should be verified in the provider dashboard after DNS propagation.

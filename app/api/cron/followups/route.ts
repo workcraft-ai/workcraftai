@@ -1,107 +1,43 @@
+import { customerShareUrl } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
-import { getWorkCraftNoReplySender } from "@/lib/email-senders";
-import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
+import { enqueueNotification, processNotifications, notificationFrame, escapeEmailHtml } from "@/lib/notification-outbox";
 
 export const maxDuration = 60;
-
 export async function POST(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const resendKey = process.env.RESEND_API_KEY;
-  const sender = getWorkCraftNoReplySender();
-  const appOrigin = getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
-  if (!cronSecret || !serviceKey || !resendKey) return NextResponse.json({ error: "Estimate follow-up service is not configured." }, { status: 503 });
-  if (!appOrigin) return NextResponse.json({ error: "Set NEXT_PUBLIC_APP_URL to the production app URL." }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
-  const { data: due, error } = await admin.rpc("workcraft_claim_estimate_followups", { p_limit: 100 });
-  if (error) {
-    console.error("Could not claim estimate follow-ups:", error.message);
-    return NextResponse.json({ error: "Could not prepare scheduled follow-ups." }, { status: 503 });
+ const secret=process.env.CRON_SECRET;
+ if(!secret||!process.env.SUPABASE_SERVICE_ROLE_KEY||!process.env.RESEND_API_KEY)return NextResponse.json({error:"Email service is not configured."},{status:503});
+ if(request.headers.get("authorization")!==`Bearer ${secret}`)return NextResponse.json({error:"Unauthorized."},{status:401});
+ const origin=getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
+ if(!origin)return NextResponse.json({error:"App URL is not configured."},{status:503});
+ const admin=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.timeout(5000)})}});
+ try{
+  // At most 4 old and 4 newly scheduled notifications: each batch uses four
+  // workers with an 8s provider timeout, comfortably below the 60s budget.
+  const pending=await processNotifications(admin,undefined,4,6000);
+  const {data:due,error}=await admin.rpc("workcraft_claim_estimate_followups",{p_limit:4});
+  if(error)throw new Error("followup_claim");
+  const ids:string[]=[];
+  for(const estimate of due??[]){
+   const {data:owner,error:ownerError}=await admin.auth.admin.getUserById(estimate.user_id);
+   if(ownerError||!owner.user?.email){await admin.rpc("workcraft_finish_estimate_followup",{p_estimate_id:estimate.id,p_sent:false});continue;}
+   const es=estimate.proposal_language==="es";const language=es?"es":"en";
+   let link:string;
+   try { link=await customerShareUrl(admin,estimate.id); }
+   catch { await admin.rpc("workcraft_finish_estimate_followup",{p_estimate_id:estimate.id,p_sent:false}); continue; }
+   const title=es?`Seguimiento de tu cotización ${estimate.reference_number}`:`Following up on your estimate ${estimate.reference_number}`;
+   const intro=es?`Hola ${estimate.client_name||""}, ¿tienes alguna pregunta sobre tu cotización?`:`Hi ${estimate.client_name||"there"}, do you have any questions about your estimate?`;
+   const action=es?"Ver cotización":"View estimate";
+   const queued=await enqueueNotification(admin,{user_id:estimate.user_id,estimate_id:estimate.id,source:"follow_up",send_key:`estimate-followup-${estimate.id}`,payload:{to:[estimate.client_email],reply_to:owner.user.email,subject:title,text:`${intro}\n\n${action}: ${link}`,html:notificationFrame(language,title,`<p>${escapeEmailHtml(intro)}</p><p><a href="${escapeEmailHtml(link)}">${action}</a></p>`)}});
+   ids.push(queued.id);
   }
-
-  type FollowupCandidate = { id: string; user_id: string; client_name: string | null; client_email: string };
-  const candidates = (due ?? []) as FollowupCandidate[];
-  const replyAddressByUser = new Map<string, Promise<string | null>>();
-  const getContractorReplyAddress = (userId: string) => {
-    const cached = replyAddressByUser.get(userId);
-    if (cached) return cached;
-
-    const lookup = admin.auth.admin.getUserById(userId).then(({ data, error }) => {
-      if (error) {
-        console.error("Could not resolve contractor reply address for estimate follow-up.");
-        return null;
-      }
-      return data.user?.email?.trim() || null;
-    }).catch(() => {
-      console.error("Could not resolve contractor reply address for estimate follow-up.");
-      return null;
-    });
-    replyAddressByUser.set(userId, lookup);
-    return lookup;
-  };
-  let sent = 0;
-  const batchSize = 10;
-  for (let offset = 0; offset < candidates.length; offset += batchSize) {
-    const batch = candidates.slice(offset, offset + batchSize);
-    const results = await Promise.all(batch.map(async (estimate) => {
-      const link = `${appOrigin}/estimate/${encodeURIComponent(estimate.id)}`;
-      const contractorReplyEmail = await getContractorReplyAddress(estimate.user_id);
-      if (!contractorReplyEmail) {
-        console.error("Estimate follow-up skipped because the contractor reply address is unavailable.");
-        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
-        return false;
-      }
-      const { reservation, error: quotaError } = await reserveAppEmail(admin, "follow_up", estimate.user_id, estimate.id);
-      if (quotaError || !reservation) {
-        console.error("Could not reserve estimate follow-up email quota:", quotaError?.message ?? "invalid reservation response");
-        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
-        return false;
-      }
-      if (!reservation.allowed || !reservation.reservation_id) {
-        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
-        return false;
-      }
-      let result: Response;
-      try {
-        result = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        signal: AbortSignal.timeout(10_000),
-        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json", "Idempotency-Key": `estimate-followup-${estimate.id}` },
-        body: JSON.stringify({
-          from: sender,
-          reply_to: contractorReplyEmail,
-          to: [estimate.client_email],
-          subject: "Following up on your estimate",
-          text: `Hi ${estimate.client_name || "there"}, just checking whether you have any questions about your estimate. Review it here: ${link}`,
-          html: `<p>Hi ${String(estimate.client_name || "there").replace(/[&<>]/g, "")},</p><p>Just checking whether you have any questions about your estimate.</p><p><a href="${link}">Review your estimate</a></p>`,
-        }),
-        });
-      } catch (sendError) {
-        console.error("Follow-up email request failed:", sendError instanceof Error ? sendError.name : "unknown error");
-        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
-        return false;
-      }
-      const responseData = await result.json().catch(() => ({}));
-      if (!result.ok) {
-        if (result.status < 500) await releaseAppEmail(admin, reservation.reservation_id);
-        console.error("Follow-up email provider rejected request:", result.status);
-        await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: false });
-        return false;
-      }
-      const { error: updateError } = await admin.rpc("workcraft_finish_estimate_followup", { p_estimate_id: estimate.id, p_sent: true });
-      if (updateError) {
-        console.error("Follow-up delivery state could not be recorded:", updateError.message);
-        return false;
-      }
-      const { error: eventError } = await admin.from("estimate_email_events").insert({ user_id: estimate.user_id, estimate_id: estimate.id, recipient: estimate.client_email, provider_email_id: responseData.id, event: "follow_up_sent" });
-      if (eventError) console.error("Follow-up email event could not be recorded:", eventError.message);
-      return true;
-    }));
-    sent += results.filter(Boolean).length;
-  }
-  return NextResponse.json({ sent, checked: candidates.length });
+  const scheduled=ids.length?await processNotifications(admin,ids,4,6000):{sent:0,pending:0};
+  // Bounded retention: no indefinite storage of notification contents/tokens.
+  await admin.from("email_delivery_inbox").delete().lt("received_at",new Date(Date.now()-7*86400000).toISOString());
+  await admin.from("notification_outbox").delete().in("status",["sent","failed"]).lt("created_at",new Date(Date.now()-90*86400000).toISOString());
+  return NextResponse.json({sent:pending.sent+scheduled.sent,pending:pending.pending+scheduled.pending,checked:(due??[]).length});
+ }catch{console.error("Scheduled notifications could not complete.");return NextResponse.json({error:"Scheduled notifications are temporarily unavailable."},{status:503});}
 }
+// Vercel Cron invokes GET. Both methods require the same secret.
+export const GET = POST;

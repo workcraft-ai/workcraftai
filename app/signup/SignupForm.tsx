@@ -96,7 +96,7 @@ export default function SignupForm() {
           Create Account
         </h1>
 
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-[#c8d1ca]">
           Sign up to get started with your account
         </p>
       </div>
@@ -215,11 +215,11 @@ export default function SignupForm() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-400">
+          <div className="mt-6 text-center text-xs text-[#c8d1ca]">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="text-blue-400 hover:underline"
+              className="text-[#f3b28f] underline underline-offset-4 hover:text-white"
             >
               Sign in
             </Link>

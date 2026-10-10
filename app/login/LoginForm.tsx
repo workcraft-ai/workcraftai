@@ -148,7 +148,7 @@ export default function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-400">
+          <div className="mt-6 text-center text-xs text-[#c8d1ca]">
             Don&apos;t have an account?{" "}
             <Link
               href="/signup"

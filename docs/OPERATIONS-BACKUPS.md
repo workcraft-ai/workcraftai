@@ -123,3 +123,9 @@ Restore into a **new recovery Supabase project first**. Do not overwrite the liv
 - The backup contains sensitive personal and business data, including customer addresses, estimate details, account data, and uploaded media. Access to the Drive account, GitHub secrets, and Restic password must be restricted.
 - Account deletion removes live application data immediately, but an encrypted copy may remain in the rolling backup set for up to 30 days before Restic retention expires it.
 - This workflow does not back up Vercel environment variables, Stripe/Resend/Gemini settings, Supabase Auth provider configuration, Edge Functions, or DNS. Keep a separate secure operations inventory and recovery steps for those services.
+
+## Free isolated automated restore drill
+
+Run **Actions → Encrypted off-site backup → Run workflow → main**, with **restore_drill** checked. This forces private media inclusion, encrypts the snapshot, restores it from Google Drive into the temporary runner and imports it into a fresh localhost-only Supabase stack. It includes durable Auth users/identities/MFA factors, current application schema/data, migration history, private Storage ownership policies and the files. The report checks schema compatibility, RLS, owner references, downloaded file sizes and public-access denial. It never writes Production or Staging, changes Vercel, or creates a paid cloud project.
+
+The organization currently uses both active free project slots. No third paid project or pause of an existing project was authorized. The local drill provides structural recovery evidence; password/MFA sign-in and full application acceptance must still be completed against a compatible recovery environment before claiming a tested cutover. Keep the database/auth versions compatible and preserve separate provider configuration. Restore plaintext and credentials are removed even on failure; diagnostic SQL is not published in logs.

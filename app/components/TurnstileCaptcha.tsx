@@ -52,6 +52,9 @@ export default function TurnstileCaptcha({
   useEffect(() => {
     if (!siteKey || !scriptReady || !containerRef.current || !window.turnstile) return;
 
+    let disposed = false;
+    const timer = window.setTimeout(() => {
+    if (disposed || !containerRef.current || !window.turnstile) return;
     try {
       const widgetId = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
@@ -74,14 +77,19 @@ export default function TurnstileCaptcha({
       });
       widgetIdRef.current = widgetId;
 
-      return () => {
-        window.turnstile?.remove(widgetId);
-        if (widgetIdRef.current === widgetId) widgetIdRef.current = null;
-      };
+
     } catch {
       setWidgetError(true);
       onTokenRef.current(null);
     }
+    }, 0);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+      if (widgetIdRef.current) window.turnstile?.remove(widgetIdRef.current);
+      widgetIdRef.current = null;
+      onTokenRef.current(null);
+    };
   }, [language, scriptReady]);
 
   useEffect(() => {
@@ -104,7 +112,7 @@ export default function TurnstileCaptcha({
       />
       <div ref={containerRef} />
       {!scriptReady && !scriptError && (
-        <p className="text-xs text-slate-400">{translate(language, "Loading security check…")}</p>
+        <p className="text-xs text-[#c8d1ca]">{translate(language, "Loading security check…")}</p>
       )}
       {scriptError && (
         <p role="alert" className="text-xs text-red-300">
@@ -117,7 +125,7 @@ export default function TurnstileCaptcha({
         </p>
       )}
       {!scriptError && !widgetError && !verified && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-[#c8d1ca]">
           {translate(language, "Complete the security check to continue.")}
         </p>
       )}

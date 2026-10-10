@@ -1,4 +1,5 @@
 const spanishTranslations = {
+  "Dashboard": "Panel",
   "Skip to content": "Saltar al contenido",
   "How it works": "Cómo funciona",
   "Plans": "Planes",
@@ -44,7 +45,7 @@ const spanishTranslations = {
   "STATUS": "ESTADO",
   "ACTIONS": "ACCIONES",
   "PENDING": "PENDIENTE",
-  "View Link Archive Delete": "Ver enlace Archivar Eliminar",
+  "View estimate Archive Delete": "Ver cotización Archivar Eliminar",
   "The whole job, in view": "Todo el trabajo, a la vista",
   "From the first estimate": "Desde la primera cotización",
   "to the final payment.": "hasta el pago final.",

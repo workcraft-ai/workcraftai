@@ -126,7 +126,7 @@ export default function DashboardPage() {
       const response = await fetch(`/api/estimates/${id}/send`, { method: "POST" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Email could not be sent.");
-      setEmailEvents((current) => ({ ...current, [id]: "sent" }));
+      if (!result.notificationPending) setEmailEvents((current) => ({ ...current, [id]: "sent" }));
       if (typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number") {
         setEmailAllowance((current) => current ? {
           ...current,
@@ -134,7 +134,7 @@ export default function DashboardPage() {
           monthly_used: current.monthly_limit - result.emailQuota.remainingThisMonth,
         } : current);
       }
-      setSendMessage(typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number"
+      setSendMessage(result.notificationPending ? "Estimate email queued. We will retry automatically; it has not been confirmed sent yet." : typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number"
         ? `Estimate email sent. ${result.emailQuota.remainingToday} Pro emails remain today and ${result.emailQuota.remainingThisMonth} this month.`
         : "Estimate email sent.");
     } catch (error) {
@@ -253,7 +253,7 @@ export default function DashboardPage() {
         {questions.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between"><h2 className="text-base font-bold text-slate-900">Customer questions</h2><span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">{`${questions.filter((item) => !item.read_at).length} unread`}</span></div>
           <div className="mt-3 divide-y divide-slate-100">{questions.map((question) => <article key={question.id} className="py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString(locale)}</span></p><a className="inline-flex min-h-11 items-center text-xs text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`} target="_blank" rel="noopener noreferrer">{question.customer_email}</a><p className="mt-1 text-xs text-slate-500">Click the customer’s email to reply from your email app.</p><p className="mt-1 text-sm text-slate-700">{question.message}</p></div><div className="flex gap-3 text-xs"><Link href={`/estimate/${encodeURIComponent(question.estimate_id)}`} className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline">View proposal</Link>{!question.read_at && <button type="button" onClick={() => void markQuestionRead(question)} className="inline-flex min-h-11 items-center font-semibold text-slate-600 underline">Mark read</button>}</div></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString(locale)}</span></p><a className="inline-flex min-h-12 items-center text-xs text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`} target="_blank" rel="noopener noreferrer">{question.customer_email}</a><p className="mt-1 text-xs text-slate-500">Click the customer’s email to reply from your email app.</p><p className="mt-1 text-sm text-slate-700">{question.message}</p></div><div className="flex gap-3 text-xs"><Link href={`/estimate/${encodeURIComponent(question.estimate_id)}`} className="inline-flex min-h-12 items-center font-semibold text-blue-700 underline">View proposal</Link>{!question.read_at && <button type="button" onClick={() => void markQuestionRead(question)} className="inline-flex min-h-12 items-center font-semibold text-slate-600 underline">Mark read</button>}</div></div>
           </article>)}</div>
         </section>}
 
@@ -264,7 +264,7 @@ export default function DashboardPage() {
             <div className="flex space-x-2">
               <button
                 onClick={() => setCurrentTab("active")}
-                className={`inline-flex min-h-11 items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-12 items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   currentTab === "active"
                     ? "bg-slate-900 text-white"
                     : "text-slate-600 hover:bg-slate-200/60"
@@ -274,7 +274,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setCurrentTab("archived")}
-                className={`inline-flex min-h-11 items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-12 items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   currentTab === "archived"
                     ? "bg-slate-900 text-white"
                     : "text-slate-600 hover:bg-slate-200/60"
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                             value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"}
                             disabled={statusSavingId !== null}
                             onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)}
-                            className="min-h-11 max-w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
+                            className="min-h-12 max-w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
                           >
                             {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
                           </select>
@@ -348,11 +348,11 @@ export default function DashboardPage() {
                       <td className="p-3.5 text-right space-x-3">
                         <Link
                           href={`/estimate/${est.id}`}
-                          className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-600 hover:text-blue-500 underline"
+                          className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-600 hover:text-blue-500 underline"
                         >
                           {translate(language, "View Estimate")}
                         </Link>
-                        {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-600 underline" aria-label="Email client is a Pro feature">Email client <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 no-underline">Pro</span></Link>}
+                        {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="inline-flex min-h-12 items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-600 underline" aria-label="Email client is a Pro feature">Email client <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 no-underline">Pro</span></Link>}
                         {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
                         {est.followup_at && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
                         {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}
@@ -360,14 +360,14 @@ export default function DashboardPage() {
                         {est.is_archived ? (
                           <button
                             onClick={() => toggleArchiveStatus(est.id, false)}
-                            className="inline-flex min-h-11 items-center text-xs font-semibold text-slate-600 hover:text-slate-900 underline"
+                            className="inline-flex min-h-12 items-center text-xs font-semibold text-slate-600 hover:text-slate-900 underline"
                           >
                             Restore
                           </button>
                         ) : (
                           <button
                             onClick={() => toggleArchiveStatus(est.id, true)}
-                            className="inline-flex min-h-11 items-center text-xs font-semibold text-slate-500 hover:text-slate-700 underline"
+                            className="inline-flex min-h-12 items-center text-xs font-semibold text-slate-500 hover:text-slate-700 underline"
                           >
                             Archive
                           </button>
@@ -375,7 +375,7 @@ export default function DashboardPage() {
 
                         <button
                           onClick={() => deleteEstimate(est.id)}
-                          className="inline-flex min-h-11 items-center text-xs font-semibold text-red-600 hover:text-red-500 underline"
+                          className="inline-flex min-h-12 items-center text-xs font-semibold text-red-600 hover:text-red-500 underline"
                         >
                           Delete
                         </button>

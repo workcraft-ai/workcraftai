@@ -28,8 +28,8 @@ export async function POST(request: Request) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
   const limit = typeof body.limit === "number" ? body.limit : Number(body.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 90) {
-    return NextResponse.json({ error: "The app email limit must be a whole number from 1 to 90 per UTC day." }, { status: 400 });
+  if (!Number.isInteger(limit) || limit < 1 || limit > 75) {
+    return NextResponse.json({ error: "The app email limit must be a whole number from 1 to 75 per UTC day." }, { status: 400 });
   }
   if (!validReason(body.reason)) return NextResponse.json({ error: "Provide a reason of at least 8 characters." }, { status: 400 });
 

@@ -1,10 +1,10 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
 import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
+import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
@@ -65,49 +65,25 @@ export async function POST(request: Request) {
   }
 
   async function syncCustomerPayment(paymentId: string, connectedAccountId: string, paymentIntentId?: string | null) {
-    const { data: payment, error: lookupError } = await admin.from("customer_payments")
-      .select("id, user_id, estimate_id, stripe_account_id, stripe_checkout_session_id")
-      .eq("id", paymentId).maybeSingle();
-    if (lookupError) throw lookupError;
-    if (!payment) return;
-    if (payment.stripe_account_id !== connectedAccountId) throw new Error("Connected account does not match the payment record.");
-    const { error: updateError } = await admin.from("customer_payments").update({
-      status: "succeeded",
-      stripe_payment_intent_id: paymentIntentId || undefined,
-      updated_at: new Date().toISOString(),
-    }).eq("id", paymentId).eq("stripe_account_id", connectedAccountId).not("status", "in", "(refunded,partially_refunded)");
-    if (updateError) throw updateError;
-
-    const current = await getEstimatePaymentData(admin, payment.estimate_id);
-    if (!current.estimate) throw new Error("Estimate for the payment no longer exists.");
-    const fullyPaid = paidCents(current.payments) >= current.totalCents;
-    const { error: estimateUpdateError } = await admin.from("estimates").update({ status: fullyPaid ? "paid" : "accepted" })
-      .eq("id", payment.estimate_id).eq("user_id", payment.user_id);
-    if (estimateUpdateError) throw estimateUpdateError;
+    const { error } = await admin.rpc("workcraft_apply_customer_payment_state", {
+      p_payment_id: paymentId, p_stripe_account_id: connectedAccountId,
+      p_state: "succeeded", p_payment_intent_id: paymentIntentId ?? null,
+    });
+    if (error) throw error;
   }
 
   async function syncRefund(charge: Stripe.Charge, connectedAccountId: string) {
-    const paymentIntentId = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+    // Fetch current cumulative refunds; the RPC also prevents concurrent/stale
+    // deliveries from lowering that amount and recalculates totals atomically.
+    const current = await stripe.charges.retrieve(charge.id, {}, { stripeAccount: connectedAccountId });
+    const paymentIntentId = typeof current.payment_intent === "string" ? current.payment_intent : current.payment_intent?.id;
     if (!paymentIntentId) return;
-    const { data: payment, error: lookupError } = await admin.from("customer_payments")
-      .select("id, user_id, estimate_id, amount_cents")
-      .eq("stripe_payment_intent_id", paymentIntentId).eq("stripe_account_id", connectedAccountId).maybeSingle();
-    if (lookupError) throw lookupError;
-    if (!payment) return;
-    const refunded = Math.min(Number(payment.amount_cents), Number(charge.amount_refunded));
-    const nextStatus = refunded >= Number(payment.amount_cents) ? "refunded" : refunded > 0 ? "partially_refunded" : "succeeded";
-    const { error: updateError } = await admin.from("customer_payments").update({
-      status: nextStatus,
-      amount_refunded_cents: refunded,
-      updated_at: new Date().toISOString(),
-    }).eq("id", payment.id).eq("stripe_account_id", connectedAccountId);
-    if (updateError) throw updateError;
-    const current = await getEstimatePaymentData(admin, payment.estimate_id);
-    if (!current.estimate) return;
-    const fullyPaid = paidCents(current.payments) >= current.totalCents;
-    const { error: estimateUpdateError } = await admin.from("estimates").update({ status: fullyPaid ? "paid" : "accepted" })
-      .eq("id", payment.estimate_id).eq("user_id", payment.user_id);
-    if (estimateUpdateError) throw estimateUpdateError;
+    const { error } = await admin.rpc("workcraft_apply_customer_payment_state", {
+      p_payment_id: null, p_stripe_account_id: connectedAccountId,
+      p_state: "refunded", p_payment_intent_id: paymentIntentId,
+      p_refunded_cents: current.amount_refunded,
+    });
+    if (error) throw error;
   }
 
   async function syncSubscription(subscriptionId: string) {
@@ -130,9 +106,7 @@ export async function POST(request: Request) {
   }
 
   async function sendPastDueBillingNotice(userId: string, eventId: string) {
-    const apiKey = process.env.RESEND_API_KEY;
     const sender = getWorkCraftNoReplySender();
-    if (!apiKey) throw new Error("Past-due billing email is not configured.");
 
     const { data, error } = await admin.auth.admin.getUserById(userId);
     if (error) throw new Error("Could not load the account email for a past-due notice.");
@@ -144,25 +118,15 @@ export async function POST(request: Request) {
     const billingUrl = new URL("/profile", appOrigin).toString();
     const language = data.user?.user_metadata?.app_language === "es" ? "es" : "en";
     const email = buildPastDueBillingEmail({ language, billingUrl, supportEmail });
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": pastDueNoticeIdempotencyKey(eventId),
-      },
-      body: JSON.stringify({
-        from: sender,
-        reply_to: supportEmail,
-        to: [recipient],
-        ...email,
-      }),
+    const queued = await enqueueNotification(admin, {
+      user_id: userId, source: "billing", send_key: pastDueNoticeIdempotencyKey(eventId),
+      payload: {from: sender, reply_to: supportEmail, to: [recipient], ...email},
     });
-    if (!response.ok) {
-      console.error("Past-due billing email provider rejected request:", response.status);
-      throw new Error("Past-due billing email provider request failed.");
-    }
+    // Entitlement sync must complete even if a provider is down or the reserved
+    // billing pool is full. The durable worker retries the notice separately.
+    try { await processNotifications(admin, [queued.id], 1); }
+    catch { console.error("Billing notification remains queued."); }
+
   }
 
   try {
