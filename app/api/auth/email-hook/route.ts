@@ -24,8 +24,13 @@ export async function POST(request:Request){
    const row=await enqueueNotification(admin,{user_id:payload.user.id,source:"auth",send_key:`auth-${digest}`,payload:mail});
    if(row.status!=="sent")ids.push(row.id);
   }
-  const result=ids.length?await processNotifications(admin,ids,2,3000):{pending:0};
-  if(result.pending)return NextResponse.json({error:{http_code:429,message:"Email is temporarily limited. Please try again later."}},{status:429});
+  if(ids.length)await processNotifications(admin,ids,2,3000);
+  // A concurrent lease, backoff or terminal failure is not proof of delivery.
+  // Acknowledge Supabase only after all messages are durably recorded as sent.
+  const {data:states,error:stateError}=ids.length?await admin.from("notification_outbox").select("id,status").in("id",ids):{data:[],error:null};
+  if(stateError)throw new Error("Auth email status is unavailable.");
+  if(states?.some(row=>row.status==="failed"))return NextResponse.json({error:{http_code:503,message:"Email is temporarily unavailable."}},{status:503});
+  if(ids.length&&(states?.length!==ids.length||states.some(row=>row.status!=="sent")))return NextResponse.json({error:{http_code:429,message:"Email is temporarily limited. Please try again later."}},{status:429});
   return NextResponse.json({});
  }catch{console.error("Auth email hook failed; no token or recipient logged.");return NextResponse.json({error:{http_code:503,message:"Email is temporarily unavailable."}},{status:503});}
 }
