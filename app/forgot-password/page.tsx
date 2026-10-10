@@ -7,6 +7,7 @@ import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import TurnstileCaptcha, { TURNSTILE_ENABLED } from "@/app/components/TurnstileCaptcha";
+import { authResetOutcome } from "@/lib/auth-reset-response.mjs";
 
 export default function ForgotPasswordPage() {
   return <Suspense fallback={<main className="min-h-screen bg-slate-950" />}><ForgotPasswordForm /></Suspense>;
@@ -42,8 +43,11 @@ function ForgotPasswordForm() {
         ...(captchaToken ? { captchaToken } : {}),
       });
 
-      if (resetError?.code?.toLowerCase() === "captcha_failed") {
+      const outcome = authResetOutcome(resetError);
+      if (outcome === "captcha") {
         setError(translate(language, "Security verification did not complete. Please try again."));
+      } else if (outcome === "unavailable") {
+        setError(translate(language, "We could not process this request right now. Please wait a moment and try again."));
       } else {
         // Use the same response for accepted and rate-limited requests so the
         // page cannot be used to infer whether an address has an account.
@@ -81,17 +85,17 @@ function ForgotPasswordForm() {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-2 block w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-2 block min-h-12 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               placeholder="you@example.com"
             />
           </div>
           <TurnstileCaptcha onToken={setCaptchaToken} resetSignal={captchaResetSignal} />
-          <button type="submit" disabled={loading || (TURNSTILE_ENABLED && !captchaToken)} className="flex w-full justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
+          <button type="submit" disabled={loading || (TURNSTILE_ENABLED && !captchaToken)} className="flex min-h-12 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 disabled:opacity-50">
             {loading ? "Sending link…" : "Send reset link"}
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-slate-400">
-          Remembered your password? <Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">Sign in</Link>
+          Remembered your password? <Link href="/login" className="inline-flex min-h-12 items-center font-medium text-blue-400 underline hover:text-blue-300">Sign in</Link>
         </p>
       </section>
     </main>

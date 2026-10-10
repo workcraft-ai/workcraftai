@@ -56,8 +56,10 @@ async function importSql(parts) {
     throw Error('Restore import failed. Private diagnostics were saved only in the temporary runner directory.');
   }
 }
+let phase = 'start isolated stack';
 try {
   cli(['start','-x','logflare,vector,studio,imgproxy,edge-runtime,realtime,supavisor,mailpit']);
+  phase = 'check Auth schema compatibility';
   const auth = await readFile(join(backup,'database','auth-users.sql'),'utf8');
   for(const table of ['users','identities','mfa_factors']) {
     const match=auth.match(new RegExp(`COPY auth\\.${table} \\(([^)]+)\\) FROM stdin;`));
@@ -66,9 +68,12 @@ try {
     if(match[1].split(',').some(c=>!available.has(c.trim().replaceAll('"','')))) throw Error('Source Auth columns are incompatible with the local restore version.');
   }
   const files=await Promise.all(['roles.sql','schema.sql','data.sql','migration-history-schema.sql','migration-history-data.sql'].map(f=>readFile(join(backup,'database',f),'utf8')));
+  phase = 'import database and durable Auth records';
   await importSql([files[0],files[1],'SET session_replication_role = replica;',auth,files[2]]);
   // A new local stack already has an empty managed migration-history schema.
+  phase = 'import migration history';
   await importSql(['DROP SCHEMA IF EXISTS supabase_migrations CASCADE;',files[3],files[4]]);
+  phase = 'restore private Storage policies';
   await importSql([await readFile(join(backup,'database','storage-policies.sql'),'utf8')]);
   const policyCount=Number(query("select count(*) from pg_policies where schemaname='storage' and tablename='objects'"));
   if(policyCount < 3)throw Error('Private Storage ownership policies were not recovered.');
@@ -83,6 +88,7 @@ try {
   }
   const manifest=JSON.parse(await readFile(join(backup,'storage','estimate-media-manifest.json'),'utf8'));
   if(!Array.isArray(manifest.objects))throw Error('Full-media manifest missing.');
+  phase = 'restore private media';
   execFileSync(process.execPath,['scripts/restore-storage.mjs'],{env:{...process.env,SUPABASE_URL:env.API_URL,SUPABASE_SERVICE_ROLE_KEY:env.SERVICE_ROLE_KEY,BACKUP_STORAGE_DIR:join(backup,'storage')},stdio:['ignore','pipe','pipe']});
   // Check bytes after uploading rather than merely trusting the upload response.
   for(const object of manifest.objects) {
@@ -91,6 +97,7 @@ try {
     const response=await fetch(`${env.API_URL}/storage/v1/object/public/estimate-media/${object.path.split('/').map(encodeURIComponent).join('/')}`);
     if(response.ok)throw Error('Recovered private media was publicly accessible.');
   }
+  phase = 'verify recovered RLS and ownership';
   const unsafe=Number(query("select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and not c.relrowsecurity"));
   if(unsafe)throw Error('Recovered application tables are missing RLS.');
   const orphans=Number(query('select count(*) from public.estimates e left join auth.users u on u.id=e.user_id where u.id is null'));
@@ -101,7 +108,7 @@ try {
   console.log('Isolated restore structure and private media checks passed. Password/MFA and application acceptance remain separate.');
 } catch {
   // Do not expose SQL row contents, authentication hashes, object paths or keys.
-  console.error('The isolated restore drill did not pass. Do not treat recovery as verified.');
+  console.error(`The isolated restore drill did not pass during: ${phase}. Do not treat recovery as verified.`);
   process.exitCode=1;
 } finally {
   try{cli(['stop','--no-backup'])}catch{/* runner disposal removes any remaining isolated containers */}
