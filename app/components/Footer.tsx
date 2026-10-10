@@ -10,7 +10,7 @@ export default function Footer() {
 
   return (
     <footer className="print:hidden bg-[#e9e7df] text-[#56615a]">
-      <div className="mx-auto grid min-h-[83px] w-[calc(100%-38px)] grid-cols-[1fr_auto] items-center gap-x-3 gap-y-[3px] border-b border-[#d4d7ce] py-4 sm:flex sm:min-h-[85px] sm:w-[calc(100%-64px)] sm:justify-between sm:gap-6 sm:py-0 lg:max-w-[1192px]">
+      <div className="mx-auto grid min-h-[83px] w-[calc(100%-38px)] grid-cols-1 items-center gap-x-3 gap-y-[3px] border-b border-[#d4d7ce] py-4 sm:flex sm:min-h-[85px] sm:w-[calc(100%-64px)] sm:justify-between sm:gap-6 sm:py-0 lg:max-w-[1192px]">
         <a
           href="https://workcraftai.com/"
           aria-label={translate(language, "WorkCraft AI home")}
@@ -29,12 +29,6 @@ export default function Footer() {
           <br />
           {translate(language, "Keep good work moving.")}
         </p>
-        <a
-          href="https://app.workcraftai.com/"
-          className="col-start-2 row-start-1 row-span-2 inline-flex min-h-12 min-w-12 items-center justify-center text-xs font-bold transition-colors hover:text-[#a94727] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#a94727] sm:text-xs"
-        >
-          {translate(language, "Go to the app")} <span className="ml-1 text-[#a94727]" aria-hidden="true">↗</span>
-        </a>
       </div>
 
       <div className="mx-auto flex min-h-[55px] w-[calc(100%-38px)] flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3 text-xs text-[#56615a] sm:min-h-[52px] sm:w-[calc(100%-64px)] sm:flex-nowrap sm:gap-4 sm:py-0 sm:text-xs lg:max-w-[1192px]">

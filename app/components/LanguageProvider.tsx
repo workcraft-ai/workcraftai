@@ -365,6 +365,10 @@ Object.assign(spanish, {
 
 Object.assign(spanish, {
   "Go to the app": "Ir a la aplicación",
+  "Swipe left to see estimate actions, including View Estimate and Email client.": "Desliza hacia la izquierda para ver las acciones, como Ver cotización y Enviar correo al cliente.",
+  "Swipe right to see customer details.": "Desliza hacia la derecha para ver los datos del cliente.",
+  "Show actions": "Ver acciones",
+  "Show customer details": "Ver datos del cliente",
   "All rights reserved.": "Todos los derechos reservados.",
   "Legal and support": "Información legal y soporte",
   "Built for the work that keeps things moving.": "Hecho para el trabajo que mantiene todo en marcha.",
