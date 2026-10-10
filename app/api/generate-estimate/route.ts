@@ -230,40 +230,36 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: `Prepare a draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn one JSON object matching the response schema. Write proposal_summary as 1-2 concise customer-facing sentences in ${proposalLanguage === "es" ? "Spanish" : "English"}, describing overall work without prices. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and state what needs confirmation in both descriptions. For every line item, choose the best matching canonical unit and provide a cautious U.S. starting rate in USD for that unit, before contractor markup and sales tax, using broad typical labor/material assumptions. These are editable starting estimates, not live local supplier quotes. Include a positive suggested_unit_price whenever a reasonable starting rate can be estimated. Use 0 only when the scope or unit is genuinely too unclear to price responsibly; do not use 0 just because the contractor's Price Book has no match. Keep rates rounded to cents. Never use or invent a price from the user's Price Book; WorkCraft AI applies saved contractor rates after this draft.` }] }],
         generationConfig: {
-          responseFormat: {
-            text: {
-              mimeType: "application/json",
-              schema: {
-                type: "object",
-                properties: {
-                  proposal_summary: { type: "string" },
-                  line_items: {
-                    type: "array",
-                    minItems: 1,
-                    maxItems: 40,
-                    items: {
-                      type: "object",
-                      properties: {
-                        description: { type: "string" },
-                        description_es: { type: "string" },
-                        quantity: { type: "number", minimum: 0.01 },
-                        unit: { type: "string", enum: generatedUnits },
-                        suggested_unit_price: {
-                          type: "number",
-                          minimum: 0,
-                          maximum: 100000000,
-                          description: "Estimated USD rate for one unit, rounded to cents. Use a positive rate when a reasonable starting price can be estimated; use zero only if pricing is genuinely unclear.",
-                        },
-                      },
-                      required: ["description", "description_es", "quantity", "unit", "suggested_unit_price"],
-                      additionalProperties: false,
+          responseMimeType: "application/json",
+          responseJsonSchema: {
+            type: "object",
+            properties: {
+              proposal_summary: { type: "string" },
+              line_items: {
+                type: "array",
+                minItems: 1,
+                maxItems: 40,
+                items: {
+                  type: "object",
+                  properties: {
+                    description: { type: "string" },
+                    description_es: { type: "string" },
+                    quantity: { type: "number", minimum: 0.01 },
+                    unit: { type: "string", enum: generatedUnits },
+                    suggested_unit_price: {
+                      type: "number",
+                      minimum: 0,
+                      maximum: 100000000,
+                      description: "Estimated USD rate for one unit, rounded to cents. Use a positive rate when a reasonable starting price can be estimated; use zero only if pricing is genuinely unclear.",
                     },
                   },
+                  required: ["description", "description_es", "quantity", "unit", "suggested_unit_price"],
+                  additionalProperties: false,
                 },
-                required: ["proposal_summary", "line_items"],
-                additionalProperties: false,
               },
             },
+            required: ["proposal_summary", "line_items"],
+            additionalProperties: false,
           },
           maxOutputTokens: 3072,
           thinkingConfig: { thinkingLevel: "low" },
