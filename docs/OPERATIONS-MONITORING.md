@@ -1,16 +1,16 @@
 # WorkCraft AI monitoring and incident checklist
 
-Last refreshed: 2026-10-09. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
+Last refreshed: 2026-10-10. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
 
 ## Current verified state
 
 | Area | Verified state | Remaining evidence |
 | --- | --- | --- |
 | Public availability | UptimeRobot has HTTP monitors for `https://workcraftai.com/` and `https://app.workcraftai.com/api/health` (app monitor ID `804206941`). The app health endpoint is **Up** at a five-minute interval; it checks the app, Supabase Auth, and database. The owner confirmed receipt of both UptimeRobot test emails at the monitored support inbox. | Verify outage and recovery notifications, then inspect provider quota and error alerts. |
-| Database migrations | Production and Staging each report the same 32 migration versions through `20261009161204_fix_estimate_email_quota_usage_date_ambiguity`. The latest fixes cover Storage upload preflight, serialized media limits, and email-quota reservation. The state-aware Stripe claim RPC is installed in both projects with an empty `search_path`; only `service_role` can execute it. | Reconfirm histories after future migrations. |
-| Vercel | Both Production deployment checks passed after PR #74 merged as `209daa8`. The app health endpoint returned 200 with Supabase Auth/database healthy, and the marketing homepage returned 200. Deployment/environment API requests returned 403 and the Vercel CLI is not installed, so plan and settings remain unverified. | Confirm provider usage/error alert settings and recheck the Vercel plan before commercial launch. |
+| Database migrations | Production and Staging each report the same 37 migration versions through `20261010115121_invoice_email_quota_and_tracking`. The latest migrations add admin AI usage reset/trade configuration and Pro invoice email quota/tracking. The state-aware Stripe claim RPC is installed in both projects with an empty `search_path`; only `service_role` can execute it. | Reconfirm histories after future migrations. |
+| Vercel | Connected Vercel metadata confirms the `workcraftai-app` project and a Ready Production deployment for the current `main` commit. The Vercel CLI is not installed locally, so detailed environment settings remain unverified. | Confirm provider usage/error alert settings and recheck the Vercel plan before commercial launch. |
 | Stripe | Preview Test-mode connected-account destination targets the current branch Preview URL. Connected checkout completion, payment success, refund, and expiration deliveries returned HTTP 200. A connected ACH PaymentIntent moved from `processing` to `succeeded`; `payment_intent.succeeded` returned HTTP 200. Replaying the event returned HTTP 200 with `duplicate: true`. The state-aware route is deployed to Preview and Production; its migration is present in both databases. | Verify `checkout.session.async_payment_succeeded`, recovery after a transient non-2xx response, subscription lifecycle and payment-failure delivery, and the billing notice. Stripe CLI's synthetic Checkout async event did not reach the connected-account destination. Never use a live payment. |
-| Resend | The production webhook is enabled for delivered, delayed, bounced, and complained events; recent webhook callbacks succeeded. Estimate email source sets `estimates@workcraftai.com` and contractor Reply-To. The attempted dashboard send produced no new estimate message in Resend, so delivery and Reply-To are unverified. The bilingual transactional past-due email is deployed to Preview and Production but not delivery-tested. | Have the owner send one estimate to an owner-controlled inbox; inspect the Resend event and message headers. Test the billing notice against a Preview Test-mode subscription. Confirm provider quota/error alerts. |
+| Resend | The production webhook is enabled for delivered, delayed, bounced, and complained events; recent webhook callbacks succeeded. Automated app email now uses `WorkCraft AI <no-reply@workcraftai.com>`; estimate email keeps the contractor's address as Reply-To. The previous dashboard send attempt produced no new estimate message in Resend, so delivery and Reply-To remain unverified. The bilingual transactional past-due email is deployed to Preview and Production but not delivery-tested. | After the unified sender deploys, send one estimate to an owner-controlled inbox; inspect the Resend event and message headers. Test the billing notice against a Preview Test-mode subscription. Confirm provider quota/error alerts. |
 | UptimeRobot | Site and app HTTP monitors are configured at the free five-minute interval. Email alerts are enabled for `support@workcraftai.com`; the owner confirmed both test emails arrived. | Verify outage and recovery delivery. |
 | Backups | An encrypted Restic-to-Google-Drive workflow and restore instructions are checked in. | Confirm the first full snapshot and a restore into a new recovery Supabase project. |
 | Billing policy | The owner confirmed Pro access should downgrade immediately when Stripe reports `past_due`; account data remains available, and access returns after Stripe confirms payment. A bilingual transactional email is deployed to Preview and Production. | Test the notice on Preview and include this policy in the Terms counsel review. |
@@ -28,6 +28,8 @@ The UptimeRobot free plan currently checks every five minutes. Monitors are conf
 Both monitors currently show **Up**, 100% uptime, and no incidents in the last 24 hours. The owner confirmed both UptimeRobot test emails arrived at `support@workcraftai.com`. Actual outage/recovery delivery remains untested. A health monitor does not detect a bad Stripe signing secret, Resend quota exhaustion, Gemini provider failure, or a subscription billing issue.
 
 ## Provider usage and error alerts
+
+Route provider and monitoring notifications to the owner-controlled `alerts@workcraftai.com` inbox (or an alias that forwards to it). Keep each provider's own authenticated sender identity; `alerts@` is the receiving address, not a replacement From address for UptimeRobot, GitHub, Vercel, Supabase, Stripe, or Resend. The app sends its own automated notices through Resend using `WorkCraft AI <no-reply@workcraftai.com>`. For the address roles and remaining setup, see [`EMAIL-ADDRESS-ROLES.md`](EMAIL-ADDRESS-ROLES.md).
 
 Configure provider-native alerts where available. Confirm each by checking the destination and, where supported, sending a test alert. Thresholds can vary by plan and provider policy; review the current dashboard before relying on a notification or enabling paid usage.
 
@@ -47,7 +49,7 @@ The app also has durable application-level controls:
 
 - Free accounts can save 10 estimates per UTC day and 50 per UTC month. Pro accounts can save 50 per day and 500 per month.
 - Pro cloud AI has a 5/day and 50/month account limit; the platform-wide ceiling remains 250 attempts per UTC day. Attempts count when admitted, including provider failures.
-- Pro estimate emails, follow-ups, and proposal-question alerts share a 5/day and 100/month account allowance. All app mail shares the 75/day global Resend ceiling (admin-adjustable up to 90); support and retention messages use only that shared platform pool.
+- Pro estimate emails, follow-ups, proposal-question alerts, and invoice emails share a 5/day and 100/month account allowance. All app mail shares the 75/day global Resend ceiling (admin-adjustable up to 90); support and retention messages use only that shared platform pool.
 - Pro private media permits 100 MB uploaded per UTC month, 250 MB retained, and 100 files. Deleting media frees retained capacity but not the monthly upload allowance.
 - Public support submissions are rate-limited.
 
@@ -83,7 +85,7 @@ Use the dedicated Stripe Test-mode destinations and disposable connected-account
 
 ## Email verification
 
-Estimate messages use `WorkCraft AI <estimates@workcraftai.com>` with Reply-To set to the contractor's account email. A dashboard send attempt produced no confirmation and no provider request, so do not treat it as sent. Have the owner trigger one send to an owner-controlled inbox; inspect the email in Resend, confirm the delivery event, and check the message headers for the contractor Reply-To. The support email is a separate public contact and does not route provider alerts.
+Estimate messages use `WorkCraft AI <no-reply@workcraftai.com>` with Reply-To set to the contractor's account email. A dashboard send attempt produced no confirmation and no provider request, so do not treat it as sent. After the unified sender is deployed, have the owner trigger one send to an owner-controlled inbox; inspect the email in Resend, confirm the delivery event, and check the message headers for the contractor Reply-To. The public support email remains `support@workcraftai.com` and does not route provider alerts.
 
 Resend webhook endpoint: `https://app.workcraftai.com/api/webhooks/resend`. Its event signing secret must stay server-only. Confirm the webhook's configured delivery events, latest delivery attempts, and the resulting estimate activity status in the app. A generic test event may be acknowledged but ignored when it does not match an estimate email already recorded by the app.
 

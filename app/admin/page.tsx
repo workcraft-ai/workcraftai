@@ -3,7 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/app/utils/supabase/client";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 
 type AdminRole = "support" | "billing" | "super_admin";
 type Account = {
@@ -20,6 +21,7 @@ type Account = {
 };
 type AccountDetail = {
   account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; last_active_at: string | null; deletion_status: "active" | "pending_deletion" | "deleting"; deletion_notice_sent_at: string | null; deletion_due_at: string | null; is_admin: boolean; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null; active_pro_grant: ProGrant | null };
+  ai_usage: { daily_date: string; daily_used: number; daily_limit: number; monthly_month: string; monthly_used: number; monthly_limit: number } | null;
   pro_grants: ProGrant[];
   notes: { id: string; note: string; category: string; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   audit: { id: string; action: string; reason: string; outcome: string; details: Record<string, unknown>; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
@@ -51,6 +53,7 @@ async function requestJson(url: string, options?: RequestInit) {
 }
 
 export default function AdminPage() {
+  const { language } = useLanguage();
   const [role, setRole] = useState<AdminRole | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaVerifiedFactor, setMfaVerifiedFactor] = useState(false);
@@ -91,6 +94,10 @@ export default function AdminPage() {
   const [appEmailLimitInput, setAppEmailLimitInput] = useState("");
   const [appEmailLimitReason, setAppEmailLimitReason] = useState("");
   const [appEmailSettingsLoading, setAppEmailSettingsLoading] = useState(true);
+  const [estimateTradeOptions, setEstimateTradeOptions] = useState(DEFAULT_ESTIMATE_TRADES.map((option) => ({ ...option })));
+  const [estimateTradeOptionsLoading, setEstimateTradeOptionsLoading] = useState(true);
+  const [estimateTradeOptionsReason, setEstimateTradeOptionsReason] = useState("");
+  const [aiUsageResetReason, setAiUsageResetReason] = useState("");
   const [deletionConfirmEmail, setDeletionConfirmEmail] = useState("");
   const [deletionReason, setDeletionReason] = useState("");
   const [retentionReason, setRetentionReason] = useState("");
@@ -102,6 +109,7 @@ export default function AdminPage() {
     setDeletionConfirmEmail("");
     setDeletionReason("");
     setRetentionReason("");
+    setAiUsageResetReason("");
     try {
       setDetail(await requestJson(`/api/admin/accounts/${encodeURIComponent(id)}`));
     } catch (cause) {
@@ -172,6 +180,22 @@ export default function AdminPage() {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load the app email limit.");
     }).finally(() => {
       if (!cancelled) setAppEmailSettingsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "super_admin") return;
+    let cancelled = false;
+    void requestJson("/api/admin/trades").then((result) => {
+      if (cancelled) return;
+      const options = parseEstimateTradeOptions(result.trades);
+      if (options) setEstimateTradeOptions(options);
+      else setError("The saved estimate trade list is invalid. Update it before continuing.");
+    }).catch((cause) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load estimate trade options.");
+    }).finally(() => {
+      if (!cancelled) setEstimateTradeOptionsLoading(false);
     });
     return () => { cancelled = true; };
   }, [role]);
@@ -266,6 +290,15 @@ export default function AdminPage() {
     if (!selectedId || !recoveryReason.trim()) return;
     if (!window.confirm(`Send a password recovery email to ${detail?.account.email}?`)) return;
     void runAction("recovery", `/api/admin/accounts/${encodeURIComponent(selectedId)}/reset-password`, { reason: recoveryReason }, "Recovery email requested.").then((sent) => { if (sent) setRecoveryReason(""); });
+  };
+
+  const resetAccountAiUsage = () => {
+    if (!selectedId || !detail || aiUsageResetReason.trim().length < 8) return;
+    const confirmation = translate(language, "Reset this account’s current daily and monthly AI counts? Its usage history, provider token totals, and the shared platform limit will remain unchanged.");
+    if (!window.confirm(confirmation)) return;
+    void runAction("ai-usage-reset", `/api/admin/accounts/${encodeURIComponent(selectedId)}/ai-usage`, { reason: aiUsageResetReason }, "AI allowance counts reset. Usage history and the platform-wide limit are unchanged.").then((reset) => {
+      if (reset) setAiUsageResetReason("");
+    });
   };
 
   const applyCoupon = (event: FormEvent) => {
@@ -432,6 +465,28 @@ export default function AdminPage() {
     }
   };
 
+  const saveEstimateTradeOptions = async (event: FormEvent) => {
+    event.preventDefault();
+    const options = parseEstimateTradeOptions(estimateTradeOptions);
+    if (!options || estimateTradeOptionsReason.trim().length < 8) return;
+    setBusy("estimate-trades");
+    setError("");
+    setNotice("");
+    try {
+      const result = await requestJson("/api/admin/trades", {
+        method: "POST",
+        body: JSON.stringify({ trades: options, reason: estimateTradeOptionsReason }),
+      });
+      setEstimateTradeOptions(result.trades);
+      setEstimateTradeOptionsReason("");
+      setNotice(result.message || "Estimate trade options saved.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save estimate trade options.");
+    } finally {
+      setBusy("");
+    }
+  };
+
   if (accessState === "loading") return <LocalizedTree><main className="mx-auto max-w-6xl px-4 py-14"><p className="text-slate-600">Checking administrator access…</p></main></LocalizedTree>;
   if (accessState !== "ready") return <LocalizedTree><main className="mx-auto max-w-3xl px-4 py-14"><section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold text-slate-900">Admin support</h1><p className="mt-3 text-slate-600">{accessState === "denied" ? "This account does not have support-console access." : error}</p></section></main></LocalizedTree>;
 
@@ -474,7 +529,7 @@ export default function AdminPage() {
       </section>}
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro accounts can send 5 customer-facing estimate emails, follow-ups, or proposal-question alerts per UTC day and 100 per UTC month. This is separate from the shared platform ceiling for all app mail, including support and retention notices. The platform cap starts at 75 per UTC day; the admin maximum is 90 to leave room below Resend’s current 100/day free allowance. Accepted or ambiguous provider requests count; definite provider rejections release their reservation.</p></div>
+        <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro accounts can send 5 customer-facing estimate emails, follow-ups, proposal-question alerts, or invoice emails per UTC day and 100 per UTC month. This is separate from the shared platform ceiling for all app mail, including support and retention notices. The platform cap starts at 75 per UTC day; the admin maximum is 90 to leave room below Resend’s current 100/day free allowance. Accepted or ambiguous provider requests count; definite provider rejections release their reservation.</p></div>
         {appEmailSettings && <>
           <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Current cap:</strong> {appEmailSettings.daily_limit} / day</p><p className="mt-1"><strong>Today:</strong> {appEmailSettings.today.emails_started} app email reservations used (UTC)</p></div>
           <form onSubmit={saveAppEmailLimit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr_auto] sm:items-end">
@@ -485,6 +540,26 @@ export default function AdminPage() {
           <p className="mt-2 text-xs text-slate-500">Allowed range: 1–90 app emails per UTC day. Changes are recorded in the admin audit log. If the limit is reached, email sending pauses until 00:00 UTC; estimate data and saved support questions remain available.</p>
         </>}
         {appEmailSettingsLoading && !appEmailSettings && <p className="mt-3 text-sm text-slate-500">Loading email capacity…</p>}
+      </section>}
+
+      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div><h2 className="text-lg font-bold text-slate-900">Estimate trade options</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Manage the choices shown in the Trade dropdown when creating an estimate. Add an English name and its Spanish label for each trade. Changes apply to new estimate forms; existing estimates keep their saved trade.</p></div>
+        <form onSubmit={saveEstimateTradeOptions} className="mt-4 space-y-3">
+          <div className="space-y-3">
+            {estimateTradeOptions.map((option, index) => <div key={index} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <label className="block text-xs font-semibold text-slate-700">Trade name (English)<input required maxLength={60} value={option.value} onChange={(event) => setEstimateTradeOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+              <label className="block text-xs font-semibold text-slate-700">Trade name (Spanish)<input required maxLength={60} value={option.label_es} onChange={(event) => setEstimateTradeOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, label_es: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+              <button type="button" aria-label={translate(language, "Remove this trade")} title={translate(language, "Remove this trade")} onClick={() => setEstimateTradeOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={estimateTradeOptions.length <= 1 || busy !== ""} className="min-h-11 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-40">{translate(language, "Remove")}</button>
+            </div>)}
+          </div>
+          <button type="button" onClick={() => setEstimateTradeOptions((current) => [...current, { value: "", label_es: "" }])} disabled={estimateTradeOptionsLoading || estimateTradeOptions.length >= 40 || busy !== ""} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50">+ {translate(language, "Add trade")}</button>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <label className="block text-xs font-semibold text-slate-700">Reason for change<input value={estimateTradeOptionsReason} onChange={(event) => setEstimateTradeOptionsReason(event.target.value)} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <button type="submit" disabled={busy !== "" || estimateTradeOptionsLoading || !parseEstimateTradeOptions(estimateTradeOptions) || estimateTradeOptionsReason.trim().length < 8} className="min-h-11 rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "estimate-trades" ? "Saving…" : "Save trade options"}</button>
+          </div>
+          <p className="text-xs text-slate-500">Keep each name unique. Custom trade names need both labels; every change is recorded in the admin audit log.</p>
+          {estimateTradeOptionsLoading && <p className="text-sm text-slate-500">Loading estimate trade options…</p>}
+        </form>
       </section>}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -512,6 +587,14 @@ export default function AdminPage() {
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Account</p><h2 className="mt-1 break-all text-xl font-bold text-slate-950">{detail.account.email}</h2><p className="mt-1 text-sm text-slate-600">{detail.account.business_name || "No business name on file"}</p></div>
           <dl className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Email confirmed</dt><dd className="mt-1 font-semibold text-slate-900">{detail.account.email_confirmed_at ? "Yes" : "No"}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Plan status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{adminPlanStatus(detail.account)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Joined</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.created_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last sign in</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_sign_in_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last app activity</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_active_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Retention status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.deletion_status.replaceAll("_", " ")}</dd></div><div className="col-span-2 rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Current billing period ends</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.current_period_end)}</dd></div></dl>
+
+          {role === "super_admin" && <form onSubmit={(event) => { event.preventDefault(); resetAccountAiUsage(); }} className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+            <h3 className="font-bold text-purple-950">Reset account AI allowance</h3>
+            {detail.ai_usage ? <p className="mt-1 text-sm text-purple-900"><strong>Today (UTC):</strong> {detail.ai_usage.daily_used} / {detail.ai_usage.daily_limit} {translate(language, "used")} · <strong>This month (UTC):</strong> {detail.ai_usage.monthly_used} / {detail.ai_usage.monthly_limit} {translate(language, "used")}</p> : <p className="mt-1 text-sm text-purple-900">AI usage counts are unavailable.</p>}
+            <p className="mt-2 text-xs leading-5 text-purple-900">Resets this account’s current daily and monthly AI counts. The event history, provider token totals, and shared platform-wide daily limit stay unchanged. An active AI request must finish first. Every reset is audited.</p>
+            <label className="mt-3 block text-xs font-semibold text-purple-950">Reason for reset<input value={aiUsageResetReason} onChange={(event) => setAiUsageResetReason(event.target.value)} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-purple-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+            <button type="submit" disabled={busy !== "" || aiUsageResetReason.trim().length < 8} className="mt-3 min-h-11 rounded-lg bg-purple-800 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "ai-usage-reset" ? "Resetting…" : "Reset AI counts"}</button>
+          </form>}
 
           {detail.account.deletion_status === "pending_deletion" && <section className="rounded-xl border border-amber-300 bg-amber-50 p-4"><h3 className="font-bold text-amber-950">Inactivity deletion is pending</h3><p className="mt-1 text-sm leading-5 text-amber-900">Warning sent {date(detail.account.deletion_notice_sent_at)} · deletion due {date(detail.account.deletion_due_at)}. The user signing in cancels it automatically.</p>{role === "super_admin" && <form onSubmit={cancelPendingDeletion} className="mt-3"><label className="block text-xs font-semibold text-amber-950">Reason to cancel<input value={retentionReason} onChange={(event) => setRetentionReason(event.target.value)} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || retentionReason.trim().length < 8} className="mt-3 rounded-lg border border-amber-700 px-4 py-2 text-sm font-semibold text-amber-950 disabled:opacity-50">{busy === "retention" ? "Saving…" : "Cancel pending deletion"}</button></form>}</section>}
           {detail.account.deletion_status === "deleting" && <p role="status" className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">An account deletion is currently being processed.</p>}

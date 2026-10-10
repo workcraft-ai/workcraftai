@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { getProAccess } from "@/lib/pro-access";
+import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 
 const MAX_QUESTION_BODY_BYTES = 8_000;
@@ -53,9 +54,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try { hasProEmail = (await getProAccess(admin, estimate.user_id)).hasPro; }
   catch (entitlementError) { console.error("Proposal question entitlement lookup failed:", entitlementError instanceof Error ? entitlementError.message : "unknown error"); }
   const apiKey = process.env.RESEND_API_KEY;
-  const sender = process.env.RESEND_ESTIMATE_FROM_EMAIL || process.env.RESEND_FROM_EMAIL;
+  const sender = getWorkCraftNoReplySender();
   let emailSent = false;
-  if (hasProEmail && businessEmail && apiKey && sender) {
+  if (hasProEmail && businessEmail && apiKey) {
     const { reservation, error: quotaError } = await reserveAppEmail(admin, "proposal_question", estimate.user_id, id);
     if (quotaError) {
       console.error("Proposal question email quota reservation failed:", quotaError.message);

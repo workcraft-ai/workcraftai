@@ -26,7 +26,7 @@ const questions = [
   },
   {
     question: "What are the Pro usage limits?",
-    answer: "Pro ($9.99/month) includes up to 50 saved estimates per UTC day and 500 per UTC month; 5 cloud AI drafts per day and 50 per month; and 5 estimate emails, follow-ups, or customer-question alerts per day and 100 per month. Pro also includes 100 MB of new private media uploads per month, up to 250 MB and 100 files retained. View your current usage and how much remains in Profile. Counters reset at 00:00 UTC or the start of each UTC month. Failed AI provider attempts count. These are account allowances; shared provider capacity may pause an action sooner.",
+    answer: "Pro ($9.99/month) includes up to 50 saved estimates per UTC day and 500 per UTC month; 5 cloud AI drafts per day and 50 per month; and 5 customer-facing emails—including estimate emails, follow-ups, customer-question alerts, and invoice emails—per day and 100 per month. Pro also includes 100 MB of new private media uploads per month, up to 250 MB and 100 files retained. View your current usage and how much remains in Profile. Counters reset at 00:00 UTC or the start of each UTC month. Failed AI provider attempts count. These are account allowances; shared provider capacity may pause an action sooner.",
   },
   {
     question: "Can my customer review a proposal without an account?",
@@ -70,7 +70,7 @@ const questions = [
   },
   {
     question: "Does WorkCraft AI send estimates or customer emails?",
-    answer: "You can send estimate and proposal emails from the app where the feature is available. If a message does not arrive, check the recipient address and spam folder, then contact us with the estimate number and the approximate time you sent it.",
+    answer: "You can send estimate, proposal, and invoice emails from the app where the feature is available. If a message does not arrive, check the recipient address and spam folder, then contact us with the estimate number and the approximate time you sent it.",
   },
   {
     question: "What should I include in a support request?",

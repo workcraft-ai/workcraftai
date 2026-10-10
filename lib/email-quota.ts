@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type AppEmailSource = "follow_up" | "support" | "proposal_question" | "account_retention";
+export type AppEmailSource = "follow_up" | "support" | "proposal_question" | "account_retention" | "invoice";
 export type EmailReservation = {
   allowed: boolean;
   reason: "allowed" | "platform_daily_limit" | "account_daily_limit" | "account_monthly_limit";
@@ -19,11 +19,12 @@ function firstRow(data: unknown): Partial<EmailReservation> | null {
   return data[0] as Partial<EmailReservation>;
 }
 
-export async function reserveAppEmail(admin: SupabaseClient, source: AppEmailSource, userId?: string, estimateId?: string) {
+export async function reserveAppEmail(admin: SupabaseClient, source: AppEmailSource, userId?: string, estimateId?: string, jobId?: string) {
   const { data, error } = await admin.rpc("workcraft_reserve_app_email", {
     p_source: source,
     p_user_id: userId ?? null,
     p_estimate_id: estimateId ?? null,
+    p_job_id: jobId ?? null,
   });
   const row = firstRow(data);
   if (!error && (!row || typeof row.allowed !== "boolean" || typeof row.reason !== "string" || typeof row.usage_date !== "string")) {

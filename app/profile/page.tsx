@@ -267,7 +267,7 @@ export default function ProfilePage() {
             <div className="rounded-lg bg-slate-50 p-4">
               <h3 className="text-sm font-bold text-slate-900">Customer emails</h3>
               <p role="status" className={`mt-1 text-xs leading-5 ${remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit) === 0 || remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit) === 0 ? "font-semibold text-red-800" : remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit) <= 1 || remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit) <= 20 ? "font-semibold text-amber-800" : "text-slate-700"}`}>{remaining(usageSnapshot.email.daily_used, usageSnapshot.email.daily_limit)} of {usageSnapshot.email.daily_limit} left today · {remaining(usageSnapshot.email.monthly_used, usageSnapshot.email.monthly_limit)} of {usageSnapshot.email.monthly_limit} left this month</p>
-              <p className="mt-1 text-[11px] text-slate-500">Estimate emails, follow-ups, and customer-question alerts share this allowance.</p>
+              <p className="mt-1 text-[11px] text-slate-500">Estimate emails, follow-ups, customer-question alerts, and invoice emails share this allowance.</p>
             </div>
             <div className="rounded-lg bg-slate-50 p-4">
               <h3 className="text-sm font-bold text-slate-900">Private media storage</h3>

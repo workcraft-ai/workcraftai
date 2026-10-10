@@ -12,7 +12,7 @@
 
 ## Production release steps
 
-1. Confirm these Vercel Production variables are present: `CRON_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`, and `STRIPE_SECRET_KEY` for accounts with a WorkCraft AI subscription. `NEXT_PUBLIC_SUPPORT_EMAIL` is optional and defaults to `support@workcraftai.com`.
+1. Confirm these Vercel Production variables are present: `CRON_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, and `STRIPE_SECRET_KEY` for accounts with a WorkCraft AI subscription. `RESEND_NO_REPLY_FROM_EMAIL` is optional and defaults to `WorkCraft AI <no-reply@workcraftai.com>`. `NEXT_PUBLIC_SUPPORT_EMAIL` is optional and defaults to `support@workcraftai.com`.
 2. Review and apply `supabase/migrations/20261004220558_account_retention_lifecycle.sql` to the intended production Supabase project before deploying the app changes. It seeds existing accounts from Auth sign-in/creation timestamps and installs an Auth-user trigger for new accounts. Do not apply it to production as part of this code change.
 3. Deploy the app. Vercel will register `/api/cron/account-retention` for daily execution at 10:00 UTC. The endpoint requires the configured `CRON_SECRET` bearer token.
 4. In Supabase, verify the lifecycle table is inaccessible to `anon` and `authenticated`, the RPC grants are service-role only, seeded row counts match Auth users, and admin accounts are present but excluded by the job.
