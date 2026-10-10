@@ -121,8 +121,8 @@ jobs:
           BACKUP_ROOT: ${{ runner.temp }}/workcraftai-backup
         run: |
           set -euo pipefail
-          # Supabase's standard CLI dump excludes managed Auth tables. Use a
-          # matching PostgreSQL 17 client to export only durable account data.
+          # CLI schema dumps exclude managed Auth definitions. Use a matching
+          # PostgreSQL 17 client to export only durable account data separately.
           # Never print the connection URI or the resulting SQL.
           docker run --rm \
             --env DATABASE_URL \
@@ -160,7 +160,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
           BACKUP_STORAGE_DIR: ${{ runner.temp }}/workcraftai-backup/storage
-        run: npm run backup:storage
+          BACKUP_EXPECTED_PROJECT_REF: ivioejiiigtbmhpzjuni
+          DATABASE_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          # Bind API downloads to the database being backed up. A wrong
+          # project's key or an anon key must not produce a green empty backup.
+          BACKUP_STORAGE_EXPECTED_COUNT=$(docker run --rm --env DATABASE_URL --entrypoint sh postgres:17-alpine \
+            -ec 'exec psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM storage.objects WHERE bucket_id = '\''estimate-media'\''"')
+          export BACKUP_STORAGE_EXPECTED_COUNT
+          npm run backup:storage
 
       - name: Initialize repository if needed and save encrypted snapshot
         env:

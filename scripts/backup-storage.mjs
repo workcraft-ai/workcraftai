@@ -1,21 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { assertStorageBackupCount, storageBackupConfig } from "./backup-storage-config.mjs";
 
 const bucketName = "estimate-media";
 const pageSize = 100;
-const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const backupStorageDir = process.env.BACKUP_STORAGE_DIR;
+const config = storageBackupConfig(process.env);
 
-if (!supabaseUrl || !serviceRoleKey || !backupStorageDir) {
-  throw new Error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and BACKUP_STORAGE_DIR are required.");
-}
-
-const outputRoot = resolve(backupStorageDir);
+const outputRoot = resolve(config.directory);
 const bucketRoot = join(outputRoot, bucketName);
 const manifestPath = join(outputRoot, `${bucketName}-manifest.json`);
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
+const supabase = createClient(config.url, config.key, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 const manifest = { version: 1, bucket: bucketName, objects: [] };
@@ -80,7 +75,12 @@ async function backupFolder(folderPath = "") {
   }
 }
 
+// A publishable/anon key can silently list zero private files under RLS.
+// Verify actual administrative access without logging returned account data.
+const { error: adminError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1 });
+if (adminError) throw new Error("Storage backup credential cannot access the source project's admin API. Use its server-only service-role/secret key.");
 await mkdir(bucketRoot, { recursive: true });
 await backupFolder();
+assertStorageBackupCount(manifest.objects.length, config.expectedCount);
 await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`, { flag: "wx" });
 console.log(`Backed up ${manifest.objects.length} private estimate-media objects.`);
