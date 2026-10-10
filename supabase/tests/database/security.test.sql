@@ -59,9 +59,9 @@ select ok(
   'authenticated users can execute the estimate conversion RPC'
 );
 select ok(
-  not has_function_privilege('anon', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
-  and not has_function_privilege('authenticated', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
-  and has_function_privilege('service_role', 'public.workcraft_reserve_app_email(text,uuid,uuid)', 'EXECUTE')
+  not has_function_privilege('anon', 'public.workcraft_reserve_app_email(text,uuid,uuid,uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.workcraft_reserve_app_email(text,uuid,uuid,uuid)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.workcraft_reserve_app_email(text,uuid,uuid,uuid)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.workcraft_release_app_email(uuid)', 'EXECUTE'),
   'only the trusted server can reserve or release app email capacity'
 );
