@@ -6,8 +6,10 @@ import { getServerProAccess } from "@/lib/pro-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const MAX_BODY_BYTES = 12_000;
+const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
 type GeneratedItem = { description?: unknown; quantity?: unknown; unit_price?: unknown };
 
 export async function GET() {
@@ -151,6 +153,8 @@ export async function POST(request: Request) {
   };
 
   let response: Response;
+  const generationStartedAt = Date.now();
+  const generationSignal = AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS);
   try {
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
@@ -159,9 +163,23 @@ export async function POST(request: Request) {
         contents: [{ role: "user", parts: [{ text: `Draft scope and quantities only for a ${trade} job. Job description: ${prompt}\n\nReturn JSON only with a line_items array. Each item must contain description (string), quantity (number), and unit_price (number). Always set unit_price to 0; WorkCraft AI will apply the contractor's saved Price Book rates where a clear match exists. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and say what needs confirmation in the description. Use concise descriptions that name the actual fixture, material, or task so it can be matched to a saved service.` }] }],
         generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2048 },
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: generationSignal,
     });
-  } catch {
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const cause = error instanceof Error ? error.cause : null;
+    const rawCauseCode = cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string"
+      ? cause.code
+      : null;
+    const causeCode = rawCauseCode && /^[A-Z0-9_]{1,40}$/.test(rawCauseCode) ? rawCauseCode : null;
+    console.error("Gemini generation transport failed:", {
+      requestId: request.headers.get("x-vercel-id"),
+      model,
+      durationMs: Date.now() - generationStartedAt,
+      timedOut: generationSignal.aborted,
+      errorName,
+      causeCode,
+    });
     await complete("failed", null, null);
     return NextResponse.json({ error: "Cloud AI request timed out or could not connect. Try again later." }, { status: 502 });
   }
