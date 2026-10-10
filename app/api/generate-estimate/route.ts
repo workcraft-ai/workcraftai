@@ -76,7 +76,13 @@ function geminiProviderErrorSignal(error: GeminiProviderError | undefined) {
       });
     }).slice(0, 5)
     : [];
-  return { providerCode: code, providerStatus: status, providerErrorCategory: category, providerFields };
+  const validFieldPath = /^(?:generation_config|generationConfig|contents|tools|system_instruction|systemInstruction|safety_settings|safetySettings)(?:\.[A-Za-z0-9_-]+|\[\d+\])*$/;
+  const messageFields = [
+    ...Array.from(message.matchAll(/(?:at|field)\s+["']([^"']{1,200})["']/gi), (match) => match[1]),
+    ...Array.from(message.matchAll(/Unknown name\s+(["'])([A-Za-z0-9_.-]{1,100})\1\s+at\s+(["'])([A-Za-z0-9_.\[\]-]{1,160})\3/gi), (match) => `${match[4]}.${match[2]}`),
+  ].filter((field) => validFieldPath.test(field));
+  const safeProviderFields = [...new Set([...providerFields, ...messageFields])].slice(0, 5);
+  return { providerCode: code, providerStatus: status, providerErrorCategory: category, providerFields: safeProviderFields };
 }
 
 export async function GET() {
@@ -231,7 +237,7 @@ export async function POST(request: Request) {
         contents: [{ role: "user", parts: [{ text: `Prepare a draft estimate for a ${trade} job. Job description: ${prompt}\n\nReturn one JSON object matching the response schema. Write proposal_summary as 1-2 concise customer-facing sentences in ${proposalLanguage === "es" ? "Spanish" : "English"}, describing overall work without prices. Break work into distinct tasks and list labor/material work separately when clear. Do not invent measurements. If a quantity cannot be responsibly inferred, use 1 and state what needs confirmation in both descriptions. For every line item, choose the best matching canonical unit and provide a cautious U.S. starting rate in USD for that unit, before contractor markup and sales tax, using broad typical labor/material assumptions. These are editable starting estimates, not live local supplier quotes. Include a positive suggested_unit_price whenever a reasonable starting rate can be estimated. Use 0 only when the scope or unit is genuinely too unclear to price responsibly; do not use 0 just because the contractor's Price Book has no match. Keep rates rounded to cents. Never use or invent a price from the user's Price Book; WorkCraft AI applies saved contractor rates after this draft.` }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseJsonSchema: {
+          responseSchema: {
             type: "object",
             properties: {
               proposal_summary: { type: "string" },
