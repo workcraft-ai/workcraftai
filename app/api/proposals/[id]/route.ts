@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getEstimatePaymentData, paidCents } from "@/lib/customer-payments";
 import { getProAccess } from "@/lib/pro-access";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { stripeLivemode } from "@/lib/stripe-server";
 
 export async function GET(
   request: Request,
@@ -69,7 +70,7 @@ export async function GET(
     catch (entitlementError) { console.error("Proposal payment entitlement lookup failed:", entitlementError instanceof Error ? entitlementError.message : "unknown error"); }
   }
   const { data: connectedAccount } = estimate.user_id
-    ? await admin.from("stripe_connected_accounts").select("charges_enabled").eq("user_id", estimate.user_id).maybeSingle()
+    ? await admin.from("stripe_connected_accounts").select("charges_enabled, stripe_livemode").eq("user_id", estimate.user_id).maybeSingle()
     : { data: null };
   const paymentSummary = {
     amountPaidCents: paidCents(paymentData.payments),
@@ -79,7 +80,7 @@ export async function GET(
       const totalCents = calculateEstimateMoney(estimate, [], option.name).totalCents;
       return [[option.name, totalCents]];
     })),
-    available: hasPro && connectedAccount?.charges_enabled === true,
+    available: hasPro && connectedAccount?.charges_enabled === true && connectedAccount.stripe_livemode === stripeLivemode(),
   };
 
   const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) =>

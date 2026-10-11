@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
+import { getCardPaymentsState, getServiceSupabase, getStripeClient, stripeLivemode } from "@/lib/stripe-server";
 import { estimateTotalCents } from "@/lib/customer-payment-calculations.mjs";
 
 export { estimateTotalCents, paidCents } from "@/lib/customer-payment-calculations.mjs";
@@ -29,9 +29,9 @@ type PaymentRow = {
 
 export async function refreshConnectedAccount(stripe: Stripe, admin: ReturnType<typeof getServiceSupabase>, userId: string) {
   const { data: saved, error } = await admin.from("stripe_connected_accounts")
-    .select("stripe_account_id").eq("user_id", userId).maybeSingle();
+    .select("stripe_account_id, stripe_livemode").eq("user_id", userId).maybeSingle();
   if (error) throw error;
-  if (!saved) return null;
+  if (!saved || saved.stripe_livemode !== stripeLivemode()) return null;
   const account = await stripe.v2.core.accounts.retrieve(saved.stripe_account_id, {
     include: ["configuration.merchant", "requirements"],
   });
@@ -40,7 +40,7 @@ export async function refreshConnectedAccount(stripe: Stripe, admin: ReturnType<
     charges_enabled: state.chargesEnabled,
     requirements_due: state.requirementsDue,
     updated_at: new Date().toISOString(),
-  }).eq("user_id", userId);
+  }).eq("user_id", userId).eq("stripe_account_id", saved.stripe_account_id);
   if (updateError) throw updateError;
   return { stripeAccountId: saved.stripe_account_id, ...state };
 }

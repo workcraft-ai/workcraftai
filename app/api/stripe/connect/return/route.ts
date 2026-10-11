@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { getServerProAccess } from "@/lib/pro-access";
 import { createStripeOnboardingLink, getOnboardingContinuation, getStripeConnectOrigin, MAX_AUTOMATIC_ONBOARDING_CONTINUATIONS } from "@/lib/stripe-connect-onboarding";
-import { getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
+import { getCardPaymentsState, getServiceSupabase, getStripeClient, stripeLivemode } from "@/lib/stripe-server";
 
 function profileRedirect(origin: string, status: string) {
   const url = new URL("/profile", origin);
@@ -25,10 +25,10 @@ export async function GET(request: Request) {
 
     const admin = getServiceSupabase();
     const { data: saved, error: lookupError } = await admin.from("stripe_connected_accounts")
-      .select("stripe_account_id, charges_enabled, requirements_due")
+      .select("stripe_account_id, stripe_livemode, charges_enabled, requirements_due")
       .eq("user_id", user.id).maybeSingle();
     if (lookupError) throw lookupError;
-    if (!saved) return profileRedirect(origin, "incomplete");
+    if (!saved || saved.stripe_livemode !== stripeLivemode()) return profileRedirect(origin, "incomplete");
 
     const stripe = getStripeClient();
     const account = await stripe.v2.core.accounts.retrieve(saved.stripe_account_id, {
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         charges_enabled: state.chargesEnabled,
         requirements_due: state.requirementsDue,
         updated_at: new Date().toISOString(),
-      }).eq("user_id", user.id);
+      }).eq("user_id", user.id).eq("stripe_account_id", saved.stripe_account_id);
       if (updateError) throw updateError;
     }
 

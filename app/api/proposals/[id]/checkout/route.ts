@@ -2,7 +2,7 @@ import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-shar
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
-import { getAppOrigin, getServiceSupabase } from "@/lib/stripe-server";
+import { getAppOrigin, getServiceSupabase, stripeLivemode } from "@/lib/stripe-server";
 import { getProAccess } from "@/lib/pro-access";
 
 function errorResponse(message: string, status: number) {
@@ -40,9 +40,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const { data: account, error: accountError } = await admin.from("stripe_connected_accounts")
-      .select("stripe_account_id").eq("user_id", estimate.user_id).maybeSingle();
+      .select("stripe_account_id, stripe_livemode").eq("user_id", estimate.user_id).maybeSingle();
     if (accountError) return errorResponse("Could not load contractor payment settings.", 502);
-    if (!account?.stripe_account_id || !(await accountCanCharge(account.stripe_account_id))) {
+    if (!account?.stripe_account_id || account.stripe_livemode !== stripeLivemode() || !(await accountCanCharge(account.stripe_account_id))) {
       return errorResponse("The contractor has not finished Stripe payment setup yet. Contact them to arrange payment.", 409);
     }
 

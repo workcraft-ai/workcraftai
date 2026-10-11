@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
-import { getCardPaymentsState, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
+import { getCardPaymentsState, getServiceSupabase, getStripeClient, stripeLivemode } from "@/lib/stripe-server";
 import { getServerProAccess } from "@/lib/pro-access";
 import { createStripeOnboardingLink, getStripeConnectOrigin } from "@/lib/stripe-connect-onboarding";
 import { createWorkCraftConnectedAccountParams, getConnectedAccountDestination } from "@/lib/stripe-connect-configuration.mjs";
@@ -20,10 +20,13 @@ export async function POST(request: Request) {
   try {
     const stripe = getStripeClient();
     const admin = getServiceSupabase();
-    const { data: saved, error: lookupError } = await admin.from("stripe_connected_accounts").select("stripe_account_id").eq("user_id", user.id).maybeSingle();
+    const { data: saved, error: lookupError } = await admin.from("stripe_connected_accounts")
+      .select("stripe_account_id, stripe_livemode").eq("user_id", user.id).maybeSingle();
     if (lookupError) throw lookupError;
 
-    let accountId = saved?.stripe_account_id;
+    const livemode = stripeLivemode();
+    if (livemode === null) throw new Error("Stripe key mode is unavailable.");
+    let accountId = saved?.stripe_livemode === livemode ? saved.stripe_account_id : undefined;
     let hasActiveCardPayments = false;
     let dashboard: "express" | "full" | "none" | undefined;
     if (!accountId) {
@@ -32,21 +35,47 @@ export async function POST(request: Request) {
         email: user.email,
         businessName: typeof user.user_metadata?.business_name === "string" ? user.user_metadata.business_name : undefined,
         country: process.env.STRIPE_CONNECT_ACCOUNT_COUNTRY || "US",
-      }), { idempotencyKey: `workcraft-connect-${user.id}` });
+      }), { idempotencyKey: `workcraft-connect-${livemode ? "live" : "test"}-${user.id}` });
       accountId = account.id;
       dashboard = account.dashboard;
       const state = getCardPaymentsState(account);
       hasActiveCardPayments = state.chargesEnabled;
-      const { error: saveError } = await admin.from("stripe_connected_accounts").insert({
-        user_id: user.id,
-        stripe_account_id: accountId,
-        charges_enabled: state.chargesEnabled,
-        requirements_due: state.requirementsDue,
-      });
-      if (saveError) {
-        const { data: concurrent } = await admin.from("stripe_connected_accounts").select("stripe_account_id").eq("user_id", user.id).maybeSingle();
-        if (!concurrent?.stripe_account_id) throw saveError;
-        accountId = concurrent.stripe_account_id;
+      if (saved) {
+        const { data: replaced, error: replaceError } = await admin.rpc("workcraft_replace_connected_stripe_account", {
+          p_user_id: user.id,
+          p_old_account_id: saved.stripe_account_id,
+          p_old_livemode: saved.stripe_livemode,
+          p_new_account_id: accountId,
+          p_new_livemode: livemode,
+          p_charges_enabled: state.chargesEnabled,
+          p_requirements_due: state.requirementsDue,
+        });
+        if (replaceError) throw replaceError;
+        if (!replaced) {
+          const { data: concurrent, error: concurrentError } = await admin.from("stripe_connected_accounts")
+            .select("stripe_account_id, stripe_livemode").eq("user_id", user.id).single();
+          if (concurrentError || concurrent?.stripe_livemode !== livemode) throw new Error("Stripe account changed while connecting.");
+          accountId = concurrent.stripe_account_id;
+        }
+      } else {
+        const { error: saveError } = await admin.from("stripe_connected_accounts").insert({
+          user_id: user.id,
+          stripe_account_id: accountId,
+          stripe_livemode: livemode,
+          charges_enabled: state.chargesEnabled,
+          requirements_due: state.requirementsDue,
+        });
+        if (saveError) {
+          const { data: concurrent, error: concurrentError } = await admin.from("stripe_connected_accounts")
+            .select("stripe_account_id, stripe_livemode").eq("user_id", user.id).single();
+          if (concurrentError || concurrent?.stripe_livemode !== livemode) throw saveError;
+          accountId = concurrent.stripe_account_id;
+        }
+      }
+      if (accountId !== account.id) {
+        const current = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant", "requirements"] });
+        hasActiveCardPayments = getCardPaymentsState(current).chargesEnabled;
+        dashboard = current.dashboard;
       }
     } else {
       const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant", "requirements"] });
