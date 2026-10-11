@@ -63,8 +63,10 @@ export default function DashboardPage() {
   const [currentTab, setCurrentTab] = useState<"active" | "archived">("active");
   const [isPro, setIsPro] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null);
   const [sendMessage, setSendMessage] = useState("");
+  const [shareFallbackUrl, setShareFallbackUrl] = useState("");
   const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
   const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
   const [firstName, setFirstName] = useState("");
@@ -175,6 +177,33 @@ export default function DashboardPage() {
     } finally { setSendingId(null); }
   };
 
+  const copyCustomerLink = async (id: string) => {
+    setCopyingId(id);
+    setSendMessage("");
+    setShareFallbackUrl("");
+    try {
+      const response = await fetch(`/api/estimates/${id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "copy" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not copy the customer link.");
+      if (typeof result.url !== "string") throw new Error("Customer sharing is disabled or expired. Open the estimate to replace the customer link.");
+      try {
+        await navigator.clipboard.writeText(result.url);
+        setSendMessage("Customer link copied. Share it with your customer by text or your own email. Copying does not send a message.");
+      } catch {
+        setShareFallbackUrl(result.url);
+        setSendMessage("The customer link is ready below. Select and copy it to share from your text or email app.");
+      }
+    } catch (error) {
+      setSendMessage(error instanceof Error ? error.message : "Could not copy the customer link.");
+    } finally {
+      setCopyingId(null);
+    }
+  };
+
   const updateEstimateStatus = async (id: string, status: EstimateStatus) => {
     setStatusSavingId(id);
     setSendMessage("");
@@ -269,6 +298,13 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        {!loading && (estimates.length === 0 || (estimates.length === 1 && !estimates[0].is_archived && !estimates[0].proposal_viewed_at)) && <section aria-labelledby="first-quote-title" className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-900">{translate(language, "Your first quote")}</p>
+          <h2 id="first-quote-title" className="mt-1 text-lg font-bold text-slate-900">{translate(language, estimates.length === 0 ? "Start with one real job" : "Your estimate is ready for the next step")}</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-700">{translate(language, estimates.length === 0 ? "Add the customer, describe the work, set your own prices, and save. You can build a price book later." : "Review the scope and total, then copy the customer link from your estimate. Customers can review and approve without creating an account.")}</p>
+          {estimates.length === 0 ? <Link href="/estimate/new" className="mt-4 inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "Create your first estimate")}</Link> : <Link href={`/estimate/${estimates[0].id}`} className="mt-4 inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "Review and share estimate")}</Link>}
+        </section>}
+
         <nav aria-label="Business tools" className="grid gap-3 sm:grid-cols-3">
           <ToolLink href="/schedule" title="Schedule & jobs" description="Plan work and track job progress" />
           <ToolLink href="/pricebook" title="Price book & templates" description="Save your rates and reusable scopes" />
@@ -278,6 +314,9 @@ export default function DashboardPage() {
           {translate(language, `Customer email allowance: ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0)} of ${emailAllowance.daily_limit} left today · ${Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0)} of ${emailAllowance.monthly_limit} left this month (UTC).`)}
         </p>}
         {sendMessage && <p role="status" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{sendMessage}</p>}
+        {shareFallbackUrl && <label className="block rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800">{translate(language, "Customer link")}
+          <input type="text" readOnly value={shareFallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-2 min-h-12 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-normal text-slate-800" />
+        </label>}
 
         {questions.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between"><h2 className="text-base font-bold text-slate-900">Customer questions</h2><span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">{`${questions.filter((item) => !item.read_at).length} unread`}</span></div>
@@ -338,9 +377,7 @@ export default function DashboardPage() {
             </div>
           ) : filteredEstimates.length === 0 ? (
             <div className="p-8 text-center text-sm text-slate-500">
-              {currentTab === "active"
-                ? "No active estimates found."
-                : "No archived estimates found."}
+              {translate(language, currentTab === "active" ? "No active estimates found." : "No archived estimates found.")}
             </div>
           ) : (
             <>
@@ -358,8 +395,9 @@ export default function DashboardPage() {
                   {est.followup_at && <p className="mt-1 text-xs text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</p>}
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Link href={`/estimate/${est.id}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-orange-800 px-3 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "View Estimate")}</Link>
-                    {isPro ? <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{sendingId === est.id ? translate(language, "Sending…") : emailEvents[est.id] ? translate(language, "Resend email") : translate(language, "Email client")}</button> : <Link href="/profile" className="inline-flex min-h-12 items-center justify-center gap-1 rounded-lg border border-slate-300 px-2 text-xs font-semibold text-slate-800">{translate(language, "Email client")} <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-orange-800">Pro</span></Link>}
+                    <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                   </div>
+                  {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                   <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Change estimate status")}
                     <select aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`} value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"} disabled={statusSavingId !== null} onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
                       {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
@@ -431,7 +469,8 @@ export default function DashboardPage() {
                         >
                           {translate(language, "View Estimate")}
                         </Link>
-                        {isPro ? <button onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client"}</button> : <Link href="/profile" className="inline-flex min-h-12 items-center gap-1 whitespace-nowrap text-xs font-semibold text-slate-600 underline" aria-label="Email client is a Pro feature">Email client <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-800 no-underline">Pro</span></Link>}
+                        <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
+                        {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                         {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
                         {est.followup_at && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
                         {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}
