@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { syncStripeSubscription } from "@/lib/stripe-subscription-sync";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
@@ -10,12 +11,6 @@ import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
-function getPeriodEnd(subscription: Stripe.Subscription) {
-  const periodEnds = subscription.items.data.map((item) => item.current_period_end);
-  const latestPeriodEnd = Math.max(0, ...periodEnds);
-  return latestPeriodEnd ? new Date(latestPeriodEnd * 1000).toISOString() : null;
-}
-
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecrets = [...new Set([process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((secret): secret is string => Boolean(secret)))];
@@ -24,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 503 });
   }
 
-  const stripe = new Stripe(stripeKey);
+  const stripe = new Stripe(stripeKey, { timeout: 15_000, maxNetworkRetries: 1 });
   const signature = request.headers.get("stripe-signature");
   if (!signature) return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
 
@@ -81,24 +76,7 @@ export async function POST(request: Request) {
     if (error) throw error;
   }
 
-  async function syncSubscription(subscriptionId: string) {
-    // Read the current Stripe object so retries and out-of-order event delivery
-    // cannot roll local subscription status back to an older event snapshot.
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    const userId = subscription.metadata.user_id;
-    if (!userId) return null;
-    const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
-    const { error } = await admin.from("subscriptions").upsert({
-      user_id: userId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      status: subscription.status,
-      current_period_end: getPeriodEnd(subscription),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
-    if (error) throw error;
-    return { userId, subscription };
-  }
+  const syncSubscription = (subscriptionId: string) => syncStripeSubscription(admin, stripe, subscriptionId);
 
   async function sendPastDueBillingNotice(userId: string, eventId: string) {
     const sender = getWorkCraftNoReplySender();
@@ -134,25 +112,14 @@ export async function POST(request: Request) {
     }
     const userId = session.client_reference_id || session.metadata?.user_id;
     if (session.mode === "subscription" && userId && session.subscription) {
-      if (session.metadata?.checkout_attempt_id) {
-        const { error: attemptError } = await admin.from("pro_checkout_attempts").update({
-          status: "completed",
-          stripe_checkout_session_id: session.id,
-          checkout_url: null,
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", userId).eq("id", session.metadata.checkout_attempt_id);
-        if (attemptError) throw attemptError;
-      }
-      const subscription = await stripe.subscriptions.retrieve(String(session.subscription));
-      const { error } = await admin.from("subscriptions").upsert({
-        user_id: userId,
-        stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
-        stripe_subscription_id: subscription.id,
-        status: subscription.status,
-        current_period_end: getPeriodEnd(subscription),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
-      if (error) throw error;
+      // Verify the current provider session before authorizing a new identity.
+      const completed = await stripe.checkout.sessions.retrieve(session.id);
+      const attemptId = completed.metadata?.checkout_attempt_id;
+      const completedUser = completed.client_reference_id || completed.metadata?.user_id;
+      const subscriptionId = typeof completed.subscription === "string" ? completed.subscription : completed.subscription?.id;
+      if (completed.mode !== "subscription" || completed.status !== "complete" || !attemptId
+        || completedUser !== userId || !subscriptionId) throw new Error("Subscription checkout could not be verified.");
+      await syncStripeSubscription(admin, stripe, subscriptionId, { userId, attemptId, sessionId: completed.id });
     }
   }
 
@@ -213,7 +180,7 @@ export async function POST(request: Request) {
     const synced = await syncSubscription(subscription.id);
     if (!synced) {
       await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
-      return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+      return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
     }
     if (shouldSendPastDueNotice({
       eventType: event.type,
@@ -232,7 +199,7 @@ export async function POST(request: Request) {
       const synced = await syncSubscription(subscriptionId);
       if (!synced) {
         await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
-        return NextResponse.json({ received: true, ignored: "subscription has no WorkCraft AI user metadata" });
+        return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
       }
     }
   }

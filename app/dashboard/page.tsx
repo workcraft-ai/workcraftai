@@ -6,6 +6,7 @@ import EstimateTableScroll from "@/app/components/EstimateTableScroll";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+import { latestEstimateEmailEvents } from "@/lib/email-delivery-status";
 
 type GreetingKey = "Good morning" | "Good afternoon" | "Good evening";
 
@@ -46,6 +47,8 @@ function estimateEmailEventLabel(event: string) {
     case "delivery_delayed": return "Email delivery delayed";
     case "bounced": return "Email bounced";
     case "complained": return "Email marked as spam";
+    case "failed": return "Email delivery failed";
+    case "suppressed": return "Email delivery suppressed";
     case "follow_up_sent": return "Follow-up sent";
     case "proposal_viewed": return "Proposal viewed";
     default: return event.replaceAll("_", " ");
@@ -116,12 +119,10 @@ export default function DashboardPage() {
         setFirstName("");
         setEmailAllowance(null);
       }
-      const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, event, created_at").order("created_at", { ascending: false });
+      const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, provider_email_id, event, created_at").order("created_at", { ascending: false });
       const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").order("created_at", { ascending: false }).limit(20);
       setQuestions((questionRows ?? []) as ProposalQuestion[]);
-      const latest: Record<string, string> = {};
-      for (const event of events ?? []) if (!latest[event.estimate_id]) latest[event.estimate_id] = event.event;
-      setEmailEvents(latest);
+      setEmailEvents(latestEstimateEmailEvents(events ?? []));
     } catch (err: unknown) {
       console.error("Error fetching dashboard estimates:", err);
     } finally {
@@ -352,6 +353,7 @@ export default function DashboardPage() {
                   </div>
                   <p className="mt-3 text-sm text-slate-700">{est.job_address || "—"}</p>
                   <p className="mt-1 text-xs text-slate-500">{translate(language, "Created")}: {new Date(est.created_at).toLocaleDateString(locale)}</p>
+                  {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <p className="mt-2 text-xs font-semibold text-slate-700">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</p>}
                   {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <p className="mt-2 text-xs font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</p>}
                   {est.followup_at && <p className="mt-1 text-xs text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</p>}
                   <div className="mt-3 grid grid-cols-2 gap-2">

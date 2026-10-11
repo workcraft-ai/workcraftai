@@ -66,8 +66,7 @@ export default function InvoicePage() {
   }, [load]);
 
   const invoiceMoney = calculateEstimateMoney({}, lines);
-  const lineItemTotalCents = invoiceMoney.subtotalCents;
-  const subtotalCents = amountToCents(job?.quoted_total || 0) || lineItemTotalCents;
+  const subtotalCents = amountToCents(job?.quoted_total ?? 0);
   const canSendInvoice = EMAIL_PATTERN.test(invoiceEmailAddress.trim());
   const setStatus = async (invoice_status: JobInvoice["invoice_status"]) => {
     if (!job) return;

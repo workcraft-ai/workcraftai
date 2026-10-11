@@ -137,7 +137,7 @@ export async function POST(
   if (!Number.isFinite(invoiceTotal) || invoiceTotal < 0) return jsonError("The invoice total is invalid. Update the job and try again.", 409);
 
   const invoiceMoney = calculateEstimateMoney({}, items);
-  const invoiceTotalForEmail = invoiceTotal || invoiceMoney.subtotalCents / 100;
+  const invoiceTotalForEmail = invoiceTotal;
   const rows = items.map((item, index) => {
     const description = spanish ? item.description_es?.trim() || item.description : item.description;
     const unit = String(item.unit || (spanish ? "unidad" : "each"));
