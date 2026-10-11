@@ -10,7 +10,7 @@ type MobileBottomNavProps = {
 };
 
 const primaryLinks = [
-  { href: "/dashboard", label: "Home", icon: "home" },
+  { href: "/dashboard", label: "Dashboard", icon: "home" },
   { href: "/customers", label: "Customers", icon: "customers" },
   { href: "/schedule", label: "Jobs", icon: "jobs" },
   { href: "/pricebook", label: "Price book", icon: "pricebook" },

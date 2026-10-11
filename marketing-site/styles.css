@@ -207,3 +207,17 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 /* Accessible guide metadata and featured sample caption. */
 .breadcrumbs, .guide-byline time, .resource-estimate-caption { color: #58655d; }
 .breadcrumbs a { display: inline-flex; align-items: center; min-height: 48px; min-width: 48px; }
+
+/* Consent-based public-site analytics. The preference control stays available in the footer. */
+.analytics-choice{appearance:none;border:0;background:none;color:inherit;font:inherit;font-weight:600;cursor:pointer;padding:8px 0}
+.analytics-choice:hover{text-decoration:underline;text-underline-offset:3px;color:var(--orange)}
+.analytics-choice:focus-visible,.analytics-banner button:focus-visible,.analytics-banner a:focus-visible{outline:2px solid #a64524;outline-offset:3px;border-radius:3px}
+.analytics-banner{position:fixed;z-index:40;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;justify-content:space-between;gap:24px;width:min(920px,calc(100% - 32px));padding:17px 20px;border:1px solid #c6d0c3;border-radius:10px;background:#fffefa;box-shadow:0 12px 40px #19292333;color:#1d2925}
+.analytics-banner[hidden]{display:none}
+.analytics-banner p{margin:0;font-size:13px;line-height:1.5}
+.analytics-banner a{color:#9a3e20;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.analytics-actions{display:flex;gap:9px;flex-shrink:0}
+.analytics-actions button{min-height:44px;padding:10px 14px;border-radius:6px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.analytics-decline{border:1px solid #b7c1b8;background:white;color:#1d2925}
+.analytics-accept{border:1px solid #1d2925;background:#1d2925;color:white}
+@media(max-width:700px){.analytics-banner{align-items:stretch;flex-direction:column;gap:13px;padding:15px}.analytics-actions{justify-content:flex-end}.analytics-actions button{flex:1}}

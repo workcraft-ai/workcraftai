@@ -16,17 +16,18 @@ jobs:
     steps:
       - name: Check marketing website
         run: |
-          status=$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --retry 2 --retry-delay 3 https://workcraftai.com/)
+          status=$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --retry 4 --retry-delay 3 --retry-all-errors https://workcraftai.com/)
           echo "Marketing site HTTP status: ${status}"
           [[ "$status" =~ ^2[0-9][0-9]$ ]]
 
       - name: Check app and Supabase Auth health
         run: |
-          status=$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --retry 2 --retry-delay 3 https://app.workcraftai.com/api/health)
+          status=$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 --retry 4 --retry-delay 3 --retry-all-errors https://app.workcraftai.com/api/health)
           echo "App health HTTP status: ${status}"
           [[ "$status" == "200" ]]
 
       - name: Retry queued transactional notifications
+        if: ${{ always() }}
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |

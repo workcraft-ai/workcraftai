@@ -64,7 +64,14 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="5. Data Deletion" /></h2>
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="5. Optional Public Website Analytics" /></h2>
+          <p className="text-sm leading-7 text-slate-700">
+            <LocalizedText text="If you allow analytics on workcraftai.com, Google Analytics measures public page visits and clicks on signup links. The public website does not send account IDs, customer details, estimate contents, or URL query strings to Google Analytics. Google may set analytics cookies and receive browser and device information under its own privacy policy. The analytics tag does not load if you decline. You can change your choice anytime using Analytics choices in the public website footer. We do not use this tag inside the signed-in app or customer proposal pages." />
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="6. Data Deletion" /></h2>
           <p className="text-sm leading-7 text-slate-700">
             <LocalizedText text="You may request full deletion of your account and associated data at any time through your account settings or by contacting support." />
           </p>

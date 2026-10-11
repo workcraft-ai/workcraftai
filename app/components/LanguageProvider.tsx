@@ -219,6 +219,9 @@ Object.assign(spanish, {
   "3. Backups and Retention": "3. Copias de seguridad y conservación",
   "When disaster-recovery backups are enabled, we create daily encrypted database backups and weekly backups that also include private estimate photos and voice notes. Backups are encrypted before they are uploaded to a restricted Google Drive folder and are retained for up to 30 days. Because backups are not used for normal app operation, deleted account data may remain in encrypted backups until those snapshots expire.": "Cuando se habilitan las copias de seguridad para recuperación ante desastres, creamos copias diarias cifradas de la base de datos y copias semanales que también incluyen fotos y notas de voz privadas de las cotizaciones. Las copias se cifran antes de subirse a una carpeta restringida de Google Drive y se conservan hasta 30 días. Como no se usan para el funcionamiento normal de la aplicación, los datos de una cuenta eliminada podrían permanecer en copias cifradas hasta que venzan.",
   "4. Estimate Email Tracking": "4. Seguimiento de correos de cotizaciones",
+  "5. Optional Public Website Analytics": "5. Estadísticas opcionales del sitio web público",
+  "If you allow analytics on workcraftai.com, Google Analytics measures public page visits and clicks on signup links. The public website does not send account IDs, customer details, estimate contents, or URL query strings to Google Analytics. Google may set analytics cookies and receive browser and device information under its own privacy policy. The analytics tag does not load if you decline. You can change your choice anytime using Analytics choices in the public website footer. We do not use this tag inside the signed-in app or customer proposal pages.": "Si permites las estadísticas en workcraftai.com, Google Analytics mide las visitas a las páginas públicas y los clics en los enlaces de registro. El sitio público no envía a Google Analytics identificadores de cuenta, datos de clientes, contenido de cotizaciones ni parámetros de la URL. Google puede instalar cookies de estadísticas y recibir información del navegador y del dispositivo conforme a su propia política de privacidad. La etiqueta de estadísticas no se carga si rechazas. Puedes cambiar tu elección en cualquier momento mediante Opciones de estadísticas en el pie de página del sitio público. No usamos esta etiqueta dentro de la aplicación con sesión iniciada ni en las páginas de propuestas para clientes.",
+  "6. Data Deletion": "6. Eliminación de datos",
   "3. Estimate Email Tracking": "4. Seguimiento de correos de cotizaciones",
   "4. Data Deletion": "5. Eliminación de datos",
   "5. Data Deletion": "5. Eliminación de datos",
@@ -524,6 +527,10 @@ Object.assign(spanish, {
 
 Object.assign(spanish, {
   "Notifications": "Notificaciones",
+  "Customer questions": "Preguntas de clientes",
+  "No customer questions for this estimate yet.": "Aún no hay preguntas de clientes para esta cotización.",
+  "Reply by email": "Responder por correo electrónico a",
+  "AI suggested starting price · no confident Price Book match for this trade, unit, and pricing basis. Review before sharing.": "Precio inicial sugerido por IA · no hubo una coincidencia confiable en tu lista de precios para este oficio, unidad y tipo de precio. Revísalo antes de compartir.",
   "Notifications could not be marked as read. Try again.": "No se pudieron marcar las notificaciones como leídas. Inténtalo de nuevo.",
   "Proposal approval is temporarily unavailable.": "La aprobación de propuestas no está disponible temporalmente.",
   "Questions are temporarily unavailable.": "Las preguntas no están disponibles temporalmente.",
