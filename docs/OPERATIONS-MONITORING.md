@@ -118,3 +118,15 @@ Activation: generate a signing secret in Supabase Production → Authentication 
 Production acceptance on October 10: one signed reset-hook request returned 200, the outbox recorded `sent`, the Resend event ledger recorded `delivered`, the shared Auth counter increased by one, and the owner confirmed inbox receipt on a phone. GitHub [run 38077269341](https://github.com/workcraft-ai/workcraftai/actions/runs/38077269341) passed the health and notification-retry steps with the matching secret. Earlier SMTP-only observations above are historical.
 
 DMARC now publishes `v=DMARC1; p=none` at `_dmarc.workcraftai.com`, verified through Vercel metadata and public DNS on October 10. It does not enforce rejection or collect aggregate reports without a `rua` destination. Add a reporting address only after confirming a monitored mailbox, review alignment reports, then consider enforcement. Existing SPF/DKIM/MX records were preserved.
+
+## Latest readiness release verification
+
+The current migration baseline is 43 matching Production/Staging versions, through
+`20261011024002`. Release `2b9c006` passed CI and reached Ready on both Production
+sites. Its public-browser audit covers 102 combinations, with no automated WCAG,
+overflow or locale failures. Resend delivery subscriptions now include failed and
+suppressed events, preserving the endpoint and signing secret. Billing refreshes
+use per-account leases and ignore superseded subscriptions. Final public release
+checks are repeatable with `scripts/production-public-checks.mjs` and
+`scripts/launch-readiness-audit.mjs`; these do not certify current signed-in,
+checkout, inbox or recovery-login task completion.

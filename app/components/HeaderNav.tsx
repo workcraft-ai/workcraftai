@@ -158,7 +158,7 @@ export default function HeaderNav() {
         {translate(language, "+ New estimate")}
       </Link>
 
-      <NotificationBell userId={user.id} />
+      <NotificationBell key={user.id} userId={user.id} />
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"

@@ -508,6 +508,7 @@ Object.assign(spanish, {
 
 Object.assign(spanish, {
   "Notifications": "Notificaciones",
+  "Notifications could not be marked as read. Try again.": "No se pudieron marcar las notificaciones como leídas. Inténtalo de nuevo.",
   "unread": "sin leer",
   "Mark all as read": "Marcar todas como leídas",
   "Marking…": "Marcando…",
