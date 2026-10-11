@@ -7,6 +7,13 @@ export function getStripeClient() {
   return new Stripe(key);
 }
 
+export function stripeLivemode() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (key?.startsWith("sk_live_") || key?.startsWith("rk_live_")) return true;
+  if (key?.startsWith("sk_test_") || key?.startsWith("rk_test_")) return false;
+  return null;
+}
+
 export function getServiceSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
