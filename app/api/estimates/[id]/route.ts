@@ -82,7 +82,15 @@ export async function GET(
     return data?.signedUrl ? { id: attachment.id, media_type: attachment.media_type, content_type: attachment.content_type, created_at: attachment.created_at, url: data.signedUrl } : null;
   }));
 
-  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean) }, {
+  const { data: questions, error: questionError } = await supabase.from("proposal_questions")
+    .select("id, customer_name, customer_email, message, created_at, read_at")
+    .eq("estimate_id", id)
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (questionError) console.error("Estimate question lookup failed:", questionError.message);
+
+  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean), questions: questions ?? [] }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

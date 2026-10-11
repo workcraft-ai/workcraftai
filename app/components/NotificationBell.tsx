@@ -167,7 +167,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
     const safeEstimateId = notification.estimate_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notification.estimate_id)
       ? notification.estimate_id
       : null;
-    router.push(safeEstimateId ? "/estimate/" + encodeURIComponent(safeEstimateId) : "/dashboard");
+    router.push(safeEstimateId ? "/estimate/" + encodeURIComponent(safeEstimateId) + (notification.event_type === "customer_question" ? "#customer-questions" : "") : "/dashboard");
   };
 
   const markAllRead = async () => {

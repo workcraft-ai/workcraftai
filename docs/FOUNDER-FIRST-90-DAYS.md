@@ -14,7 +14,7 @@ Start with approximately a dozen independent trade and service contractors who c
 
 ## Weekly scorecard
 
-Review aggregate counts from existing account, estimate, proposal-view, question, and subscription records. Do not add third-party trackers or customer content to analytics for this cohort. Record a weekly snapshot with its date and definitions; exclude known founder/test accounts only when clearly tagged in the notes, so the denominator does not shift silently.
+Review aggregate counts from existing account, estimate, proposal-view, question, and subscription records. The public website uses optional, consent-based Google Analytics for page views and signup-link clicks; the signed-in app and customer proposal pages have no Google Analytics tag. Do not send customer content or account identifiers to analytics. Public-site counts include only visitors who allow analytics, so they are not a complete visitor census. Record a weekly snapshot with its date and definitions; exclude known founder/test accounts only when clearly tagged in the notes, so the denominator does not shift silently.
 
 | Measure | Definition | Why it matters |
 | --- | --- | --- |

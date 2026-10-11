@@ -42,6 +42,7 @@ interface Estimate {
 interface ContractorBrand { businessName: string; phone: string; address: string; logoUrl: string; brandColor: string; }
 interface ProposalPhoto { id: string; url: string; }
 interface OwnerAttachment { id: string; media_type: "photo" | "voice"; url: string; }
+interface OwnerQuestion { id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 interface PaymentSummary { amountPaidCents: number; totalCents: number; packageTotalsCents?: Record<string, number>; available: boolean; }
 
 interface EstimatePackage {
@@ -76,6 +77,7 @@ export default function ClientEstimatePage() {
   const [contractor, setContractor] = useState<ContractorBrand>({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
   const [photos, setPhotos] = useState<ProposalPhoto[]>([]);
   const [ownerAttachments, setOwnerAttachments] = useState<OwnerAttachment[]>([]);
+  const [ownerQuestions, setOwnerQuestions] = useState<OwnerQuestion[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [ownerHasPro, setOwnerHasPro] = useState(false);
   const [ownerPlanLoaded, setOwnerPlanLoaded] = useState(false);
@@ -114,6 +116,7 @@ export default function ClientEstimatePage() {
       setOwnerHasPro(false);
       setOwnerPlanLoaded(false);
       setOwnerAttachments([]);
+      setOwnerQuestions([]);
       setPhotos([]);
       setWasConverted(false);
       setQuestionStatus("");
@@ -147,6 +150,7 @@ export default function ClientEstimatePage() {
             const ownerData = await ownerResponse.json();
             if (!isCurrent) return;
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
+            if (Array.isArray(ownerData.questions)) setOwnerQuestions(ownerData.questions as OwnerQuestion[]);
             const convertedJobId = ownerData.estimate?.converted_job_id;
             setInvoiceJobId(typeof convertedJobId === "string" && convertedJobId ? convertedJobId : null);
             try {
@@ -179,6 +183,12 @@ export default function ClientEstimatePage() {
     fetchEstimateDetails();
     return () => { isCurrent = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (isOwner && window.location.hash === "#customer-questions") {
+      document.getElementById("customer-questions")?.scrollIntoView({ block: "start" });
+    }
+  }, [isOwner, ownerQuestions.length]);
 
   const selectedPackageName = selectedPackage === null ? null : estimate?.package_options?.[selectedPackage]?.name ?? null;
   const calculatedEstimateMoney = calculateEstimateMoney(estimate ?? {}, lineItems, selectedPackageName);
@@ -391,6 +401,15 @@ export default function ClientEstimatePage() {
           </div>
           {invoiceError && <p role="alert" className="basis-full rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">{invoiceError}</p>}
         </div>}
+
+        {isOwner && <section id="customer-questions" className="print:hidden scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <h2 className="text-sm font-bold">Customer questions</h2>
+          {ownerQuestions.length ? <div className="divide-y divide-slate-100">{ownerQuestions.map((question) => <article key={question.id} className="py-3 first:pt-0 last:pb-0">
+            <p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString()}</span></p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{question.message}</p>
+            <a className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`}>{translate(estimate.proposal_language, "Reply by email")} {question.customer_email}</a>
+          </article>)}</div> : <p className="text-xs text-slate-600">No customer questions for this estimate yet.</p>}
+        </section>}
 
         {isOwner && <section className="print:hidden rounded-xl border border-slate-200 bg-white p-4 space-y-3">
           <h2 className="text-sm font-bold">Customer sharing</h2>

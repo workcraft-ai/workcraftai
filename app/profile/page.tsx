@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 type UsageSnapshot = {
@@ -18,6 +18,7 @@ function remaining(used: number, limit: number) {
 }
 
 export default function ProfilePage() {
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export default function ProfilePage() {
   const [stripeStatusError, setStripeStatusError] = useState(false);
   const [stripeStatusRefreshing, setStripeStatusRefreshing] = useState(false);
   const [stripeDashboard, setStripeDashboard] = useState<"full" | "express" | "none" | null>(null);
+  const [stripePaymentMode, setStripePaymentMode] = useState<"test" | "live" | "unavailable">("unavailable");
   const [usageSnapshot, setUsageSnapshot] = useState<UsageSnapshot | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
 
@@ -64,6 +66,7 @@ export default function ProfilePage() {
     setStripeRequirementsDue(connect.requirementsDue === true);
     setStripeSetupState(connect.setupState === "ready" || connect.setupState === "needs_action" || connect.setupState === "under_review" ? connect.setupState : "incomplete");
     setStripeDashboard(connect.dashboard === "full" || connect.dashboard === "express" || connect.dashboard === "none" ? connect.dashboard : null);
+    setStripePaymentMode(connect.paymentMode === "test" || connect.paymentMode === "live" ? connect.paymentMode : "unavailable");
     setStripeStatusError(false);
   }, []);
 
@@ -283,6 +286,7 @@ export default function ProfilePage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer payments</p>
             <h2 className="mt-1 text-lg font-bold text-slate-900">Stripe payment setup</h2>
             <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">{stripeDashboard === "express" ? "This existing Stripe connection uses the Express Dashboard. New connections use the Full Stripe Dashboard. Use the Open Stripe Express button to review payments and payout settings." : "Stripe-hosted onboarding collects verification and payout information directly. New connected accounts use the Full Stripe Dashboard; after Stripe activates your account, use your own Stripe login to manage payments, payouts, reports, and account details. Stripe processing fees are separate from your WorkCraft AI Pro subscription."}</p>
+            {stripePaymentMode === "test" && <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">{language === "es" ? "Stripe está en modo de prueba. La incorporación y los pagos usan datos de prueba; no se cobran fondos reales." : "Stripe is in test mode. Setup and payments use test data; no real money is collected."}</p>}
             {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature.</p>}
             {hasProAccess && !connectLoading && stripeConnected && stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-green-700">Stripe is connected and can accept payments.{stripeRequirementsDue ? " Stripe may request updated business information later." : ""}</p>}
             {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "needs_action" && <p role="status" className="mt-2 text-xs font-semibold text-amber-700">Stripe still needs information before it can activate payments. Continue setup to complete the remaining verification steps.</p>}
