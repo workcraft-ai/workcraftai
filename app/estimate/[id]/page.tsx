@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, translate, type Language } from "@/app/components/LanguageProvider";
-import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { calculateEstimateMoney, percentageOfCents } from "@/lib/estimate-money.mjs";
 
 interface LineItem {
   id: string;
@@ -192,7 +192,7 @@ export default function ClientEstimatePage() {
       markupCents: 0,
       taxCents: 0,
       totalCents: summaryTotalCents,
-      depositCents: estimate.require_deposit ? Math.round(summaryTotalCents * Number(estimate.deposit_percentage || 0) / 100) : 0,
+      depositCents: estimate.require_deposit ? percentageOfCents(summaryTotalCents, estimate.deposit_percentage || 0) : 0,
     }
     : calculatedEstimateMoney;
   const subtotal = estimateMoney.subtotalCents / 100;

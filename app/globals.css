@@ -112,3 +112,6 @@ body {
   .mobile-app-nav { display: none !important; }
   body:has(.mobile-app-nav) { padding-bottom: 0 !important; }
 }
+
+/* Keep recovery guidance readable on dark Auth surfaces. */
+.auth-dark .auth-helper { color: #cbd5cf; }

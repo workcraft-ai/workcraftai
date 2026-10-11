@@ -10,6 +10,8 @@ const eventStatuses: Record<string, string> = {
   "email.delivery_delayed": "delivery_delayed",
   "email.bounced": "bounced",
   "email.complained": "complained",
+  "email.failed": "failed",
+  "email.suppressed": "suppressed",
 };
 
 type ResendEvent = {

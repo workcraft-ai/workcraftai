@@ -64,11 +64,11 @@ function ForgotPasswordForm() {
 
   return (
     <LocalizedTree>
-    <main className="flex min-h-screen flex-col justify-center bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 lg:px-8">
+    <main className="auth-dark flex min-h-screen flex-col justify-center bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-md flex-col items-center">
         <Logo className="h-10 w-10" />
         <h1 className="mt-6 text-center text-2xl font-bold tracking-tight text-white">Reset your password</h1>
-        <p className="mt-2 text-center text-sm text-slate-400">We’ll email you a secure link to choose a new password.</p>
+        <p className="mt-2 auth-helper text-center text-sm">We’ll email you a secure link to choose a new password.</p>
       </div>
 
       <section className="mx-auto mt-8 w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 px-4 py-8 shadow sm:px-10">
@@ -94,7 +94,7 @@ function ForgotPasswordForm() {
             {loading ? "Sending link…" : "Send reset link"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 auth-helper text-center text-sm">
           Remembered your password? <Link href="/login" className="inline-flex min-h-12 items-center font-medium text-blue-400 underline hover:text-blue-300">Sign in</Link>
         </p>
       </section>

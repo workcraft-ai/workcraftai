@@ -1,3 +1,4 @@
+import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
@@ -37,7 +38,7 @@ function validLineItems(value: unknown): value is LineItemInput[] {
       (candidate.unit === undefined || (typeof candidate.unit === "string" && candidate.unit.trim().length > 0 && candidate.unit.length <= 40)) &&
       (candidate.description_es === undefined || candidate.description_es === null || (typeof candidate.description_es === "string" && candidate.description_es.length <= 240));
     if (!valid) return false;
-    subtotalCents += Math.round(Number(candidate.quantity) * Number(candidate.unit_price) * 100);
+    subtotalCents += calculateEstimateMoney({}, [{ quantity: Number(candidate.quantity), unit_price: Number(candidate.unit_price) }]).subtotalCents;
     return subtotalCents <= 100_000_000_000;
   });
 }
