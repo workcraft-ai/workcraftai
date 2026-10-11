@@ -158,9 +158,7 @@ Object.assign(spanishTranslations, {
   "Keep good work moving": "Mantén el buen trabajo en marcha",
   "Turn your next estimate into a clear next step.": "Convierte tu próxima cotización en un paso claro.",
   "WorkCraft AI gives independent contractors a simple place to prepare estimates and keep job details organized.": "WorkCraft AI ofrece a los contratistas independientes un espacio sencillo para preparar cotizaciones y organizar los detalles de cada trabajo.",
-  "ADVERTISEMENT": "PUBLICIDAD",
   "Relevant tools for independent contractors": "Herramientas útiles para contratistas independientes",
-  "A calm, clearly labeled ad can appear here after the site is approved by Google AdSense.": "Aquí puede aparecer un anuncio discreto y claramente identificado cuando Google AdSense apruebe el sitio.",
   "Ad placement preview · ads not active": "Vista previa del espacio publicitario · anuncios inactivos",
   "A clearer workflow": "Un flujo de trabajo más claro",
   "Keep estimates and job details together.": "Mantén juntas las cotizaciones y los detalles del trabajo.",
@@ -170,8 +168,7 @@ Object.assign(spanishTranslations, {
   "Previous guide": "Guía anterior",
   "Back to all guides": "Volver a todas las guías",
   "← Back to all guides": "← Volver a todas las guías",
-  "Advertisement and related information": "Anuncio e información relacionada",
-  "Advertisement placement preview": "Vista previa del espacio publicitario",
+  "Related guides and tools": "Guías y herramientas relacionadas",
   "Estimate guide": "Guía de cotización",
   "Price book guide": "Guía de lista de precios",
   "How to write a clear contractor estimate": "Cómo redactar una cotización clara",
@@ -351,9 +348,18 @@ Object.assign(spanishTranslations, {
   "For contracts, safety instructions, permits, or regulated work, use a qualified human reviewer when an inaccurate translation could change rights, obligations, or safety.": "Para contratos, instrucciones de seguridad, permisos o trabajos regulados, pide una revisión humana calificada si un error de traducción puede cambiar derechos, obligaciones o seguridad.",
   "Give customers a proposal they can follow.": "Entrega una propuesta que el cliente pueda entender.",
   "Prepare a customer-facing proposal in English or Spanish and keep the details organized as you work.": "Prepara una propuesta para el cliente en inglés o español y organiza los detalles mientras trabajas.",
-  "FEATURED GUIDE · 6 MIN READ": "GUÍA DESTACADA · 6 MIN DE LECTURA",
-  "A practical structure for describing the work, quantities, assumptions, and price so customers know what they are approving.": "Una estructura práctica para describir el trabajo, las cantidades, los supuestos y el precio para que el cliente sepa qué está aprobando.",
-  "Read the featured guide": "Leer la guía destacada",
+  "FEATURED GUIDE": "GUÍA DESTACADA",
+  "6 MIN READ": "6 MIN DE LECTURA",
+  "Write estimates customers can understand.": "Redacta cotizaciones que tus clientes entiendan.",
+  "Show the work, quantities, assumptions, and total clearly—so customers know what they’re approving.": "Muestra claramente el trabajo, las cantidades, los supuestos y el total para que tus clientes sepan qué están aprobando.",
+  "Read the estimate guide": "Leer la guía de cotizaciones",
+  "WORKCRAFT AI": "WORKCRAFT AI",
+  "SAMPLE": "EJEMPLO",
+  "ESTIMATE · #WC-0248": "COTIZACIÓN · #WC-0248",
+  "Faucet replacement": "Reemplazo de grifo",
+  "Labor & materials": "Mano de obra y materiales",
+  "Estimate total": "Total de la cotización",
+  "Scope confirmed": "Alcance confirmado",
   "MORE HELPFUL GUIDES": "MÁS GUÍAS ÚTILES",
   "Ideas you can put to work.": "Ideas que puedes poner en práctica.",
   "Clear, useful reads. No fluff.": "Lecturas claras y útiles, sin relleno.",
@@ -378,7 +384,6 @@ Object.assign(spanishTranslations, {
   "← Back to all guides": "← Volver a todas las guías",
   "WorkCraft AI Field Guide": "Guía práctica de WorkCraft AI",
   "October 10, 2026": "10 de octubre de 2026",
-  "A clearly labeled ad can appear here after the site is approved by Google AdSense.": "Aquí puede aparecer un anuncio claramente identificado cuando Google AdSense apruebe el sitio.",
   "A clearer workflow": "Un flujo de trabajo más claro",
   "Explore the app": "Explora la aplicación",
 });
@@ -468,8 +473,7 @@ function translatePage(language) {
   document.querySelector(".main-nav")?.setAttribute("aria-label", language === "es" ? "Navegación principal" : "Main navigation");
   mobileNavigation?.setAttribute("aria-label", language === "es" ? "Navegación móvil" : "Mobile navigation");
   document.querySelectorAll('nav[aria-label="Breadcrumb"]').forEach((breadcrumb) => breadcrumb.setAttribute("aria-label", language === "es" ? "Ruta de navegación" : "Breadcrumb"));
-  document.querySelectorAll(".guide-sidebar").forEach((sidebar) => sidebar.setAttribute("aria-label", language === "es" ? "Anuncio e información relacionada" : "Advertisement and related information"));
-  document.querySelectorAll(".guide-ad-card").forEach((adCard) => adCard.setAttribute("aria-label", language === "es" ? "Vista previa del espacio publicitario" : "Advertisement placement preview"));
+  document.querySelectorAll(".guide-sidebar").forEach((sidebar) => sidebar.setAttribute("aria-label", language === "es" ? "Guías y herramientas relacionadas" : "Related guides and tools"));
   document.querySelector(".hero-art")?.setAttribute("aria-label", language === "es" ? "Panel ilustrativo de WorkCraft AI con cotizaciones, trabajos, lista de precios e informes ficticios" : "Illustrative WorkCraft AI dashboard with fictional sample estimates, schedule, price book, and reports");
   document.querySelector(".demo-video")?.setAttribute("aria-label", language === "es" ? "Demostración del producto WorkCraft AI" : "WorkCraft AI product demonstration");
   document.querySelectorAll(".brand-image").forEach((image) => image.setAttribute("alt", language === "es" ? "WorkCraft AI, para quienes hacen el trabajo. Mantén el buen trabajo en marcha." : "WorkCraft AI, for the people who get the work done. Keep good work moving."));
