@@ -38,6 +38,22 @@ function persistLanguage(language: Language) {
 }
 
 const spanish: Record<string, string> = {
+  "Your first quote": "Tu primera cotización",
+  "Start with one real job": "Empieza con un trabajo real",
+  "Your estimate is ready for the next step": "Tu cotización está lista para el siguiente paso",
+  "Add the customer, describe the work, set your own prices, and save. You can build a price book later.": "Agrega al cliente, describe el trabajo, fija tus propios precios y guarda. Puedes crear tu lista de precios después.",
+  "Review the scope and total, then copy the customer link from your estimate. Customers can review and approve without creating an account.": "Revisa el alcance y el total, luego copia el enlace del cliente de tu cotización. Los clientes pueden revisar y aprobar sin crear una cuenta.",
+  "Create your first estimate": "Crea tu primera cotización",
+  "Review and share estimate": "Revisar y compartir cotización",
+  "Copying…": "Copiando…",
+  "Customer link copied. Share it with your customer by text or your own email. Copying does not send a message.": "Se copió el enlace del cliente. Compártelo por mensaje de texto o desde tu propio correo. Copiarlo no envía ningún mensaje.",
+  "The customer link is ready below. Select and copy it to share from your text or email app.": "El enlace del cliente está listo abajo. Selecciónalo y cópialo para compartirlo por mensaje de texto o desde tu correo.",
+  "Customer link": "Enlace del cliente",
+  "Customer sharing is disabled or expired. Open the estimate to replace the customer link.": "El enlace del cliente está desactivado o vencido. Abre la cotización para reemplazarlo.",
+  "For a quick first quote, enter the customer, add the work and your prices, then save. Price book, AI, photos, and packages are optional.": "Para tu primera cotización rápida, ingresa el cliente, agrega el trabajo y tus precios, y guarda. La lista de precios, la IA, las fotos y los paquetes son opcionales.",
+  "Estimate form shortcuts": "Accesos directos del formulario de cotización",
+  "Customer details": "Datos del cliente",
+  "Work and prices": "Trabajo y precios",
   "Estimate trade options": "Opciones de oficios para cotizaciones",
   "Manage the choices shown in the Trade dropdown when creating an estimate. Add an English name and its Spanish label for each trade. Changes apply to new estimate forms; existing estimates keep their saved trade.": "Administra las opciones del menú Oficio al crear una cotización. Agrega un nombre en inglés y su etiqueta en español para cada oficio. Los cambios se aplican a los formularios nuevos; las cotizaciones existentes conservan su oficio guardado.",
   "Trade name (English)": "Nombre del oficio (inglés)",

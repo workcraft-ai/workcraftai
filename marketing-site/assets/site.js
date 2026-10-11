@@ -1,4 +1,7 @@
 const spanishTranslations = {
+  "Built for independent tradespeople quoting from the job site. Make a clear estimate on your phone, then share a link your customer can approve without an account. Free includes the link; Pro adds branded email, AI drafting, job scheduling, invoices, and Stripe payments.": "Creado para profesionales independientes que cotizan desde el lugar de trabajo. Prepara una cotización clara en tu teléfono y comparte un enlace que el cliente puede aprobar sin crear una cuenta. Gratis incluye el enlace; Pro agrega correos con tu marca, borradores con IA, programación de trabajos, facturas y pagos con Stripe.",
+  "Copy a customer link for free, or send branded email with Pro.": "Copia un enlace para el cliente gratis o envía un correo con tu marca con Pro.",
+  "Copy a proposal link for customer review and approval; send it from your own text or email app": "Copia un enlace de propuesta para que el cliente la revise y apruebe; envíalo por mensaje de texto o desde tu propio correo",
   "Dashboard": "Panel",
   "Skip to content": "Saltar al contenido",
   "How it works": "Cómo funciona",
@@ -412,15 +415,15 @@ const mobileNavigation = document.querySelector("#mobile-navigation");
 const localizedMetadata = {
   en: {
     title: "Contractor Estimates and Job Tools | WorkCraft AI",
-    description: "WorkCraft AI helps independent contractors create and share estimates for free. Pro adds AI drafting, job scheduling, invoice tools, and customer payments through Stripe.",
+    description: "Build a clear estimate on your phone and share a customer approval link for free. WorkCraft AI Pro adds branded email, AI drafting, jobs, invoices, and Stripe payments.",
     socialTitle: "WorkCraft AI | Estimates and job tools for contractors",
-    socialDescription: "Create and share estimates for free. Upgrade for AI drafting, job scheduling, invoice tools, and customer payments through Stripe.",
+    socialDescription: "Build and share a customer-ready estimate from your phone. Start free; add Pro email, AI drafting, jobs, invoices, and Stripe payments when you need them.",
   },
   es: {
     title: "Cotizaciones y herramientas para contratistas | WorkCraft AI",
-    description: "WorkCraft AI ayuda a contratistas independientes a crear y compartir cotizaciones gratis. Pro añade redacción con IA, programación de trabajos, facturas y pagos de clientes mediante Stripe.",
+    description: "Prepara una cotización clara en tu teléfono y comparte gratis un enlace que el cliente puede aprobar. Pro agrega correos con tu marca, IA, trabajos, facturas y pagos con Stripe.",
     socialTitle: "WorkCraft AI | Cotizaciones y herramientas para contratistas",
-    socialDescription: "Crea y comparte cotizaciones gratis. Mejora a Pro para usar redacción con IA, programar trabajos, gestionar facturas y recibir pagos de clientes mediante Stripe.",
+    socialDescription: "Crea y comparte cotizaciones desde tu teléfono. Empieza gratis; agrega correo Pro, IA, trabajos, facturas y pagos con Stripe cuando los necesites.",
   },
 };
 

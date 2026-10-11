@@ -652,6 +652,11 @@ export default function CreateEstimatePage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">WorkCraft AI / Estimates</p>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">Create an estimate</h1>
               <p className="mt-1 text-sm text-slate-500">Build a clear, editable quote for your next job.</p>
+              <p className="mt-2 max-w-2xl text-sm text-slate-700">{translate(language, "For a quick first quote, enter the customer, add the work and your prices, then save. Price book, AI, photos, and packages are optional.")}</p>
+              <nav aria-label={translate(language, "Estimate form shortcuts")} className="mt-2 flex flex-wrap gap-3 text-sm font-semibold">
+                <a href="#customer-details" className="inline-flex min-h-11 items-center text-orange-800 underline underline-offset-2">{translate(language, "Customer details")}</a>
+                <a href="#estimate-line-items" className="inline-flex min-h-11 items-center text-orange-800 underline underline-offset-2">{translate(language, "Work and prices")}</a>
+              </nav>
               {estimateAllowance && <p role="status" className={`mt-2 text-xs ${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) === 0 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) === 0 ? "font-semibold text-red-800" : Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) <= 2 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) <= 10 ? "font-semibold text-amber-800" : "text-slate-600"}`}>{Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0)} of {estimateAllowance.daily_limit} estimates left today · {Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0)} of {estimateAllowance.monthly_limit} left this month (UTC)</p>}
             </div>
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
@@ -683,7 +688,7 @@ export default function CreateEstimatePage() {
           </section>
 
           {/* Client Details Section */}
-          <div className="space-y-4">
+          <div id="customer-details" className="scroll-mt-24 space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Client Information
             </h2>
@@ -808,8 +813,8 @@ export default function CreateEstimatePage() {
           {/* Scope of Work Table */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Scope & Line Items
+              <h2 id="estimate-line-items" className="scroll-mt-24 text-sm font-semibold text-slate-900">
+                Scope &amp; Line Items
               </h2>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="button" onClick={() => setShowPriceBook((open) => !open)} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 hover:text-blue-600">{showPriceBook ? "Close price book" : "+ Add from price book"}</button>
