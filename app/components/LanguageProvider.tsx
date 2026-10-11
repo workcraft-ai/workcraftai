@@ -509,6 +509,8 @@ Object.assign(spanish, {
 Object.assign(spanish, {
   "Notifications": "Notificaciones",
   "Notifications could not be marked as read. Try again.": "No se pudieron marcar las notificaciones como leídas. Inténtalo de nuevo.",
+  "Proposal approval is temporarily unavailable.": "La aprobación de propuestas no está disponible temporalmente.",
+  "Questions are temporarily unavailable.": "Las preguntas no están disponibles temporalmente.",
   "unread": "sin leer",
   "Mark all as read": "Marcar todas como leídas",
   "Marking…": "Marcando…",
