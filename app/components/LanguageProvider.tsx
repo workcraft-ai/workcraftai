@@ -506,6 +506,46 @@ Object.assign(spanish, {
   "Add your first customer": "Agrega tu primer cliente",
 });
 
+Object.assign(spanish, {
+  "Notifications": "Notificaciones",
+  "unread": "sin leer",
+  "Mark all as read": "Marcar todas como leídas",
+  "Marking…": "Marcando…",
+  "Close notifications": "Cerrar notificaciones",
+  "Loading notifications…": "Cargando notificaciones…",
+  "No notifications yet.": "Aún no hay notificaciones.",
+  "Notifications could not load.": "No se pudieron cargar las notificaciones.",
+  "asked a question about your estimate": "hizo una pregunta sobre tu cotización",
+  "accepted your estimate": "aceptó tu cotización",
+  "declined your estimate": "rechazó tu cotización",
+  "made a payment on your estimate": "realizó un pago de tu cotización",
+  "Estimate": "Cotización",
+});
+
+
+Object.assign(spanish, {
+  "Decline estimate": "Rechazar cotización",
+  "Are you sure you want to decline this estimate? The contractor will be notified.": "¿Seguro que quieres rechazar esta cotización? Se notificará al contratista.",
+  "Reason (optional)": "Motivo (opcional)",
+  "Share an optional reason with the contractor.": "Comparte un motivo opcional con el contratista.",
+  "Reason:": "Motivo:",
+  "Confirm decline": "Confirmar rechazo",
+  "Keep estimate": "Conservar cotización",
+  "Declining…": "Rechazando…",
+  "The estimate is no longer open for a response.": "La cotización ya no está abierta para recibir respuestas.",
+  "Your response could not be recorded. Please try again.": "No se pudo registrar tu respuesta. Inténtalo de nuevo.",
+  "Your reason must be 500 characters or less.": "El motivo debe tener 500 caracteres o menos.",
+  "Enter an optional reason or submit without one.": "Escribe un motivo opcional o envía la respuesta sin uno.",
+  "Your response is too long.": "Tu respuesta es demasiado larga.",
+  "Please try again.": "Inténtalo de nuevo.",
+  "You declined this estimate. The contractor has been notified.": "Rechazaste esta cotización. Se notificó al contratista.",
+});
+
+Object.assign(spanish, {
+  "Proposal not found or link expired.": "No se encontró la propuesta o el enlace venció.",
+  "Estimate responses are temporarily unavailable.": "Las respuestas a cotizaciones no están disponibles temporalmente.",
+});
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";

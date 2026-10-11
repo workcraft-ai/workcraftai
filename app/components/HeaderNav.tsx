@@ -7,6 +7,7 @@ import { createClient } from "@/app/utils/supabase/client";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { translate, useLanguage } from "@/app/components/LanguageProvider";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const appLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -157,6 +158,7 @@ export default function HeaderNav() {
         {translate(language, "+ New estimate")}
       </Link>
 
+      <NotificationBell userId={user.id} />
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"

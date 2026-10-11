@@ -36,6 +36,7 @@ interface Estimate {
   signature_name?: string | null;
   selected_package?: string | null;
   accepted_at?: string | null;
+  customer_declined_at?: string | null;
 }
 
 interface ContractorBrand { businessName: string; phone: string; address: string; logoUrl: string; brandColor: string; }
@@ -64,6 +65,10 @@ export default function ClientEstimatePage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [confirmingDecline, setConfirmingDecline] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [decliningBusy, setDecliningBusy] = useState(false);
+  const [declineError, setDeclineError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -97,6 +102,10 @@ export default function ClientEstimatePage() {
       setErrorMsg("");
       setSelectedPackage(null);
       setSignatureName("");
+      setConfirmingDecline(false);
+      setDeclineReason("");
+      setDeclineError("");
+      setDecliningBusy(false);
       setContractor({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
       setInvoiceError("");
       setInvoiceJobId(null);
@@ -258,6 +267,31 @@ export default function ClientEstimatePage() {
     } catch (err: unknown) {
       alert("Error processing approval: " + (err instanceof Error ? err.message : String(err)));
       setPaying(false);
+    }
+  };
+
+  const handleDecline = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDecliningBusy(true);
+    setDeclineError("");
+    try {
+      const response = await fetch(`/api/estimates/${encodeURIComponent(id)}/decline${customerSuffix()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: declineReason.trim() }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success !== true) {
+        throw new Error(typeof result.error === "string" ? result.error : "Your response could not be recorded. Please try again.");
+      }
+      const declinedAt = typeof result.declinedAt === "string" ? result.declinedAt : new Date().toISOString();
+      setEstimate((current) => current ? { ...current, status: "declined", customer_declined_at: declinedAt } : current);
+      setConfirmingDecline(false);
+      setDeclineReason("");
+    } catch (error) {
+      setDeclineError(error instanceof Error ? error.message : "Your response could not be recorded. Please try again.");
+    } finally {
+      setDecliningBusy(false);
     }
   };
 
@@ -502,7 +536,7 @@ export default function ClientEstimatePage() {
             )}
           </div>
 
-          {!isOwner && <section className="rounded-xl border border-slate-200 bg-white p-4">
+          {!isOwner && estimate.status !== "declined" && <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-bold text-slate-900">Have a question about this proposal?</h2>
             <p className="mt-1 text-xs text-slate-600">Send it directly to {contractor.businessName}. Your email will be used so they can reply.</p>
             <form onSubmit={sendQuestion} className="mt-3 space-y-3">
@@ -538,7 +572,7 @@ export default function ClientEstimatePage() {
             </div>
           ) : estimate.status === "declined" ? (
             <div className="bg-slate-100 border border-slate-200 text-slate-700 p-4 rounded-xl text-center font-semibold text-sm">
-              This estimate was marked as declined. Contact the contractor if you have questions.
+              {estimate.customer_declined_at ? "You declined this estimate. The contractor has been notified." : "This estimate was marked as declined. Contact the contractor if you have questions."}
             </div>
           ) : (
             <>
@@ -561,6 +595,48 @@ export default function ClientEstimatePage() {
                 ? `Approve Estimate · Deposit Due Later ($${depositAmount.toFixed(2)})`
                 : `Approve Proposal ($${total.toFixed(2)})`}
             </button>
+            {confirmingDecline ? (
+              <form onSubmit={(event) => void handleDecline(event)} className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-slate-900">Are you sure you want to decline this estimate? The contractor will be notified.</p>
+                <label htmlFor="customer-decline-reason" className="block text-xs font-semibold text-slate-700">Reason (optional)</label>
+                <p id="customer-decline-reason-help" className="text-xs text-slate-600">Share an optional reason with the contractor.</p>
+                <textarea
+                  id="customer-decline-reason"
+                  value={declineReason}
+                  onChange={(event) => setDeclineReason(event.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  aria-describedby="customer-decline-reason-help"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
+                />
+                {declineError && <p role="alert" className="text-xs font-medium text-red-800">{declineError}</p>}
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    disabled={decliningBusy}
+                    onClick={() => { setConfirmingDecline(false); setDeclineError(""); setDeclineReason(""); }}
+                    className="min-h-12 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                  >
+                    Keep estimate
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={decliningBusy}
+                    className="min-h-12 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  >
+                    {decliningBusy ? "Declining…" : "Confirm decline"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setDeclineError(""); setConfirmingDecline(true); }}
+                className="min-h-12 w-full rounded-xl border border-red-300 bg-white px-4 py-3 text-sm font-semibold text-red-800 transition hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              >
+                Decline estimate
+              </button>
+            )}
             </>
           ))}
         </div>
