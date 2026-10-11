@@ -112,6 +112,15 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 .main-nav>a,.language-toggle{min-height:48px;min-width:48px;display:inline-flex;align-items:center;justify-content:center}
 
 /* Contractor resource library and field guides. */
+.header-actions{display:flex;align-items:center;gap:12px}
+.header-signin{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:8px;color:#31443a;font-size:12px;font-weight:700}
+.header-signin:hover{color:#9b3e1f;text-decoration:underline;text-underline-offset:3px}
+.header-actions .header-cta{border-color:#192923;background:#192923;color:#fffefa}
+.header-actions .header-cta:hover{background:#33473d;color:#fffefa}
+@media(max-width:1050px){.site-header .main-nav{display:none}.site-header .menu-toggle{display:inline-flex;align-items:center;justify-content:center}.site-header .header-signin{white-space:nowrap}.site-header .header-cta{white-space:nowrap}}
+.hero h1{font-size:clamp(43px,5.2vw,69px);line-height:1.1}
+.resource-page-title{margin-top:0;margin-bottom:15px;color:#536d5d;font-size:clamp(15px,1.7vw,20px);font-weight:700;letter-spacing:-.3px}
+@media(max-width:650px){.header-actions{gap:3px}.header-actions .header-signin{display:none}.header-actions .header-cta{padding:11px 9px;font-size:10px}.hero h1{font-size:clamp(42px,10vw,56px)}}
 .resource-main{padding-top:48px;padding-bottom:88px}
 .resource-hero{padding:30px 0 54px}
 .resource-hero h1{max-width:700px;margin:23px 0 20px;font-size:clamp(46px,6vw,72px);line-height:1.05}

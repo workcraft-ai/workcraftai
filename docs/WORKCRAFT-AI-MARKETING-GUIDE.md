@@ -39,7 +39,7 @@ LinkedIn says a Company Page can be created for free and documents the Page crea
 
 1. Sign in to [Google Search Console](https://search.google.com/search-console/) with the company's Google account.
 2. Add a **Domain property** for `workcraftai.com` and verify it by adding Google's TXT record at the domain's DNS provider.
-3. After the domains resolve, submit both `https://workcraftai.com/sitemap.xml` and `https://app.workcraftai.com/sitemap.xml` in Search Console's **Sitemaps** report. The marketing sitemap lists its single canonical landing page; the app sitemap lists only its public support and legal pages.
+3. After the domains resolve, submit both `https://workcraftai.com/sitemap.xml` and `https://app.workcraftai.com/sitemap.xml` in Search Console's **Sitemaps** report. The marketing sitemap lists the landing page, Resources hub, and published guides; the app sitemap lists only its public support and legal pages.
 4. Use **URL Inspection** on the marketing home page and the app's support and legal pages. Confirm the selected canonical matches each page's declared canonical. App tools and customer-specific pages should remain excluded from results.
 5. Check the Sitemaps, Pages/Indexing, and Performance reports monthly. Sitemap submission is a discovery hint, not a guarantee of indexing. [Google's sitemap guide](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap) · [Google's canonical guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls)
 6. The marketing site's English/Spanish toggle currently changes content on the same URL. It does not create a separately indexable Spanish page or `hreflang` alternate. If Spanish search visibility becomes a priority, publish a stable Spanish URL with its own translated metadata and reciprocal language alternates.
@@ -100,6 +100,27 @@ Do not use browser bots to imitate people posting or liking content, auto-commen
 4. Add useful text to the website for each real feature and keep a public demo video once it is ready. Search engines need crawlable page text; do not rely on text embedded only in images.
 5. Review site visits, signups, and feedback weekly. Improve the onboarding and first estimate workflow before spending on Google or Meta ads.
 6. When ready for a small ad test, choose one audience, one landing page, and one measurable action. Set a hard daily and total spend limit before launching. Ads are not part of the free plan.
+
+## Founder cohort: first 90 days
+
+The first objective is an **activated contractor**: someone who saves a real estimate and shares its customer link. A signup alone is not proof of value. Do not count fictional demos, support tests, or your own account as acquisition. Keep customer names, addresses, estimate text, and email addresses out of marketing analytics and public examples.
+
+| When | Founder actions | Decision signal |
+| --- | --- | --- |
+| Days 1–30 | Invite about 12 contractors across a few trades. Offer a brief setup session, watch the first estimate being made, and write down each point of friction. Publish two useful posts each week and answer relevant community questions where business participation is allowed. | Suggested pilot targets: 8 create an estimate, 5 share a customer link, and 3 return within two weeks. These are working goals, not forecasts. |
+| Days 31–60 | Address the most common activation blocker. With permission, write two short, factual stories about how real contractors used the product. Ask three to five local supply houses or trade groups whether a free estimating guide would help their audience. Invite satisfied users to recommend one peer. | Compare sources by contractors who share a first estimate, not raw clicks or registrations. |
+| Days 61–90 | Publish trade-specific estimate examples based on the trades active in the cohort. Reuse the most helpful post formats. Consider a tightly capped paid experiment only after the first-estimate funnel can be measured. | Keep channels with repeat use and a practical acquisition cost; stop those producing only curiosity visits. |
+
+Use these stages when reviewing a source each week: public-page visit → signup click → completed signup → first estimate saved → first customer link shared → second-week return → Pro purchase. The marketing site and app use separate Vercel projects and subdomains; ensure any selected analytics provider can attribute the cross-domain journey before claiming a channel's conversion rate. Until event tracking is configured, use the existing app records for later stages and treat visit-to-signup conversion as unknown. Never put personal data or estimate content in event properties or UTM tags.
+
+### Copy starters
+
+- Founder post: “I built WorkCraft AI for contractors who want to put together an estimate while the job is still fresh. Build one on your phone and share a customer approval link for free. I’m inviting a small group to try it and tell me where the process slows them down. Watch the demo: [link].”
+- Community answer: “For this quote, I would separate scope, quantity, assumptions, and exclusions so the customer knows what is being offered. Here is a free example: [relevant guide]. I’m the founder of WorkCraft AI; the app is optional.” Follow each community's rules.
+- Supply-house introduction: “We have a free guide that helps independent contractors write clearer estimates. Could I show it to you and ask if it would help people who visit your counter?” Ask permission before placing materials or sending a newsletter item.
+- Feedback and quote request: “What did you use before, and what became easier or harder? May I quote your honest answer publicly if we agree on the exact wording?” Never make a benefit or testimonial up. Disclose any incentive and do not condition it on a positive review.
+
+Three distinct trade pages now provide examples for plumbing, electrical, and roofing. Keep each current with practical scope and verification details; do not mass-produce near-identical pages to capture search terms. The guides are examples, not local price sheets or code advice.
 
 ## Current domain and Vercel project mapping
 
