@@ -179,7 +179,8 @@ export async function POST(request: Request) {
     const previousStatus = (event.data.previous_attributes as { status?: string } | null)?.status;
     const synced = await syncSubscription(subscription.id);
     if (!synced) {
-      await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+      const { error } = await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+      if (error) throw error;
       return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
     }
     if (shouldSendPastDueNotice({
@@ -198,7 +199,8 @@ export async function POST(request: Request) {
     if (subscriptionId) {
       const synced = await syncSubscription(subscriptionId);
       if (!synced) {
-        await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+        const { error } = await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
+        if (error) throw error;
         return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
       }
     }

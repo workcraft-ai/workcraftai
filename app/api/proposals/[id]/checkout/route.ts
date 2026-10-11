@@ -1,4 +1,4 @@
-import { customerShareAllowed } from "@/lib/proposal-sharing";
+import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-sharing";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
@@ -46,13 +46,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return errorResponse("The contractor has not finished Stripe payment setup yet. Contact them to arrange payment.", 409);
     }
 
-    const { data: preparedRows, error: prepareError } = await admin.rpc("workcraft_prepare_customer_payment", {
+    const { data: preparedRows, error: prepareError } = await admin.rpc("workcraft_prepare_shared_customer_payment", {
       p_user_id: estimate.user_id,
       p_estimate_id: estimate.id,
       p_payment_kind: kind,
       p_stripe_account_id: account.stripe_account_id,
+      p_share_hash: requestShareTokenHash(request),
     });
     if (prepareError) {
+      if (prepareError.code === "P0002") return errorResponse("Proposal not found or link expired.", 404);
       const message = prepareError.message;
       if (message.includes("WORKCRAFT_PRO_REQUIRED")) return errorResponse("Online customer payments require an active WorkCraft AI Pro plan.", 403);
       if (message.includes("PAYMENT_CHECKOUT_ALREADY_OPEN")) return errorResponse("Another payment checkout is already open for this estimate. Finish or close it before starting a different payment.", 409);

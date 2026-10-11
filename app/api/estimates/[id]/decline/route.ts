@@ -1,4 +1,4 @@
-import { customerShareAllowed } from "@/lib/proposal-sharing";
+import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
@@ -44,9 +44,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Estimate responses are temporarily unavailable." }, { status: 503, headers: NO_STORE });
   }
 
-  const { data: declinedAt, error } = await admin.rpc("workcraft_customer_decline_estimate", {
+  const { data: declinedAt, error } = await admin.rpc("workcraft_decline_shared_estimate", {
     p_estimate_id: id,
     p_reason: reason || null,
+    p_share_hash: requestShareTokenHash(request),
   });
   if (error) {
     if (error.code === "P0002" || error.message.includes("ESTIMATE_NOT_FOUND")) {

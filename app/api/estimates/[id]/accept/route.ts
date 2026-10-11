@@ -1,4 +1,4 @@
-import { customerShareAllowed } from "@/lib/proposal-sharing";
+import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
@@ -22,11 +22,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (signatureName.length < 2) return NextResponse.json({ error: "Enter your full name to approve this estimate." }, { status: 400 });
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
-  if (!(await customerShareAllowed(admin, id, request, false))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
-  const { data: acceptedTotalCents, error } = await admin.rpc("workcraft_accept_estimate_once", {
+  try {
+    if (!(await customerShareAllowed(admin, id, request, false))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Proposal approval is temporarily unavailable." }, { status: 503 });
+  }
+  const { data: acceptedTotalCents, error } = await admin.rpc("workcraft_accept_shared_estimate", {
     p_estimate_id: id,
     p_signature_name: signatureName,
     p_selected_package: selectedPackage,
+    p_share_hash: requestShareTokenHash(request),
   });
   if (error) {
     if (error.code === "P0002" || error.message.includes("ESTIMATE_NOT_FOUND")) return NextResponse.json({ error: "Estimate not found." }, { status: 404 });

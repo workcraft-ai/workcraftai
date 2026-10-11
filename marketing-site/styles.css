@@ -197,3 +197,4 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 
 /* Accessible guide metadata and featured sample caption. */
 .breadcrumbs, .guide-byline time, .resource-estimate-caption { color: #58655d; }
+.breadcrumbs a { display: inline-flex; align-items: center; min-height: 48px; min-width: 48px; }

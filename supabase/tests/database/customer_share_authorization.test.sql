@@ -1,0 +1,24 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(12);
+insert into auth.users(id,email,raw_user_meta_data) values('a8100000-0000-4000-8000-000000000001','atomic-share@example.test','{}');
+insert into public.subscriptions(user_id,status) values('a8100000-0000-4000-8000-000000000001','active');
+insert into public.estimates(id,user_id,client_name,client_email,share_token_hash)
+values('b8100000-0000-4000-8000-000000000001','a8100000-0000-4000-8000-000000000001','Fixture','customer@example.test',repeat('a',64));
+select ok(not has_function_privilege('authenticated','public.workcraft_accept_shared_estimate(uuid,text,text,text)','EXECUTE'),'shared acceptance is server-only');
+select ok(not has_function_privilege('anon','public.workcraft_decline_shared_estimate(uuid,text,text)','EXECUTE'),'shared decline is server-only');
+select throws_ok($$select public.workcraft_accept_shared_estimate('b8100000-0000-4000-8000-000000000001','Fixture Customer',null,repeat('b',64))$$,'P0002','ESTIMATE_NOT_FOUND','replacement token rejects old acceptance');
+select throws_ok($$select public.workcraft_decline_shared_estimate('b8100000-0000-4000-8000-000000000001',null,null)$$,'P0002','ESTIMATE_NOT_FOUND','token-protected decline rejects UUID-only link');
+update public.estimates set share_revoked_at=now() where id='b8100000-0000-4000-8000-000000000001';
+select throws_ok($$select public.workcraft_accept_shared_estimate('b8100000-0000-4000-8000-000000000001','Fixture Customer',null,repeat('a',64))$$,'P0002','ESTIMATE_NOT_FOUND','revoked share cannot accept');
+select throws_ok($$select public.workcraft_decline_shared_estimate('b8100000-0000-4000-8000-000000000001',null,repeat('a',64))$$,'P0002','ESTIMATE_NOT_FOUND','revoked share cannot decline');
+select throws_ok($$select public.workcraft_submit_shared_proposal_question('b8100000-0000-4000-8000-000000000001','Customer','customer@example.test','Valid test question',repeat('a',64))$$,'P0002','ESTIMATE_NOT_FOUND','revoked share cannot ask question');
+select throws_ok($$select * from public.workcraft_prepare_shared_customer_payment('a8100000-0000-4000-8000-000000000001','b8100000-0000-4000-8000-000000000001','balance','acct_fixture',repeat('a',64))$$,'P0002','ESTIMATE_NOT_FOUND','revoked share cannot prepare checkout');
+update public.estimates set share_revoked_at=null,share_expires_at=now()-interval '1 second' where id='b8100000-0000-4000-8000-000000000001';
+select throws_ok($$select public.workcraft_decline_shared_estimate('b8100000-0000-4000-8000-000000000001',null,repeat('a',64))$$,'P0002','ESTIMATE_NOT_FOUND','expired share cannot mutate');
+update public.estimates set share_expires_at=null where id='b8100000-0000-4000-8000-000000000001';
+select lives_ok($$select public.workcraft_decline_shared_estimate('b8100000-0000-4000-8000-000000000001',null,repeat('a',64))$$,'matching token can decline');
+select lives_ok($$select public.workcraft_decline_shared_estimate('b8100000-0000-4000-8000-000000000001',null,repeat('a',64))$$,'valid decline retry remains idempotent');
+select is((select count(*) from public.contractor_notifications where estimate_id='b8100000-0000-4000-8000-000000000001'),1::bigint,'decline retries produce one notification');
+select * from finish();
+rollback;

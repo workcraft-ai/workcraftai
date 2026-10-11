@@ -1,4 +1,4 @@
-import { customerShareAllowed } from "@/lib/proposal-sharing";
+import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-sharing";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
@@ -30,11 +30,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-  if (!(await customerShareAllowed(admin, id, request, false))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  try {
+    if (!(await customerShareAllowed(admin, id, request, false))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Questions are temporarily unavailable." }, { status: 503 });
+  }
   const { data: estimate } = await admin.from("estimates").select("id, reference_number, user_id, client_name").eq("id", id).maybeSingle();
   if (!estimate) return NextResponse.json({ error: "This proposal could not be found." }, { status: 404 });
-  const { data: questionId, error } = await admin.rpc("workcraft_submit_proposal_question", {
+  const { data: questionId, error } = await admin.rpc("workcraft_submit_shared_proposal_question", {
     p_estimate_id: id, p_customer_name: name, p_customer_email: email, p_message: message,
+    p_share_hash: requestShareTokenHash(request),
   });
   if (error) {
     if (error.message.includes("PROPOSAL_QUESTION_LIMIT") || error.message.includes("CUSTOMER_QUESTION_LIMIT") || error.message.includes("CONTRACTOR_QUESTION_LIMIT")) {

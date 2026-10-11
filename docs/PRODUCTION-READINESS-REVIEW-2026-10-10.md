@@ -1,3 +1,9 @@
+> Historical audit baseline. The subscription, rounding, zero-invoice, email
+> status and contrast findings were fixed in PR 115. The follow-up addresses
+> atomic share revocation, foreign-key indexes, notification read errors and
+> malformed-link failures. See `READINESS-FIXES-2026-10-10.md` for release evidence
+> and explicitly unverified acceptance flows.
+
 # Executive Summary Checklist
 
 | Area | Result | Evidence / remaining action |

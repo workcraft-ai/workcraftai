@@ -6,16 +6,16 @@ Updated October 10, 2026. This is the current checklist; earlier audits remain h
 
 | Pillar | Changes | Evidence / remaining acceptance |
 | --- | --- | --- |
-| Database | Storage-derived monthly upload accounting, consistent locks, protected pending uploads; server-only payment/outbox/share RPCs | 256 local database assertions; four concurrency suites; all 40 migrations match Production and Staging |
+| Database | Storage-derived monthly upload accounting, consistent locks, protected pending uploads; server-only payment/outbox/share RPCs | 286 local database assertions; four quota concurrency suites plus share-revocation concurrency; all 43 migrations match Production and Staging |
 | Auth | Refresh cookies retained on redirects; internal routes protected; generic responses and CAPTCHA retained | Public route checks pass. Authenticated Production API/Storage smoke is blocked by the local Cisco Umbrella certificate chain, not missing credentials |
 | Stripe | Serialized payment changes; cumulative refunds never regress; delayed success cannot overwrite full refunds | Local SQL and rolled-back Staging integration tests pass. October 10 Preview event/state matrix passed retries, async ordering, subscription states and cumulative refunds; signed-in checkout/effective entitlement remains separate |
 | Email | Durable queued notifications, bounded retries/idempotency, atomic customer-question queue, invoice and early delivery correlation, Spanish follow-ups, scheduled GET/POST support | Signed Production Auth hook, reset inbox delivery, delivery webhook and shared Auth budget increment passed. Estimate delivered and contractor Reply-To verified October 10; invoice send-from-app remains pending owner login |
 | Workflows | Correct package totals; distinct units/pricing basis; incomplete legacy Price Book entries are suggestions; preserve partial-work quantities; reject ambiguous DST times | Unit and regression tests pass; contractor reviews pricing before sharing |
 | Operations | Supabase media CSP; bounded invoice-email body; encrypted full restore drill including Auth and private Storage policies | Backup previously succeeded. Guarded encrypted run 38092126519 recovered database/Auth, private policies and all 3 media files. Password/MFA sign-in and full recovery-app acceptance remain separate |
-| UI | Contrast/underlines, 48px standalone controls, current dashboard illustration, English/Spanish changes | 42 public page/viewport/language combinations pass WCAG A/AA automated checks and overflow checks; authenticated screens require browser acceptance |
-| Verification | Repeatable browser, security, payment ordering, media, quota, outbox and sharing tests | 67 unit tests, 256 SQL assertions, 5 regression probes; source/build/CI checks accompany release |
+| UI | Contrast/underlines, 48px standalone controls, current dashboard illustration, English/Spanish changes | 102 public page/viewport/language combinations pass WCAG A/AA automated checks and overflow checks; authenticated screens require browser acceptance |
+| Verification | Repeatable browser, security, payment ordering, media, quota, outbox and sharing tests | 75 unit tests, 286 SQL assertions, 5 regression probes; source/build/CI checks accompany release |
 
-Three forward-only migrations were applied to Staging first and Production second. Recorded versions were reconciled only after exact migration-name and SQL-hash comparisons: `20261010181731`, `20261010181741`, `20261010181745`. Latest version is `20261010181745_revocable_proposal_sharing`; both environments have 40 versions. No existing customer records were used as write-test fixtures.
+Historical October 10 release: three forward-only migrations were applied to Staging first and Production second. Recorded versions were reconciled only after exact migration-name and SQL-hash comparisons: `20261010181731`, `20261010181741`, `20261010181745`. That historical release ended at `20261010181745_revocable_proposal_sharing` with 40 versions. Current migration histories have 43 versions, ending at `20261011024002_atomic_customer_share_validation_and_indexes`. No existing customer records were used as write-test fixtures.
 
 Release `a34bd5d8640b26e93cdd6cd2451870ab09fb941c` reached Ready for both Production sites; its branch Preview deployments were also Ready. Required CI/CodeQL checks passed, and live app/Auth/database health passed. Vercel project and environment-name metadata is accessible; private values are redacted. The owner approved rotating `CRON_SECRET`; Vercel Production was updated and the owner confirmed the matching GitHub repository Actions secret was saved. The deployed notification endpoint accepts that secret (HTTP 200), and [workflow run 38077269341](https://github.com/workcraft-ai/workcraftai/actions/runs/38077269341) passed health and queued-notification retry steps with the GitHub secret. Availability workflow runs every 15 minutes and calls `/api/cron/notifications`; follow-ups accept authorized GET or POST.
 
@@ -50,3 +50,13 @@ PRs 106 and 107 were reviewed, CI/CodeQL passed and merged. Release `e7758b1f3d4
 ## Completed full-media recovery — October 10
 
 The owner corrected the GitHub Production Storage secrets. PR 108 merged after all required CI/CodeQL checks passed; release `7ef57575bd3884a42bcfabbe1131f7a45b493b73` reached Ready for both Production sites and its branch Preview sites were Ready. Live site and app/Auth/database health passed. [Run 38092126519](https://github.com/workcraft-ai/workcraftai/actions/runs/38092126519) created encrypted Google Drive snapshot `db1f793c`, downloaded all three Production private-media objects, decrypted the snapshot and restored 57 users, 57 identities, one MFA factor, 10 estimates, three jobs and 40 migrations into an isolated localhost stack. Application RLS, owner references, private policies, file byte counts and public-access denial passed; temporary plaintext/credentials were removed. This resolves the zero-file gap in run 38091235906. Password/MFA sign-in and full application recovery remain separate acceptance tests. The remaining incomplete Stripe test subscription was terminated and its fixture-only Staging subscription row removed, restoring the initial baseline.
+
+## Subsequent verification release
+
+PR 115 (`2b9c006`) reached Ready for the app and marketing Production projects.
+CI passed, all 102 public page/language/viewport combinations passed, and public
+health, unsigned-webhook rejection, anonymous API rejection, robots and sitemaps
+passed. The follow-up adds atomic share-token checks, twelve foreign-key indexes,
+malformed-link handling and translated notification read feedback. Both forward
+migrations were tested in Staging before Production, preserving repository versions.
+See `READINESS-FIXES-2026-10-10.md` for the test boundaries and final-run commands.

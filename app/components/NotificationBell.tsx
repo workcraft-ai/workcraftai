@@ -40,6 +40,7 @@ function formatDate(value: string, language: string) {
 }
 
 function formatAmount(amount: number | string | null, currency: string | null, language: string) {
+  if (amount === null) return null;
   const cents = Number(amount);
   if (!Number.isSafeInteger(cents) || cents < 0) return null;
   const code = typeof currency === "string" && /^[a-z]{3}$/i.test(currency) ? currency.toUpperCase() : "USD";
@@ -66,6 +67,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const [loadingList, setLoadingList] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [markError, setMarkError] = useState(false);
 
   useEffect(() => {
     openRef.current = open;
@@ -73,6 +75,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
 
   const refresh = useCallback(async (includeList: boolean) => {
     const requestId = ++requestRef.current;
+    if (includeList) setLoadingList(true);
     const unreadResult = await supabase
       .from("contractor_notifications")
       .select("id", { count: "exact", head: true })
@@ -81,6 +84,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
 
     if (requestId !== requestRef.current) return;
     if (unreadResult.error) {
+      setLoadingList(false);
       setLoadError(true);
       return;
     }
@@ -88,7 +92,6 @@ export default function NotificationBell({ userId }: { userId: string }) {
     setLoadError(false);
 
     if (!includeList) return;
-    setLoadingList(true);
     const listResult = await supabase
       .from("contractor_notifications")
       .select(notificationFields)
@@ -105,7 +108,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }, [supabase, userId]);
 
   useEffect(() => {
-    void refresh(false);
+    const initialRefresh = window.setTimeout(() => void refresh(false), 0);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh(openRef.current);
     }, 60_000);
@@ -114,15 +117,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
+      window.clearTimeout(initialRefresh);
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibility);
       requestRef.current += 1;
     };
   }, [refresh]);
-
-  useEffect(() => {
-    if (open) void refresh(true);
-  }, [open, refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,22 +141,29 @@ export default function NotificationBell({ userId }: { userId: string }) {
   }, [open]);
 
   const markRead = async (notification: ContractorNotification) => {
-    if (notification.read_at) return;
+    if (notification.read_at) return true;
     const readAt = new Date().toISOString();
-    const { error } = await supabase
+    const { data: changed, error } = await supabase
       .from("contractor_notifications")
       .update({ read_at: readAt })
       .eq("id", notification.id)
       .eq("user_id", userId)
-      .is("read_at", null);
-    if (error) return;
+      .is("read_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      setMarkError(true);
+      return false;
+    }
+    setMarkError(false);
     setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read_at: readAt } : item));
-    setUnreadCount((current) => Math.max(0, current - 1));
+    if (changed) setUnreadCount((current) => Math.max(0, current - 1));
+    return true;
   };
 
   const openNotification = async (notification: ContractorNotification) => {
-    await markRead(notification);
-    setOpen(false);
+    const marked = await markRead(notification);
+    if (marked) setOpen(false);
     const safeEstimateId = notification.estimate_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notification.estimate_id)
       ? notification.estimate_id
       : null;
@@ -173,11 +180,12 @@ export default function NotificationBell({ userId }: { userId: string }) {
       .is("read_at", null);
     setMarkingAll(false);
     if (error) {
-      setLoadError(true);
+      setMarkError(true);
       return;
     }
     setNotifications((current) => current.map((item) => item.read_at ? item : { ...item, read_at: readAt }));
     setUnreadCount(0);
+    setMarkError(false);
   };
 
   const buttonLabel = unreadCount
@@ -191,7 +199,10 @@ export default function NotificationBell({ userId }: { userId: string }) {
         aria-label={buttonLabel}
         aria-expanded={open}
         aria-controls={open ? "contractor-notification-panel" : undefined}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen(!open);
+          if (!open) void refresh(true);
+        }}
         className="relative inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-100 transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
       >
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -218,15 +229,16 @@ export default function NotificationBell({ userId }: { userId: string }) {
             </div>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
-                <button type="button" onClick={() => void markAllRead()} disabled={markingAll} className="min-h-11 rounded-lg px-2 text-xs font-semibold text-orange-800 underline disabled:opacity-50">
+                <button type="button" onClick={() => void markAllRead()} disabled={markingAll} className="min-h-12 rounded-lg px-2 text-xs font-semibold text-orange-800 underline disabled:opacity-50">
                   {markingAll ? translate(language, "Marking…") : translate(language, "Mark all as read")}
                 </button>
               )}
-              <button type="button" aria-label={translate(language, "Close notifications")} onClick={() => setOpen(false)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600">
+              <button type="button" aria-label={translate(language, "Close notifications")} onClick={() => setOpen(false)} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600">
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m4 4 12 12M16 4 4 16" /></svg>
               </button>
             </div>
           </div>
+          {markError && <p role="status" className="border-b border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">{translate(language, "Notifications could not be marked as read. Try again.")}</p>}
           {loadError ? (
             <p role="status" className="px-4 py-6 text-sm text-slate-600">{translate(language, "Notifications could not load.")}</p>
           ) : loadingList && notifications.length === 0 ? (
