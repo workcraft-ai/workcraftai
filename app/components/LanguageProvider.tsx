@@ -506,6 +506,23 @@ Object.assign(spanish, {
   "Add your first customer": "Agrega tu primer cliente",
 });
 
+Object.assign(spanish, {
+  "Notifications": "Notificaciones",
+  "unread": "sin leer",
+  "Mark all as read": "Marcar todas como leídas",
+  "Marking…": "Marcando…",
+  "Close notifications": "Cerrar notificaciones",
+  "Loading notifications…": "Cargando notificaciones…",
+  "No notifications yet.": "Aún no hay notificaciones.",
+  "Notifications could not load.": "No se pudieron cargar las notificaciones.",
+  "asked a question about your estimate": "hizo una pregunta sobre tu cotización",
+  "accepted your estimate": "aceptó tu cotización",
+  "declined your estimate": "rechazó tu cotización",
+  "made a payment on your estimate": "realizó un pago de tu cotización",
+  "Estimate": "Cotización",
+});
+
+
 export function translate(language: Language, text: string): string {
   if (language !== "es") return text;
   const leadingWhitespace = text.match(/^\s*/)?.[0] ?? "";
