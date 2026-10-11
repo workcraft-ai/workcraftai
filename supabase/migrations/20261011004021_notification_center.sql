@@ -1,5 +1,12 @@
 -- Persist contractor-facing customer activity notifications.
 -- Browser access is limited by per-user RLS and read_at-only update grants.
+alter table public.estimates
+  add column if not exists customer_declined_at timestamptz,
+  add column if not exists customer_decline_reason text;
+alter table public.estimates
+  drop constraint if exists estimates_customer_decline_reason_length_check,
+  add constraint estimates_customer_decline_reason_length_check
+    check (customer_decline_reason is null or char_length(customer_decline_reason) <= 500);
 create table public.contractor_notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -15,6 +22,7 @@ create table public.contractor_notifications (
   amount_cents bigint check (amount_cents is null or amount_cents >= 0),
   currency text check (currency is null or currency ~ '^[A-Za-z]{3}$'),
   source_key text not null unique check (char_length(source_key) between 1 and 200),
+  details text check (details is null or char_length(details) <= 500),
   created_at timestamptz not null default pg_catalog.now(),
   read_at timestamptz
 );
@@ -30,7 +38,7 @@ create index contractor_notifications_unread_idx
 
 alter table public.contractor_notifications enable row level security;
 revoke all on public.contractor_notifications from public, anon, authenticated;
-grant select (id, user_id, estimate_id, event_type, customer_name, estimate_reference, amount_cents, currency, created_at, read_at)
+grant select (id, user_id, estimate_id, event_type, customer_name, estimate_reference, amount_cents, currency, details, created_at, read_at)
   on public.contractor_notifications to authenticated;
 grant update (read_at) on public.contractor_notifications to authenticated;
 grant all on public.contractor_notifications to service_role;
@@ -45,6 +53,62 @@ create policy "Contractors mark their own notifications read"
   for update to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id and read_at is not null);
+
+create or replace function public.workcraft_customer_decline_estimate(
+  p_estimate_id uuid,
+  p_reason text default null
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $decline$
+declare
+  v_estimate public.estimates%rowtype;
+  v_now timestamptz := pg_catalog.now();
+  v_reason text := nullif(pg_catalog.btrim(coalesce(p_reason, '')), '');
+begin
+  if p_estimate_id is null or pg_catalog.length(coalesce(v_reason, '')) > 500 then
+    raise exception using errcode = '22023', message = 'INVALID_DECLINE_REASON';
+  end if;
+
+  select e.* into v_estimate
+  from public.estimates e
+  where e.id = p_estimate_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'ESTIMATE_NOT_FOUND';
+  end if;
+
+  -- Make retries safe, while keeping contractor-marked declines distinct.
+  if pg_catalog.lower(coalesce(v_estimate.status, '')) = 'declined'
+     and v_estimate.customer_declined_at is not null then
+    return v_estimate.customer_declined_at;
+  end if;
+  if pg_catalog.lower(coalesce(v_estimate.status, 'pending')) <> 'pending'
+     or v_estimate.accepted_at is not null
+     or v_estimate.customer_declined_at is not null then
+    raise exception using errcode = 'P0001', message = 'ESTIMATE_NOT_OPEN';
+  end if;
+
+  update public.estimates
+  set status = 'declined',
+      customer_declined_at = v_now,
+      customer_decline_reason = v_reason,
+      updated_at = v_now
+  where id = p_estimate_id
+    and pg_catalog.lower(coalesce(status, 'pending')) = 'pending'
+    and accepted_at is null
+    and customer_declined_at is null;
+  if not found then
+    raise exception using errcode = 'P0001', message = 'ESTIMATE_NOT_OPEN';
+  end if;
+
+  return v_now;
+end;
+$decline$;
+revoke all on function public.workcraft_customer_decline_estimate(uuid, text) from public, anon, authenticated, service_role;
+grant execute on function public.workcraft_customer_decline_estimate(uuid, text) to service_role;
 
 create function private.workcraft_notify_proposal_question()
 returns trigger
@@ -108,21 +172,23 @@ begin
   if pg_catalog.lower(coalesce(new.status, '')) = 'accepted'
      and new.accepted_at is not null then
     v_event_type := 'estimate_accepted';
-  elsif pg_catalog.lower(coalesce(new.status, '')) = 'declined' then
+  elsif pg_catalog.lower(coalesce(new.status, '')) = 'declined'
+     and new.customer_declined_at is not null then
     v_event_type := 'estimate_declined';
   else
     return new;
   end if;
 
   insert into public.contractor_notifications(
-    user_id, estimate_id, event_type, customer_name, estimate_reference, source_key
+    user_id, estimate_id, event_type, customer_name, estimate_reference, source_key, details
   ) values (
     new.user_id,
     new.id,
     v_event_type,
     pg_catalog.left(coalesce(nullif(pg_catalog.btrim(new.client_name), ''), 'Customer'), 120),
     new.reference_number,
-    'estimate:' || new.id::text || ':' || v_event_type
+    'estimate:' || new.id::text || ':' || v_event_type,
+    case when v_event_type = 'estimate_declined' then new.customer_decline_reason else null end
   )
   on conflict (source_key) do nothing;
 

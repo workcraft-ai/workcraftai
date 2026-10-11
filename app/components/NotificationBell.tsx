@@ -13,6 +13,7 @@ type ContractorNotification = {
   event_type: NotificationType;
   customer_name: string;
   estimate_reference: string | null;
+  details: string | null;
   amount_cents: number | string | null;
   currency: string | null;
   created_at: string;
@@ -27,7 +28,7 @@ const eventText: Record<NotificationType, string> = {
 };
 
 const notificationFields =
-  "id, estimate_id, event_type, customer_name, estimate_reference, amount_cents, currency, created_at, read_at";
+  "id, estimate_id, event_type, customer_name, estimate_reference, amount_cents, currency, details, created_at, read_at";
 
 function formatDate(value: string, language: string) {
   const date = new Date(value);
@@ -253,6 +254,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold leading-5">{title}</span>
                         <span className="mt-1 block text-xs text-slate-600">{reference}{amount ? " · " + amount : ""}</span>
+                        {notification.details && <span className="mt-1 block whitespace-pre-wrap break-words text-xs text-slate-600">{translate(language, "Reason:")} {notification.details}</span>}
                         <span className="mt-1 block text-[11px] text-slate-500">{formatDate(notification.created_at, language)}</span>
                       </span>
                     </button>
