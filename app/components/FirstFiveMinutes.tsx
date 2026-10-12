@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -9,6 +9,7 @@ import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
 type Progress = {
   eligible: boolean;
+  showIntro: boolean;
   dismissed: boolean;
   profileComplete: boolean;
   estimateId: string | null;
@@ -27,7 +28,7 @@ const copy = {
     taxHelp: "Use rates you have verified for your location and work. These defaults can be changed on each estimate.",
     save: "Save preferences", saving: "Saving…", estimate: "Create an estimate", preview: "Preview my estimate", share: "Copy my test link",
     fallback: "Your link is ready. Select and copy it, then confirm below.", copied: "I copied the link", rate: "Add a Price Book rate",
-    later: "Skip for now", resume: "Continue first-time setup", help: "Get step-by-step help", error: "We couldn't save that step. Please try again.", finishedTitle: "Your first estimate setup is ready", finishedBody: "You can keep creating estimates and reuse the rate you saved.",
+    later: "Skip for now", resume: "Continue setup", hide: "Hide steps", next: "Next", help: "Get step-by-step help", error: "We couldn't save that step. Please try again.", finishedTitle: "Your first estimate setup is ready", finishedBody: "You can keep creating estimates and reuse the rate you saved.",
     shareHelp: "Open it yourself first. Copying a link does not email a customer.", done: "Done", optional: "Optional after your first quote: add a logo, AI, or Stripe payments.",
     phoneError: "Enter a valid phone number, such as (555) 123-4567, or leave this field blank.",
   },
@@ -38,7 +39,7 @@ const copy = {
     taxHelp: "Usa tasas que hayas verificado para tu ubicación y trabajo. Puedes cambiarlas en cada cotización.",
     save: "Guardar preferencias", saving: "Guardando…", estimate: "Crear una cotización", preview: "Revisar mi cotización", share: "Copiar mi enlace de prueba",
     fallback: "El enlace está listo. Selecciónalo y cópialo; después confirma abajo.", copied: "Copié el enlace", rate: "Agregar un precio a la lista",
-    later: "Omitir por ahora", resume: "Continuar la configuración inicial", help: "Ver las guías paso a paso", error: "No pudimos guardar este paso. Inténtalo de nuevo.", finishedTitle: "La configuración inicial está lista", finishedBody: "Ya puedes seguir creando cotizaciones y reutilizar el precio que guardaste.",
+    later: "Omitir por ahora", resume: "Continuar configuración", hide: "Ocultar pasos", next: "Siguiente", help: "Ver las guías paso a paso", error: "No pudimos guardar este paso. Inténtalo de nuevo.", finishedTitle: "La configuración inicial está lista", finishedBody: "Ya puedes seguir creando cotizaciones y reutilizar el precio que guardaste.",
     shareHelp: "Ábrelo tú primero. Copiar un enlace no envía un correo al cliente.", done: "Listo", optional: "Después de tu primera cotización puedes agregar logotipo, IA o pagos de Stripe.",
     phoneError: "Ingresa un número válido, como (555) 123-4567, o deja este campo vacío.",
   },
@@ -61,6 +62,9 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const [error, setError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
+  const [introOpen, setIntroOpen] = useState(false);
+  const [inlineExpanded, setInlineExpanded] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -68,6 +72,9 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
       if (!response.ok) return;
       const result = await response.json() as Progress;
       setProgress(result);
+      if (result.showIntro) setIntroOpen(true);
+      if (result.profileComplete && result.estimateId && result.previewed && result.shared && result.priceBookReady) setIntroOpen(false);
+      if (result.eligible && window.location.hash === "#first-five-minutes") setInlineExpanded(true);
       setFullName(result.profile.fullName);
       setBusinessName(result.profile.businessName);
       setBusinessAddress(result.profile.businessAddress);
@@ -85,14 +92,22 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
     return () => { window.clearTimeout(task); window.removeEventListener("workcraft-onboarding-refresh", refresh); };
   }, [refresh]);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (introOpen && dialog && !dialog.open) {
+      dialog.showModal();
+      dialog.querySelector<HTMLElement>("h2")?.focus();
+    }
+  }, [introOpen]);
+
   const complete = Boolean(progress?.profileComplete && progress?.estimateId && progress?.previewed && progress?.shared && progress?.priceBookReady);
   const visible = Boolean(progress?.eligible && !progress?.dismissed);
   useEffect(() => { onVisibilityChange?.(visible); }, [onVisibilityChange, visible]);
   useEffect(() => {
-    if (!progress?.eligible || window.location.hash !== "#first-five-minutes") return;
+    if (!inlineExpanded || window.location.hash !== "#first-five-minutes") return;
     const task = window.setTimeout(() => document.getElementById("first-five-minutes")?.scrollIntoView({ block: "start" }), 0);
     return () => window.clearTimeout(task);
-  }, [progress?.eligible, progress?.profileComplete, progress?.estimateId, progress?.previewed, progress?.shared, progress?.priceBookReady]);
+  }, [inlineExpanded]);
 
   async function mark(action: Exclude<Action, "bootstrap">) {
     const response = await fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }), cache: "no-store" });
@@ -143,19 +158,29 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
     try { await mark("dismiss"); } catch { setError(t.error); } finally { setBusy(false); }
   }
 
+  function closeIntro() {
+    dialogRef.current?.close();
+    setIntroOpen(false);
+  }
+
   if (!progress?.eligible) return null;
   if (complete) return progress.dismissed ? null : <section id="first-five-minutes" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm"><div><h2 className="text-lg font-bold">{t.finishedTitle}</h2><p className="mt-1 text-sm">{t.finishedBody}</p>{error && <p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}</div><button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 rounded-lg border border-green-700 px-4 text-sm font-semibold disabled:opacity-50">{t.done}</button></section>;
-  if (progress.dismissed) return (
-    <button id="first-five-minutes" type="button" onClick={() => void mark("reopen").catch(() => setError(t.error))} className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-orange-800 shadow-sm">{t.resume}</button>
-  );
-
   const completed = [progress.profileComplete, Boolean(progress.estimateId), progress.previewed, progress.shared, progress.priceBookReady];
   const active = completed.findIndex((item) => !item);
-  return (
+  const completedCount = completed.filter(Boolean).length;
+  if (!introOpen && !inlineExpanded) return <section id="first-five-minutes" aria-labelledby="first-five-summary-title" className="scroll-mt-6 rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
+    <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">{t.kicker} · {completedCount}/5</p>
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+      <div><h2 id="first-five-summary-title" className="text-lg font-bold text-slate-900">{t.title}</h2><p className="mt-1 text-sm text-slate-600">{t.next}: {t.steps[active]}</p></div>
+      <button type="button" onClick={() => setInlineExpanded(true)} className="min-h-11 rounded-lg bg-orange-800 px-4 text-sm font-semibold text-white">{t.resume}</button>
+    </div>
+    <div role="progressbar" aria-label={t.kicker} aria-valuenow={completedCount} aria-valuemin={0} aria-valuemax={5} className="mt-4 h-2 overflow-hidden rounded-full bg-orange-100"><span className="block h-full rounded-full bg-orange-700" style={{ width: `${completedCount * 20}%` }} /></div>
+  </section>;
+  const checklist = (
     <section id="first-five-minutes" aria-labelledby="first-five-title" className="scroll-mt-6 rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">{t.kicker}</p><h2 id="first-five-title" className="mt-1 text-xl font-bold text-slate-900">{t.title}</h2><p className="mt-2 text-sm text-slate-600">{t.intro}</p></div>
-        <button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 text-sm font-semibold text-slate-600 underline disabled:opacity-50">{t.later}</button>
+        <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">{t.kicker}</p><h2 id="first-five-title" tabIndex={-1} className="mt-1 text-xl font-bold text-slate-900">{t.title}</h2><p className="mt-2 text-sm text-slate-600">{t.intro}</p></div>
+        <button type="button" onClick={introOpen ? closeIntro : () => setInlineExpanded(false)} className="min-h-11 text-sm font-semibold text-slate-600 underline">{introOpen ? t.later : t.hide}</button>
       </div>
       <ol className="mt-5 grid gap-2 sm:grid-cols-5">{t.steps.map((label, index) => <li key={label} aria-current={active === index ? "step" : undefined} className={`rounded-lg border p-3 text-xs font-semibold ${completed[index] ? "border-green-200 bg-green-50 text-green-800" : active === index ? "border-orange-300 bg-orange-50 text-orange-900" : "border-slate-200 text-slate-500"}`}><span className="mr-1" aria-hidden="true">{completed[index] ? "✓" : `${index + 1}.`}</span>{label}</li>)}</ol>
       <div className="mt-5 rounded-xl bg-[#f7f5ef] p-4">
@@ -180,4 +205,6 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
       <p className="mt-4 text-xs text-slate-600"><Link href="/help" className="font-semibold text-orange-800 underline">{t.help}</Link></p>
     </section>
   );
+  if (!introOpen) return checklist;
+  return <dialog ref={dialogRef} aria-labelledby="first-five-title" onClose={() => setIntroOpen(false)} className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-2xl bg-transparent p-0 shadow-2xl backdrop:bg-slate-950/70">{checklist}</dialog>;
 }
