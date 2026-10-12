@@ -23,10 +23,12 @@ export const metadata: Metadata = {
 export default async function SupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ form?: string | string[] }>;
+  searchParams: Promise<{ form?: string | string[]; ref?: string | string[] }>;
 }) {
   const params = await searchParams;
   const formResult = Array.isArray(params.form) ? params.form[0] : params.form;
+  const caseReferenceValue = Array.isArray(params.ref) ? params.ref[0] : params.ref;
+  const caseReference = caseReferenceValue && /^WC-SUP-[0-9A-F]{10}$/.test(caseReferenceValue) ? caseReferenceValue : undefined;
   const supportEmail = emailAddressFromConfig(process.env.NEXT_PUBLIC_SUPPORT_EMAIL) || "support@workcraftai.com";
 
   return (
@@ -42,6 +44,7 @@ export default async function SupportPage({
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[1.05fr_.95fr] lg:items-start">
           <section aria-labelledby="faq-heading">
+            <Link href="/help" className="mb-6 block rounded-xl border border-orange-200 bg-orange-50 p-5 text-sm font-semibold text-orange-900 hover:bg-orange-100"><LocalizedText text="Step-by-step guides for estimates, pricing, payments, and account access →" /></Link>
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500"><LocalizedText text="Quick answers" /></p>
@@ -56,7 +59,7 @@ export default async function SupportPage({
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-orange-800"><LocalizedText text="Still need help?" /></p>
             <h2 id="contact-heading" className="mt-2 text-2xl font-bold tracking-tight text-slate-900"><LocalizedText text="Send us a message" /></h2>
             <p className="mt-2 mb-6 text-sm leading-6 text-slate-600"><LocalizedText text="Share a few details and our support team will reply to the email address you provide." /></p>
-            <SupportForm fallbackResult={formResult === "sent" || formResult === "error" ? formResult : undefined} />
+            <SupportForm fallbackResult={formResult === "sent" || formResult === "error" ? formResult : undefined} fallbackReference={caseReference} />
             <p className="mt-6 border-t border-slate-100 pt-5 text-sm text-slate-600">Prefer email? <a href={`mailto:${supportEmail}`} className="font-semibold text-orange-800 underline underline-offset-2">{supportEmail}</a></p>
           </section>
         </div>

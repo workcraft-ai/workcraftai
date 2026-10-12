@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { latestEstimateEmailEvents } from "@/lib/email-delivery-status";
+import FirstFiveMinutes from "@/app/components/FirstFiveMinutes";
 
 type GreetingKey = "Good morning" | "Good afternoon" | "Good evening";
 
@@ -77,6 +78,7 @@ export default function DashboardPage() {
   const [jobs, setJobs] = useState<JobPreview[]>([]);
   const [jobCount, setJobCount] = useState(0);
   const [showAllEstimates, setShowAllEstimates] = useState(false);
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
 
   async function fetchEstimates() {
     try {
@@ -298,7 +300,9 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {!loading && (estimates.length === 0 || (estimates.length === 1 && !estimates[0].is_archived && !estimates[0].proposal_viewed_at)) && <section aria-labelledby="first-quote-title" className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
+        <FirstFiveMinutes onVisibilityChange={setOnboardingVisible} />
+
+        {!loading && !onboardingVisible && (estimates.length === 0 || (estimates.length === 1 && !estimates[0].is_archived && !estimates[0].proposal_viewed_at)) && <section aria-labelledby="first-quote-title" className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-900">{translate(language, "Your first quote")}</p>
           <h2 id="first-quote-title" className="mt-1 text-lg font-bold text-slate-900">{translate(language, estimates.length === 0 ? "Start with one real job" : "Your estimate is ready for the next step")}</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-700">{translate(language, estimates.length === 0 ? "Add the customer, describe the work, set your own prices, and save. You can build a price book later." : "Review the scope and total, then copy the customer link from your estimate. Customers can review and approve without creating an account.")}</p>

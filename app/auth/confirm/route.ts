@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { safeInternalRedirect } from "@/lib/security.mjs";
+import { queueWelcomeNotification } from "@/lib/welcome-notification";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -49,6 +51,18 @@ export async function GET(request: NextRequest) {
         });
 
     if (!result.error) {
+      // The email-confirmation callback is the earliest reliable point at
+      // which a verified new account can receive its one-time welcome.
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (result.data.user && serviceKey && supabaseUrl) {
+        try {
+          const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+          await queueWelcomeNotification(admin, result.data.user);
+        } catch (error) {
+          console.error("Welcome notification could not be queued after confirmation:", error);
+        }
+      }
       return supabaseResponse;
     }
   }

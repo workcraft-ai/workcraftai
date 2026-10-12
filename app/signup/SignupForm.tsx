@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import TurnstileCaptcha, { TURNSTILE_ENABLED } from "@/app/components/TurnstileCaptcha";
+import { SIGNUP_TERMS_VERSION } from "@/lib/signup-terms";
+
 
 export default function SignupForm() {
   const [email, setEmail] = useState("");
@@ -16,6 +18,7 @@ export default function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { language } = useLanguage();
 
   const router = useRouter();
@@ -28,6 +31,11 @@ export default function SignupForm() {
 
     if (password !== confirmPassword) {
       setError(translate(language, "Passwords do not match."));
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setError(translate(language, "Review and accept the Terms of Service and Privacy Policy to continue."));
       return;
     }
 
@@ -45,6 +53,7 @@ export default function SignupForm() {
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm`,
           ...(captchaToken ? { captchaToken } : {}),
+          data: { workcraft_terms_version: SIGNUP_TERMS_VERSION, workcraft_terms_accepted: true, app_language: language },
         },
       });
 
@@ -206,9 +215,19 @@ export default function SignupForm() {
 
             <TurnstileCaptcha onToken={setCaptchaToken} resetSignal={captchaResetSignal} />
 
+            <label className="flex items-start gap-3 text-xs leading-5 text-slate-200">
+              <input type="checkbox" required checked={acceptedTerms} onChange={(event) => setAcceptedTerms(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-orange-600" />
+              <span>
+                <span>{translate(language, "I agree to the")}</span>{" "}
+                <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#f3b28f] underline underline-offset-4">{translate(language, "Terms of Service")}</Link>{" "}
+                <span>{translate(language, "and acknowledge the")}</span>{" "}
+                <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#f3b28f] underline underline-offset-4">{translate(language, "Privacy Policy")}</Link>.
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={loading || (TURNSTILE_ENABLED && !captchaToken)}
+              disabled={loading || !acceptedTerms || (TURNSTILE_ENABLED && !captchaToken)}
               className="w-full flex justify-center py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-colors disabled:opacity-50"
             >
               {loading ? "Creating Account..." : "Sign Up"}

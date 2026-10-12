@@ -43,6 +43,9 @@ export default function Footer() {
           <Link href="/terms" className="inline-flex min-h-12 min-w-12 items-center justify-center px-2 transition-colors hover:text-[#a94727] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#a94727]">
             {translate(language, "Terms")}
           </Link>
+          <Link href="/help" className="inline-flex min-h-12 min-w-12 items-center justify-center px-2 transition-colors hover:text-[#a94727] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#a94727]">
+            {language === "es" ? "Guías" : "Help guides"}
+          </Link>
           <Link href="/support" className="inline-flex min-h-12 min-w-12 items-center justify-center px-2 transition-colors hover:text-[#a94727] focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#a94727]">
             {translate(language, "Support")}
           </Link>

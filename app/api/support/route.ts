@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { isIP } from "node:net";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
@@ -10,18 +10,19 @@ import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const topics = new Set(["Account access", "Estimates", "Proposals and invoices", "Billing", "Other"]);
+const topics = new Set(["Account access", "Estimates", "Proposals and invoices", "Payments and payouts", "Billing", "Other"]);
 const MAX_BODY_BYTES = 10_000;
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[character]!);
 
-function supportResponse(request: Request, payload: { success?: boolean; error?: string }, status = 200) {
+function supportResponse(request: Request, payload: { success?: boolean; error?: string; caseReference?: string }, status = 200) {
   const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
   const acceptsHtml = request.headers.get("accept")?.toLowerCase().includes("text/html");
   if (contentType === "application/x-www-form-urlencoded" && acceptsHtml) {
     const destination = new URL("/support", request.url);
     destination.searchParams.set("form", payload.success ? "sent" : "error");
+    if (payload.caseReference) destination.searchParams.set("ref", payload.caseReference);
     destination.hash = "contact-support";
     return NextResponse.redirect(destination, 303);
   }
@@ -125,6 +126,7 @@ export async function POST(request: Request) {
   const safeEmail = escapeHtml(email);
   const safeTopic = escapeHtml(topic);
   const safeMessage = escapeHtml(message).replace(/\r?\n/g, "<br>");
+  const caseReference = `WC-SUP-${randomBytes(5).toString("hex").toUpperCase()}`;
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -133,9 +135,9 @@ export async function POST(request: Request) {
         from: sender,
         to: [recipient],
         reply_to: email,
-        subject: `WorkCraft AI support: ${topic}`,
-        text: `Name: ${name}\nEmail: ${email}\nTopic: ${topic}\n\n${message}`,
-        html: `<p><strong>Name:</strong> ${safeName}<br><strong>Email:</strong> ${safeEmail}<br><strong>Topic:</strong> ${safeTopic}</p><p>${safeMessage}</p>`,
+        subject: `[${caseReference}] WorkCraft AI support: ${topic}`,
+        text: `Case: ${caseReference}\nName: ${name}\nEmail: ${email}\nTopic: ${topic}\n\n${message}`,
+        html: `<p><strong>Case:</strong> ${escapeHtml(caseReference)}<br><strong>Name:</strong> ${safeName}<br><strong>Email:</strong> ${safeEmail}<br><strong>Topic:</strong> ${safeTopic}</p><p>${safeMessage}</p>`,
       }),
       signal: AbortSignal.timeout(8_000),
     });
@@ -149,5 +151,5 @@ export async function POST(request: Request) {
     return supportResponse(request, { error: "We could not send your message just now. Please email support@workcraftai.com." }, 502);
   }
 
-  return supportResponse(request, { success: true });
+  return supportResponse(request, { success: true, caseReference });
 }

@@ -121,6 +121,8 @@ export async function PUT(
   const depositPercentage = Number(body.deposit_percentage);
   const taxRate = Number(body.tax_rate);
   const markupPercentage = Number(body.markup_percentage);
+  const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
+  const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
   if (!clientName || clientName.length > 200 || !clientEmail || clientEmail.length > 320 ||
       clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(body.lineItems) ||
       !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100) {
@@ -129,6 +131,11 @@ export async function PUT(
   if ((body.tax_rate !== undefined && (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100)) ||
       (body.markup_percentage !== undefined && (!Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500))) {
     return jsonError("Tax must be between 0 and 100%, and markup between 0 and 500%.", 400);
+  }
+  if ((body.payment_terms !== undefined && body.payment_terms !== null && typeof body.payment_terms !== "string")
+    || (body.payment_terms_es !== undefined && body.payment_terms_es !== null && typeof body.payment_terms_es !== "string")
+    || paymentTerms.length > 1000 || paymentTermsEs.length > 1000) {
+    return jsonError("Customer payment terms must be 1,000 characters or less per language.", 400);
   }
 
   const { data: existing, error: lookupError } = await supabase
@@ -185,12 +192,14 @@ export async function PUT(
     proposal_language: proposalLanguage,
     proposal_display_mode: proposalDisplayMode,
     proposal_summary: proposalSummary || null,
+    payment_terms: paymentTerms || null,
+    payment_terms_es: paymentTermsEs || null,
   };
   if (body.tax_rate !== undefined) estimateUpdate.tax_rate = taxRate;
   if (body.markup_percentage !== undefined) estimateUpdate.markup_percentage = markupPercentage;
   if (typeof body.trade === "string") estimateUpdate.trade = body.trade.slice(0, 80);
 
-  const { error: updateError } = await supabase.rpc("workcraft_replace_estimate_with_items", {
+  const { error: updateError } = await supabase.rpc("workcraft_replace_estimate_with_terms", {
     p_estimate_id: id,
     p_estimate: estimateUpdate,
     p_line_items: body.lineItems,

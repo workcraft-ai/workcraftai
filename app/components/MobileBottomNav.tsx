@@ -39,6 +39,8 @@ function NavIcon({ name }: { name: string }) {
       return <svg {...common}><circle cx="5" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="19" cy="12" r="1" fill="currentColor" /></svg>;
     case "reports":
       return <svg {...common}><path d="M4 19V5M4 19h17" /><path d="m7 15 4-4 3 2 5-6" /></svg>;
+    case "help":
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 1 1 4.6 1.4c-.5.6-2.1 1.2-2.1 2.6v.5M12 17h.01" /></svg>;
     case "admin":
       return <svg {...common}><path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6z" /><path d="m9 12 2 2 4-4" /></svg>;
     default:
@@ -59,6 +61,7 @@ export default function MobileBottomNav({ pathname, adminRole }: MobileBottomNav
   }, [moreOpen]);
   const moreLinks = [
     { href: "/reports", label: "Reports", icon: "reports" },
+    { href: "/help", label: language === "es" ? "Centro de ayuda" : "Help center", icon: "help" },
     ...(adminRole ? [{ href: "/admin", label: "Admin support", icon: "admin" }] : []),
   ];
   const moreActive = moreLinks.some(({ href }) => isPathActive(pathname, href));

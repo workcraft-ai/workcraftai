@@ -46,6 +46,8 @@ export default function EditEstimatePage() {
   const [proposalLanguage, setProposalLanguage] = useState<"en" | "es">("en");
   const [proposalDisplayMode, setProposalDisplayMode] = useState<"detailed" | "summary">("detailed");
   const [proposalSummary, setProposalSummary] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
+  const [paymentTermsEs, setPaymentTermsEs] = useState("");
 
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemInput[]>([]);
@@ -77,6 +79,8 @@ export default function EditEstimatePage() {
         setProposalLanguage(estimate.proposal_language === "es" ? "es" : "en");
         setProposalDisplayMode(estimate.proposal_display_mode === "summary" ? "summary" : "detailed");
         setProposalSummary(typeof estimate.proposal_summary === "string" ? estimate.proposal_summary : "");
+        setPaymentTerms(typeof estimate.payment_terms === "string" ? estimate.payment_terms : "");
+        setPaymentTermsEs(typeof estimate.payment_terms_es === "string" ? estimate.payment_terms_es : "");
         const { data: { user } } = await supabase.auth.getUser();
         const entitlement = user ? await getClientProEntitlement() : null;
         const activePro = entitlement?.has_pro === true;
@@ -171,6 +175,8 @@ export default function EditEstimatePage() {
           proposal_language: proposalLanguage,
           proposal_display_mode: proposalDisplayMode,
           proposal_summary: proposalSummary.trim() || null,
+          payment_terms: paymentTerms.trim() || null,
+          payment_terms_es: paymentTermsEs.trim() || null,
           package_options: isPro ? packageOptions : [],
           lineItems: nonEmptyLineItems.map((item) => ({ description: item.description.trim(), description_es: item.description_es?.trim() || null, quantity: item.quantity, unit: item.unit?.trim() || "each", unit_price: item.unit_price })),
         }),
@@ -293,6 +299,16 @@ export default function EditEstimatePage() {
               <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
               <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
             </label>}
+          </section>
+
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
+              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
+              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
           </section>
 
           {/* Line Items Editor */}
