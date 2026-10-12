@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/app/components/LanguageProvider";
+import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
 type Progress = {
   eligible: boolean;
@@ -28,6 +29,7 @@ const copy = {
     fallback: "Your link is ready. Select and copy it, then confirm below.", copied: "I copied the link", rate: "Add a Price Book rate",
     later: "Skip for now", resume: "Continue first-time setup", help: "Get step-by-step help", error: "We couldn't save that step. Please try again.", finishedTitle: "Your first estimate setup is ready", finishedBody: "You can keep creating estimates and reuse the rate you saved.",
     shareHelp: "Open it yourself first. Copying a link does not email a customer.", done: "Done", optional: "Optional after your first quote: add a logo, AI, or Stripe payments.",
+    phoneError: "Enter a valid phone number, such as (555) 123-4567, or leave this field blank.",
   },
   es: {
     kicker: "Primeros 5 minutos", title: "Preparemos tu primera cotización", intro: "Sigue estos pasos a tu ritmo. Puedes omitir la configuración y volver después.",
@@ -38,6 +40,7 @@ const copy = {
     fallback: "El enlace está listo. Selecciónalo y cópialo; después confirma abajo.", copied: "Copié el enlace", rate: "Agregar un precio a la lista",
     later: "Omitir por ahora", resume: "Continuar la configuración inicial", help: "Ver las guías paso a paso", error: "No pudimos guardar este paso. Inténtalo de nuevo.", finishedTitle: "La configuración inicial está lista", finishedBody: "Ya puedes seguir creando cotizaciones y reutilizar el precio que guardaste.",
     shareHelp: "Ábrelo tú primero. Copiar un enlace no envía un correo al cliente.", done: "Listo", optional: "Después de tu primera cotización puedes agregar logotipo, IA o pagos de Stripe.",
+    phoneError: "Ingresa un número válido, como (555) 123-4567, o deja este campo vacío.",
   },
 };
 
@@ -56,6 +59,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const [markup, setMarkup] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
 
   const refresh = useCallback(async () => {
@@ -84,6 +88,11 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const complete = Boolean(progress?.profileComplete && progress?.estimateId && progress?.previewed && progress?.shared && progress?.priceBookReady);
   const visible = Boolean(progress?.eligible && !progress?.dismissed);
   useEffect(() => { onVisibilityChange?.(visible); }, [onVisibilityChange, visible]);
+  useEffect(() => {
+    if (!progress?.eligible || window.location.hash !== "#first-five-minutes") return;
+    const task = window.setTimeout(() => document.getElementById("first-five-minutes")?.scrollIntoView({ block: "start" }), 0);
+    return () => window.clearTimeout(task);
+  }, [progress?.eligible, progress?.profileComplete, progress?.estimateId, progress?.previewed, progress?.shared, progress?.priceBookReady]);
 
   async function mark(action: Exclude<Action, "bootstrap">) {
     const response = await fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }), cache: "no-store" });
@@ -92,7 +101,9 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setError(""); setPhoneError("");
+    if (!isValidOptionalBusinessPhone(phone)) { setPhoneError(t.phoneError); return; }
+    setBusy(true);
     try {
       const tax = Number(taxRate), markupNumber = Number(markup);
       if (!businessName.trim() || !Number.isFinite(tax) || tax < 0 || tax > 100 || !Number.isFinite(markupNumber) || markupNumber < 0 || markupNumber > 500 || !/^#[0-9a-f]{6}$/i.test(brandColor)) throw new Error("invalid");
@@ -109,7 +120,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   async function preview() {
     if (!progress?.estimateId) return;
     setBusy(true); setError("");
-    try { await mark("previewed"); router.push(`/estimate/${encodeURIComponent(progress.estimateId)}`); }
+    try { await mark("previewed"); router.push(`/estimate/${encodeURIComponent(progress.estimateId)}?setup=1`); }
     catch { setError(t.error); setBusy(false); }
   }
 
@@ -133,15 +144,15 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   }
 
   if (!progress?.eligible) return null;
-  if (complete) return progress.dismissed ? null : <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm"><div><h2 className="text-lg font-bold">{t.finishedTitle}</h2><p className="mt-1 text-sm">{t.finishedBody}</p>{error && <p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}</div><button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 rounded-lg border border-green-700 px-4 text-sm font-semibold disabled:opacity-50">{t.done}</button></section>;
+  if (complete) return progress.dismissed ? null : <section id="first-five-minutes" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm"><div><h2 className="text-lg font-bold">{t.finishedTitle}</h2><p className="mt-1 text-sm">{t.finishedBody}</p>{error && <p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}</div><button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 rounded-lg border border-green-700 px-4 text-sm font-semibold disabled:opacity-50">{t.done}</button></section>;
   if (progress.dismissed) return (
-    <button type="button" onClick={() => void mark("reopen").catch(() => setError(t.error))} className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-orange-800 shadow-sm">{t.resume}</button>
+    <button id="first-five-minutes" type="button" onClick={() => void mark("reopen").catch(() => setError(t.error))} className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-orange-800 shadow-sm">{t.resume}</button>
   );
 
   const completed = [progress.profileComplete, Boolean(progress.estimateId), progress.previewed, progress.shared, progress.priceBookReady];
   const active = completed.findIndex((item) => !item);
   return (
-    <section aria-labelledby="first-five-title" className="rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
+    <section id="first-five-minutes" aria-labelledby="first-five-title" className="scroll-mt-6 rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">{t.kicker}</p><h2 id="first-five-title" className="mt-1 text-xl font-bold text-slate-900">{t.title}</h2><p className="mt-2 text-sm text-slate-600">{t.intro}</p></div>
         <button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 text-sm font-semibold text-slate-600 underline disabled:opacity-50">{t.later}</button>
@@ -152,7 +163,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
           <label className="text-sm font-semibold text-slate-800">{t.name}<input maxLength={120} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.business}<input required maxLength={120} autoComplete="organization" value={businessName} onChange={(event) => setBusinessName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.address}<input maxLength={300} autoComplete="street-address" value={businessAddress} onChange={(event) => setBusinessAddress(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+          <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "onboarding-phone-error" : undefined} onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" />{phoneError && <span id="onboarding-phone-error" role="alert" className="mt-1 block text-sm font-medium text-red-800">{phoneError}</span>}</label>
           <label className="text-sm font-semibold text-slate-800">{t.tax}<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.markup}<input type="number" min="0" max="500" step="0.01" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800 sm:col-span-2">{t.logo}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
@@ -160,10 +171,10 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
           <p className="text-xs leading-5 text-slate-600 sm:col-span-2">{t.taxHelp}</p>
           <button type="submit" disabled={busy} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50 sm:justify-self-start">{busy ? t.saving : t.save}</button>
         </form>}
-        {active === 1 && <Link href="/estimate/new" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}
+        {active === 1 && <Link href="/estimate/new?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}
         {active === 2 && <button type="button" disabled={busy} onClick={() => void preview()} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50">{t.preview}</button>}
         {active === 3 && <div><p className="mb-3 text-sm text-slate-600">{t.shareHelp}</p><button type="button" disabled={busy} onClick={() => void share()} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50">{t.share}</button>{fallbackUrl && <div className="mt-3"><label className="block text-sm text-slate-700">{t.fallback}<input readOnly value={fallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-2 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3" /></label><button type="button" onClick={() => void mark("shared").catch(() => setError(t.error))} className="mt-2 min-h-12 font-semibold text-orange-800 underline">{t.copied}</button></div>}</div>}
-        {active === 4 && <div><Link href="/pricebook" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.rate}</Link><p className="mt-2 text-xs text-slate-600">{t.optional}</p></div>}
+        {active === 4 && <div><Link href="/pricebook?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.rate}</Link><p className="mt-2 text-xs text-slate-600">{t.optional}</p></div>}
       </div>
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-800">{error}</p>}
       <p className="mt-4 text-xs text-slate-600"><Link href="/help" className="font-semibold text-orange-800 underline">{t.help}</Link></p>

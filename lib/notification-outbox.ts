@@ -2,12 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { reserveAppEmail, releaseAppEmail } from "@/lib/email-quota";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
+import { brandedEmailFrame } from "@/lib/branded-email.mjs";
 
 export type NotificationMail = { from?: string; to: string[]; reply_to?: string; subject: string; text: string; html: string };
 type Notification = { id: string; user_id: string | null; estimate_id: string | null; job_id: string | null; source: "estimate"|"proposal_question"|"invoice"|"follow_up"|"billing"|"auth"|"welcome"; send_key: string; payload: Partial<NotificationMail>; attempts: number; reservation_id: string | null; first_attempt_at: string | null; created_at: string };
 export const escapeEmailHtml = (value: string) => value.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 export function notificationFrame(language: "en"|"es", title: string, content: string) {
-  return `<html lang="${language}"><body style="margin:0;background:#f5f3ed;padding:24px;font-family:Arial,sans-serif;color:#1d2925"><div style="max-width:600px;margin:auto;background:white;border-radius:12px;padding:26px"><p style="font-weight:bold;font-size:20px">WorkCraft <span style="color:#a34223">AI</span></p><h1 style="font-size:22px">${escapeEmailHtml(title)}</h1>${content}</div></body></html>`;
+  return brandedEmailFrame({language,title,preheader:title,eyebrow:language==="es"?"ACTUALIZACIÓN DE WORKCRAFT AI":"WORKCRAFT AI UPDATE",content});
 }
 export async function enqueueNotification(admin: SupabaseClient, value: {user_id?: string; estimate_id?: string|null; job_id?:string; source:Notification["source"]; send_key:string; payload:NotificationMail}) {
   const { data: existing, error: lookup } = await admin.from("notification_outbox").select("id,status,provider_email_id").eq("send_key",value.send_key).maybeSingle();

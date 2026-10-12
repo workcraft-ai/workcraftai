@@ -553,6 +553,7 @@ Object.assign(spanish, {
 
 Object.assign(spanish, {
   "Notifications": "Notificaciones",
+  "Status:": "Estado:",
   "Customer questions": "Preguntas de clientes",
   "No customer questions for this estimate yet.": "Aún no hay preguntas de clientes para esta cotización.",
   "Reply by email": "Responder por correo electrónico a",

@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
 import type { ImportedPriceBookItem } from "@/lib/priceBookCsv.mjs";
+import SetupReturnLink from "@/app/components/SetupReturnLink";
 
 type PriceItem = { id: string; name: string; description: string; trade: string; unit: string; unit_price: number; pricing_basis?: string };
 type EstimateLine = { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number };
@@ -64,7 +65,12 @@ export default function PriceBookPage() {
       ? await supabase.from("price_book_items").update(item).eq("id", editingId).eq("user_id", user.id)
       : await supabase.from("price_book_items").insert({ ...item, user_id: user.id });
     if (insertError) setError("Could not save this Price Book item. Please check the details and try again.");
-    else { setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null); setNotice(editingId ? "Price book item updated." : "Price book item added."); await loadData(); }
+    else {
+      setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null);
+      setNotice(editingId ? "Price book item updated." : "Price book item added.");
+      await loadData();
+      if (new URLSearchParams(window.location.search).get("setup") === "1") window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const editItem = (item: PriceItem) => {
@@ -117,6 +123,7 @@ export default function PriceBookPage() {
     setNotice(`Imported ${imported} price book items.`);
     setImporting(false);
     await loadData();
+    if (new URLSearchParams(window.location.search).get("setup") === "1") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const applyTemplate = (template: EstimateTemplate) => {
@@ -137,6 +144,7 @@ export default function PriceBookPage() {
     <LocalizedTree>
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 md:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
+        <SetupReturnLink step="pricebook" />
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Free tools</p><h1 className="mt-1 text-2xl font-bold">Price book & templates</h1><p className="mt-1 text-sm text-slate-600">Set your own rates and reuse the work you quote most.</p></div>
           <button type="button" onClick={openPriceBookItems} className="inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">+ Add item</button>
