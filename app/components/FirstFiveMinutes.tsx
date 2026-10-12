@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/app/components/LanguageProvider";
+import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
 type Progress = {
   eligible: boolean;
@@ -28,6 +29,7 @@ const copy = {
     fallback: "Your link is ready. Select and copy it, then confirm below.", copied: "I copied the link", rate: "Add a Price Book rate",
     later: "Skip for now", resume: "Continue first-time setup", help: "Get step-by-step help", error: "We couldn't save that step. Please try again.", finishedTitle: "Your first estimate setup is ready", finishedBody: "You can keep creating estimates and reuse the rate you saved.",
     shareHelp: "Open it yourself first. Copying a link does not email a customer.", done: "Done", optional: "Optional after your first quote: add a logo, AI, or Stripe payments.",
+    phoneError: "Enter a valid phone number, such as (555) 123-4567, or leave this field blank.",
   },
   es: {
     kicker: "Primeros 5 minutos", title: "Preparemos tu primera cotización", intro: "Sigue estos pasos a tu ritmo. Puedes omitir la configuración y volver después.",
@@ -38,6 +40,7 @@ const copy = {
     fallback: "El enlace está listo. Selecciónalo y cópialo; después confirma abajo.", copied: "Copié el enlace", rate: "Agregar un precio a la lista",
     later: "Omitir por ahora", resume: "Continuar la configuración inicial", help: "Ver las guías paso a paso", error: "No pudimos guardar este paso. Inténtalo de nuevo.", finishedTitle: "La configuración inicial está lista", finishedBody: "Ya puedes seguir creando cotizaciones y reutilizar el precio que guardaste.",
     shareHelp: "Ábrelo tú primero. Copiar un enlace no envía un correo al cliente.", done: "Listo", optional: "Después de tu primera cotización puedes agregar logotipo, IA o pagos de Stripe.",
+    phoneError: "Ingresa un número válido, como (555) 123-4567, o deja este campo vacío.",
   },
 };
 
@@ -56,6 +59,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const [markup, setMarkup] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
 
   const refresh = useCallback(async () => {
@@ -92,7 +96,9 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault(); setError(""); setPhoneError("");
+    if (!isValidOptionalBusinessPhone(phone)) { setPhoneError(t.phoneError); return; }
+    setBusy(true);
     try {
       const tax = Number(taxRate), markupNumber = Number(markup);
       if (!businessName.trim() || !Number.isFinite(tax) || tax < 0 || tax > 100 || !Number.isFinite(markupNumber) || markupNumber < 0 || markupNumber > 500 || !/^#[0-9a-f]{6}$/i.test(brandColor)) throw new Error("invalid");
@@ -152,7 +158,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
           <label className="text-sm font-semibold text-slate-800">{t.name}<input maxLength={120} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.business}<input required maxLength={120} autoComplete="organization" value={businessName} onChange={(event) => setBusinessName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.address}<input maxLength={300} autoComplete="street-address" value={businessAddress} onChange={(event) => setBusinessAddress(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+          <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "onboarding-phone-error" : undefined} onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" />{phoneError && <span id="onboarding-phone-error" role="alert" className="mt-1 block text-sm font-medium text-red-800">{phoneError}</span>}</label>
           <label className="text-sm font-semibold text-slate-800">{t.tax}<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800">{t.markup}<input type="number" min="0" max="500" step="0.01" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-800 sm:col-span-2">{t.logo}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>

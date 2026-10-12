@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { LocalizedTree, translate, type Language } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney, percentageOfCents } from "@/lib/estimate-money.mjs";
 
 interface LineItem {
@@ -55,6 +55,7 @@ interface EstimatePackage {
 }
 
 export default function ClientEstimatePage() {
+  const { language } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
@@ -362,8 +363,9 @@ export default function ClientEstimatePage() {
     );
   }
 
+  const viewLanguage = isOwner ? language : estimate.proposal_language;
   return (
-    <LocalizedTree languageOverride={estimate.proposal_language}>
+    <LocalizedTree languageOverride={viewLanguage}>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Contractor-only status and navigation controls */}
@@ -377,7 +379,7 @@ export default function ClientEstimatePage() {
                   : "bg-yellow-500 text-slate-900"
               }`}
             >
-              {estimate.status}
+              {translate(viewLanguage, estimate.status)}
             </span>
           </div>
 
@@ -409,7 +411,7 @@ export default function ClientEstimatePage() {
           {ownerQuestions.length ? <div className="divide-y divide-slate-100">{ownerQuestions.map((question) => <article key={question.id} className="py-3 first:pt-0 last:pb-0">
             <p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString()}</span></p>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{question.message}</p>
-            <a className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`}>{translate(estimate.proposal_language, "Reply by email")} {question.customer_email}</a>
+            <a className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`}>{translate(viewLanguage, "Reply by email")} {question.customer_email}</a>
           </article>)}</div> : <p className="text-xs text-slate-600">No customer questions for this estimate yet.</p>}
         </section>}
 
@@ -436,7 +438,7 @@ export default function ClientEstimatePage() {
               </div>
               <p className="mt-2 text-xs font-semibold text-slate-600"><span>Estimate #</span>{estimate.reference_number}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(estimate.proposal_language === "es" ? "es-ES" : "en-US")}
+                <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(viewLanguage === "es" ? "es-ES" : "en-US")}
               </p>
             </div>
             <div className="text-left sm:text-right">
@@ -464,7 +466,7 @@ export default function ClientEstimatePage() {
                   <button key={`${option.name}-${index}`} type="button" onClick={() => setSelectedPackage(index)} className={`rounded-xl border p-4 text-left transition ${selectedPackage === index ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-400"}`}>
                     <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{option.name}</span>
                     <span className="mt-2 block text-xl font-bold text-slate-900">${Number(option.total).toFixed(2)}</span>
-                    {(estimate.proposal_language === "es" ? option.description_es || option.description : option.description) && <span className="mt-2 block text-xs leading-5 text-slate-600">{estimate.proposal_language === "es" ? option.description_es || option.description : option.description}</span>}
+                    {(viewLanguage === "es" ? option.description_es || option.description : option.description) && <span className="mt-2 block text-xs leading-5 text-slate-600">{viewLanguage === "es" ? option.description_es || option.description : option.description}</span>}
                   </button>
                 ))}
               </div>
@@ -516,10 +518,10 @@ export default function ClientEstimatePage() {
                   {lineItems.map((item, index) => (
                     <tr key={item.id} className="hover:bg-slate-50/50">
                       <td className="p-3 font-medium text-slate-800">
-                        {estimate.proposal_language === "es" ? item.description_es || item.description : item.description}
+                        {viewLanguage === "es" ? item.description_es || item.description : item.description}
                       </td>
                       <td className="p-3 text-center text-slate-600">
-                        {item.quantity} {item.unit ? translate(estimate.proposal_language, item.unit) : ""}
+                        {item.quantity} {item.unit ? translate(viewLanguage, item.unit) : ""}
                       </td>
                       <td className="p-3 text-right text-slate-600">
                         ${Number(item.unit_price).toFixed(2)}
@@ -532,7 +534,7 @@ export default function ClientEstimatePage() {
                 </tbody>
               </table>
             </div>
-            {estimate.proposal_language === "es" && (lineItems.some((item) => !item.description_es) || estimate.package_options?.some((option) => !option.description_es)) && <p className="text-xs text-slate-500">Some work descriptions remain in the contractor’s original language because Spanish wording was not provided.</p>}
+            {viewLanguage === "es" && (lineItems.some((item) => !item.description_es) || estimate.package_options?.some((option) => !option.description_es)) && <p className="text-xs text-slate-500">Some work descriptions remain in the contractor’s original language because Spanish wording was not provided.</p>}
           </div>}
 
           {/* Deposit & Summary Box */}
@@ -560,9 +562,9 @@ export default function ClientEstimatePage() {
           </div>
 
           {(estimate.payment_terms || estimate.payment_terms_es) && <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-bold text-slate-900">{estimate.proposal_language === "es" ? "Condiciones de pago del contratista" : "Contractor payment terms"}</h2>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{estimate.proposal_language === "es" ? (estimate.payment_terms_es || estimate.payment_terms) : (estimate.payment_terms || estimate.payment_terms_es)}</p>
-            {((estimate.proposal_language === "es" && !estimate.payment_terms_es) || (estimate.proposal_language !== "es" && !estimate.payment_terms)) && <p className="mt-2 text-xs text-slate-600">{estimate.proposal_language === "es" ? "El contratista proporcionó estas condiciones solo en su idioma original." : "The contractor provided these terms only in their original language."}</p>}
+            <h2 className="text-sm font-bold text-slate-900">{viewLanguage === "es" ? "Condiciones de pago del contratista" : "Contractor payment terms"}</h2>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{viewLanguage === "es" ? (estimate.payment_terms_es || estimate.payment_terms) : (estimate.payment_terms || estimate.payment_terms_es)}</p>
+            {((viewLanguage === "es" && !estimate.payment_terms_es) || (viewLanguage !== "es" && !estimate.payment_terms)) && <p className="mt-2 text-xs text-slate-600">{viewLanguage === "es" ? "El contratista proporcionó estas condiciones solo en su idioma original." : "The contractor provided these terms only in their original language."}</p>}
           </section>}
 
           {!isOwner && estimate.status !== "declined" && <section className="rounded-xl border border-slate-200 bg-white p-4">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
 type UsageSnapshot = {
   plan: "free" | "pro";
@@ -145,9 +146,15 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setMessage(null);
     setError(null);
+    if (!isValidOptionalBusinessPhone(phone)) {
+      setError(language === "es"
+        ? "Ingresa un número de teléfono válido, como (555) 123-4567, o deja el campo vacío."
+        : "Enter a valid phone number, such as (555) 123-4567, or leave this field blank.");
+      return;
+    }
+    setSaving(true);
 
     const { error } = await supabase.auth.updateUser({
       data: {
@@ -391,6 +398,8 @@ export default function ProfilePage() {
             <input
               id="profile-phone"
               type="tel"
+              maxLength={40}
+              autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(555) 000-0000"

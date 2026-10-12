@@ -4,6 +4,7 @@ import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { sameOrigin } from "@/lib/admin-support";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { isNewConfirmedAccount, queueWelcomeNotification } from "@/lib/welcome-notification";
+import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     eligible: newlyAcknowledged,
     dismissed: Boolean(progress?.dismissed_at),
-    profileComplete: Boolean(String(user.user_metadata?.business_name ?? "").trim()),
+    profileComplete: Boolean(String(user.user_metadata?.business_name ?? "").trim()) &&
+      isValidOptionalBusinessPhone(String(user.user_metadata?.phone ?? "")),
     estimateId: estimates?.[0]?.id ?? null,
     previewed: Boolean(progress?.previewed_at),
     shared: Boolean(progress?.shared_link_at),

@@ -952,14 +952,19 @@ export default function CreateEstimatePage() {
             </label>
           </div>}
 
-          {isProSubscriber && <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+          <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
               <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
             </div>
             <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
+            {!isProSubscriber && <div className="rounded-lg border border-purple-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-900">{language === "es" ? "La redacción de partidas con IA está incluida con Pro." : "AI line-item drafting is included with Pro."}</p>
+              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Puedes seguir creando partidas y usando tu lista de precios gratis. Mejora a Pro cuando quieras que la IA prepare un borrador." : "You can still create line items and use your Price Book for free. Upgrade when you want AI to prepare a draft."}</p>
+              <Link href="/profile" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800">{language === "es" ? "Ver Pro" : "View Pro"}</Link>
+            </div>}
             {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
-            <div className="space-y-2">
+            {isProSubscriber ? <div className="space-y-2">
               <label className="block text-xs font-medium text-slate-700">Job scope and details
                 <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe measurements, material or grade, access, existing conditions, and what is included or excluded." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </label>
@@ -970,9 +975,14 @@ export default function CreateEstimatePage() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
               </div>
-            </div>
+            </div> : <div className="space-y-2" aria-label={language === "es" ? "Vista previa de la función Pro" : "Pro feature preview"}>
+              <label className="block text-xs font-medium text-slate-700">{language === "es" ? "Detalles del trabajo" : "Job scope and details"}
+                <textarea disabled rows={3} placeholder={language === "es" ? "Describe el trabajo y las medidas…" : "Describe the work and measurements…"} className="mt-1.5 w-full resize-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
+              </label>
+              <button type="button" disabled className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white opacity-50">{language === "es" ? "Preparar partidas" : "Draft Line Items"}</button>
+            </div>}
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
-          </section>}
+          </section>
 
           <details className="rounded-lg border border-slate-200 bg-white px-3 py-2">
             <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
