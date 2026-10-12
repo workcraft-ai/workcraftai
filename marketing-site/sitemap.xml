@@ -1,16 +1,165 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://workcraftai.com/</loc></url>
-  <url><loc>https://workcraftai.com/resources/</loc></url>
-  <url><loc>https://workcraftai.com/resources/write-a-clear-contractor-estimate/</loc></url>
-  <url><loc>https://workcraftai.com/resources/build-a-practical-price-book/</loc></url>
-  <url><loc>https://workcraftai.com/resources/price-a-small-trade-job/</loc></url>
-  <url><loc>https://workcraftai.com/resources/good-better-best-estimate-options/</loc></url>
-  <url><loc>https://workcraftai.com/resources/from-approved-estimate-to-invoice/</loc></url>
-  <url><loc>https://workcraftai.com/resources/follow-up-on-an-estimate/</loc></url>
-  <url><loc>https://workcraftai.com/resources/job-photos-and-voice-notes/</loc></url>
-  <url><loc>https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/</loc></url>
-  <url><loc>https://workcraftai.com/resources/plumbing-estimate-example/</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://workcraftai.com/resources/electrical-estimate-checklist/</loc><lastmod>2026-10-11</lastmod></url>
-  <url><loc>https://workcraftai.com/resources/roofing-estimate-scope-template/</loc><lastmod>2026-10-11</lastmod></url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://workcraftai.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/write-a-clear-contractor-estimate/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/write-a-clear-contractor-estimate/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/write-a-clear-contractor-estimate/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/write-a-clear-contractor-estimate/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/write-a-clear-contractor-estimate/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/write-a-clear-contractor-estimate/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/write-a-clear-contractor-estimate/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/write-a-clear-contractor-estimate/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/build-a-practical-price-book/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/build-a-practical-price-book/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/build-a-practical-price-book/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/build-a-practical-price-book/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/build-a-practical-price-book/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/build-a-practical-price-book/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/build-a-practical-price-book/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/build-a-practical-price-book/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/price-a-small-trade-job/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/price-a-small-trade-job/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/price-a-small-trade-job/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/price-a-small-trade-job/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/price-a-small-trade-job/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/price-a-small-trade-job/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/price-a-small-trade-job/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/price-a-small-trade-job/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/good-better-best-estimate-options/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/good-better-best-estimate-options/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/good-better-best-estimate-options/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/good-better-best-estimate-options/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/good-better-best-estimate-options/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/good-better-best-estimate-options/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/good-better-best-estimate-options/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/good-better-best-estimate-options/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/from-approved-estimate-to-invoice/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/from-approved-estimate-to-invoice/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/from-approved-estimate-to-invoice/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/from-approved-estimate-to-invoice/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/from-approved-estimate-to-invoice/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/from-approved-estimate-to-invoice/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/from-approved-estimate-to-invoice/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/from-approved-estimate-to-invoice/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/follow-up-on-an-estimate/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/follow-up-on-an-estimate/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/follow-up-on-an-estimate/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/follow-up-on-an-estimate/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/follow-up-on-an-estimate/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/follow-up-on-an-estimate/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/follow-up-on-an-estimate/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/follow-up-on-an-estimate/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/job-photos-and-voice-notes/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/job-photos-and-voice-notes/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/job-photos-and-voice-notes/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/job-photos-and-voice-notes/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/job-photos-and-voice-notes/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/job-photos-and-voice-notes/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/job-photos-and-voice-notes/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/job-photos-and-voice-notes/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/clear-estimates-in-english-and-spanish/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/clear-estimates-in-english-and-spanish/</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/clear-estimates-in-english-and-spanish/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/clear-estimates-in-english-and-spanish/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/plumbing-estimate-example/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/plumbing-estimate-example/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/plumbing-estimate-example/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/plumbing-estimate-example/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/plumbing-estimate-example/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/plumbing-estimate-example/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/plumbing-estimate-example/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/plumbing-estimate-example/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/electrical-estimate-checklist/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/electrical-estimate-checklist/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/electrical-estimate-checklist/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/electrical-estimate-checklist/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/electrical-estimate-checklist/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/electrical-estimate-checklist/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/electrical-estimate-checklist/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/electrical-estimate-checklist/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/resources/roofing-estimate-scope-template/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/roofing-estimate-scope-template/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/roofing-estimate-scope-template/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/roofing-estimate-scope-template/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/resources/roofing-estimate-scope-template/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/resources/roofing-estimate-scope-template/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/roofing-estimate-scope-template/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/roofing-estimate-scope-template/" />
+  </url>
 </urlset>
