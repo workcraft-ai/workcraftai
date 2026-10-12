@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export function getStripeClient() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -14,11 +15,14 @@ export function stripeLivemode() {
   return null;
 }
 
-export function getServiceSupabase() {
+export function getServiceSupabase(fetchTimeoutMs?: number) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Payment storage is not configured.");
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(fetchTimeoutMs ? { global: { fetch: createBoundedFetch(fetchTimeoutMs) } } : {}),
+  });
 }
 
 export function getAppOrigin(request: Request) {
