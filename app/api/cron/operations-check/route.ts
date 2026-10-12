@@ -68,6 +68,7 @@ export async function GET(request: Request) {
   const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1_000).toISOString();
   const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1_000).toISOString();
   const hourAgo = new Date(now.getTime() - 60 * 60 * 1_000).toISOString();
+  const emailDeliveryWindowStart = strictUsage ? dayAgo : hourAgo;
 
   const metricQueries = [
     admin.from("stripe_webhook_events").select("event_id", { count: "exact", head: true }).eq("status", "failed"),
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
     admin.from("notification_outbox").select("id", { count: "exact", head: true }).eq("status", "pending").lte("created_at", thirtyMinutesAgo).lte("next_attempt_at", nowIso),
     admin.from("notification_outbox").select("id", { count: "exact", head: true }).eq("status", "sending").lte("created_at", thirtyMinutesAgo).lte("lease_until", fifteenMinutesAgo),
     admin.from("notification_outbox").select("id", { count: "exact", head: true }).eq("source", "auth").in("status", ["pending", "sending"]).lte("created_at", tenMinutesAgo),
-    admin.from("email_delivery_inbox").select("provider_event_id", { count: "exact", head: true }).in("event", ["failed", "suppressed", "bounced", "complained"]).gte("received_at", dayAgo),
+    admin.from("email_delivery_inbox").select("provider_event_id", { count: "exact", head: true }).in("event", ["failed", "suppressed", "bounced", "complained"]).gte("received_at", emailDeliveryWindowStart),
     admin.from("email_delivery_inbox").select("provider_event_id", { count: "exact", head: true }).eq("event", "delivery_delayed").lte("received_at", hourAgo).gte("received_at", dayAgo),
   ];
 
@@ -158,7 +159,8 @@ export async function GET(request: Request) {
       notification_due_over_30m: counts[3],
       notification_expired_lease_over_15m: counts[4],
       auth_email_pending_over_10m: counts[5],
-      email_delivery_issues_last_24h: counts[6],
+      email_delivery_issues_in_window: counts[6],
+      email_delivery_issue_window_hours: strictUsage ? 24 : 1,
       email_delivery_delayed_over_1h: counts[7],
       resend_email_daily_used: resendUsage?.daily.used ?? null,
       resend_email_daily_limit: resendUsage?.daily.limit ?? null,
