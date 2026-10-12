@@ -85,7 +85,7 @@ export async function GET(request: Request) {
     admin.from("provider_email_daily_usage").select("source,emails_started").eq("usage_date", utcToday),
     admin.from("tradeflow_ai_global_daily_usage").select("attempts_started").eq("usage_date", utcToday).maybeSingle(),
     admin.from("tradeflow_app_settings").select("ai_global_daily_generation_limit").eq("singleton", true).single(),
-    strictUsage ? getResendEmailUsage(process.env.RESEND_API_KEY) : Promise.resolve(null),
+    strictUsage ? getResendEmailUsage(process.env.RESEND_USAGE_API_KEY) : Promise.resolve(null),
   ]);
 
   if (metrics.some((metric: MetricResult) => metric.error)
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
   if (strictUsage && !resendUsage) {
     warnings.push({
       code: "resend_provider_usage_unavailable", source: "resend_provider",
-      action: "The Resend Usage API did not return email quotas. Confirm RESEND_API_KEY has full access and inspect Resend's Usage page; no key or response body is logged.",
+      action: "The Resend Usage API did not return email quotas. Confirm RESEND_USAGE_API_KEY has full access and inspect Resend's Usage page; no key or response body is logged.",
     });
   } else if (resendUsage) {
     for (const [period, usage] of Object.entries({ daily: resendUsage.daily, monthly: resendUsage.monthly })) {
