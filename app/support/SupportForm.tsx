@@ -3,17 +3,19 @@
 import { useState, type FormEvent } from "react";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
 
-type SubmissionState = { kind: "success" | "error"; message: string } | null;
+type SubmissionState = { kind: "success" | "error"; message: string; caseReference?: string } | null;
 
 export default function SupportForm({
   fallbackResult,
+  fallbackReference,
 }: {
   fallbackResult?: "sent" | "error";
+  fallbackReference?: string;
 }) {
   const [pending, setPending] = useState(false);
   const [state, setState] = useState<SubmissionState>(() => {
     if (fallbackResult === "sent") {
-      return { kind: "success", message: "Thanks for reaching out. Your message is on its way to our support team." };
+      return { kind: "success", message: "Thanks for reaching out. Keep your case reference for follow-up.", caseReference: fallbackReference };
     }
     if (fallbackResult === "error") {
       return { kind: "error", message: "We could not send your message. Please try again." };
@@ -34,10 +36,10 @@ export default function SupportForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.fromEntries(formData)),
       });
-      const result: { success?: boolean; error?: string } = await response.json();
+      const result: { success?: boolean; error?: string; caseReference?: string } = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || "We could not send your message. Please try again.");
       form.reset();
-      setState({ kind: "success", message: "Thanks for reaching out. Your message is on its way to our support team." });
+      setState({ kind: "success", message: "Thanks for reaching out. Keep your case reference for follow-up.", caseReference: result.caseReference });
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : "We could not send your message. Please try again." });
     } finally {
@@ -65,6 +67,7 @@ export default function SupportForm({
           <option>Account access</option>
           <option>Estimates</option>
           <option>Proposals and invoices</option>
+          <option>Payments and payouts</option>
           <option>Billing</option>
           <option>Other</option>
         </select>
@@ -78,7 +81,7 @@ export default function SupportForm({
         <input id="support-company-website" name="company_website" tabIndex={-1} autoComplete="off" />
       </div>
       <p className="text-xs leading-5 text-slate-500">Please don’t include passwords, payment card details, or sensitive customer information.</p>
-      {state && <p role={state.kind === "error" ? "alert" : "status"} aria-live="polite" className={`rounded-xl px-4 py-3 text-sm ${state.kind === "error" ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"}`}>{state.message}</p>}
+      {state && <p role={state.kind === "error" ? "alert" : "status"} aria-live="polite" className={`rounded-xl px-4 py-3 text-sm ${state.kind === "error" ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"}`}>{state.message}{state.caseReference && <strong className="mt-1 block select-all">{state.caseReference}</strong>}</p>}
       <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-orange-700 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 disabled:cursor-wait disabled:opacity-60">
         {pending ? "Sending…" : "Send message"}
       </button>

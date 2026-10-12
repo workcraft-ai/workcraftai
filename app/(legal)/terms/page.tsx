@@ -28,7 +28,7 @@ export default function TermsPage() {
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700"><LocalizedText text="WorkCraft AI · Legal" /></p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900"><LocalizedText text="Terms of Service" /></h1>
-          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 2026" /></p>
+          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 11, 2026" /></p>
         </header>
 
         <section className="space-y-3">
@@ -64,6 +64,17 @@ export default function TermsPage() {
           <p className="text-sm leading-7 text-slate-700">
             <LocalizedText text="You may not use the service for any illegal or unauthorized purpose, nor violate any laws in your jurisdiction. You are responsible for having permission to use the customer information you add to WorkCraft AI." />
           </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="5. Contractor Services and Customer Payments" /></h2>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="WorkCraft AI provides software for contractors to prepare estimates and manage work. We are not the contractor, customer, seller, or a party to any agreement for construction or other services. Contractors alone set the scope, schedule, prices, taxes, cancellation and refund terms, and warranties for their work. Customers should resolve service, refund, and chargeback questions with the contractor and, for a card dispute, the payment provider. WorkCraft AI does not guarantee a contractor's work or decide service disputes." /></p>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="The sales-tax rate in an estimate is entered by the contractor. WorkCraft AI calculates from that rate but does not determine whether a service, material, or location is taxable and does not automatically calculate or remit tax through Stripe Tax. Contractors must verify tax treatment and fulfill any collection and filing obligations. Customer cards are entered on Stripe-hosted Checkout, not in WorkCraft AI." /></p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="6. Service Availability and Liability" /></h2>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="We provide WorkCraft AI on an as-available basis. To the extent permitted by law, we disclaim implied warranties, including fitness for a particular purpose, and are not liable for indirect, incidental, special, or consequential losses, including lost profits or lost business. To the extent permitted by law, our total liability arising from WorkCraft AI is limited to the greater of $100 or the amount you paid us for the service in the 12 months before the claim. These limits do not apply where the law prohibits them, including liability that cannot be excluded for fraud or intentional misconduct." /></p>
         </section>
       </article>
     </div>

@@ -31,6 +31,8 @@ interface Estimate {
   proposal_language: Language;
   proposal_display_mode?: "detailed" | "summary";
   proposal_summary?: string | null;
+  payment_terms?: string | null;
+  payment_terms_es?: string | null;
   created_at: string;
   package_options?: EstimatePackage[];
   signature_name?: string | null;
@@ -547,6 +549,8 @@ export default function ClientEstimatePage() {
             <div className="flex justify-between items-center border-t border-slate-200 pt-2 font-bold text-slate-900"><span>Total</span><span>${total.toFixed(2)}</span></div>
             </>}
 
+            {taxAmount > 0 && <p className="text-xs font-normal leading-5 text-slate-600">The contractor entered this tax rate. Ask the contractor about tax treatment for this work.</p>}
+
             {estimate.require_deposit && (
               <div className="flex justify-between items-center text-green-700 font-semibold pt-2 border-t border-slate-200">
                 <span>Required Down-Payment ({estimate.deposit_percentage}%)</span>
@@ -554,6 +558,12 @@ export default function ClientEstimatePage() {
               </div>
             )}
           </div>
+
+          {(estimate.payment_terms || estimate.payment_terms_es) && <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <h2 className="text-sm font-bold text-slate-900">{estimate.proposal_language === "es" ? "Condiciones de pago del contratista" : "Contractor payment terms"}</h2>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{estimate.proposal_language === "es" ? (estimate.payment_terms_es || estimate.payment_terms) : (estimate.payment_terms || estimate.payment_terms_es)}</p>
+            {((estimate.proposal_language === "es" && !estimate.payment_terms_es) || (estimate.proposal_language !== "es" && !estimate.payment_terms)) && <p className="mt-2 text-xs text-slate-600">{estimate.proposal_language === "es" ? "El contratista proporcionó estas condiciones solo en su idioma original." : "The contractor provided these terms only in their original language."}</p>}
+          </section>}
 
           {!isOwner && estimate.status !== "declined" && <section className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-bold text-slate-900">Have a question about this proposal?</h2>
@@ -587,6 +597,7 @@ export default function ClientEstimatePage() {
                   <button type="button" disabled={startingPayment} onClick={() => void startCustomerPayment("balance")} className="rounded-lg border border-blue-700 px-4 py-2.5 text-sm font-semibold text-blue-800 disabled:opacity-50">{startingPayment ? "Opening Stripe…" : paymentSummary.amountPaidCents > 0 ? `Pay remaining balance · $${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}` : `Pay in full · $${(paymentSummary.totalCents / 100).toFixed(2)}`}</button>
                 </div>
                 <p className="mt-3 text-center text-[11px] leading-5 text-slate-600">Payments are processed by Stripe and go directly to the contractor’s Stripe account. WorkCraft AI does not receive or hold the payment.</p>
+                <p className="mt-2 text-center text-[11px] leading-5 text-slate-600">The contractor sets payment, cancellation, and refund terms for this job. Ask them about those terms before paying. Contact them about service or refund issues; Stripe handles payment disputes.</p>
               </div>}
             </div>
           ) : estimate.status === "declined" ? (

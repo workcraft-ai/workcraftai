@@ -42,7 +42,11 @@ const questions = [
   },
   {
     question: "Where do I manage payouts, refunds, and disputes?",
-    answer: "Use your Stripe Dashboard to review payments and payouts, update payout details, and respond to refund or dispute matters. You remain responsible for your services, customer communication, and decisions about resolving service issues. Stripe manages payment processing and eligible connected-account risk under its terms.",
+    answer: "Use your Stripe Dashboard to review payments and payouts, update payout details, and respond to refund or dispute matters. WorkCraft AI emails the account owner when Stripe reports a dispute on a payment recorded in the app; check Stripe directly for deadlines and evidence requirements. You remain responsible for your services, customer communication, and decisions about resolving service issues. Stripe manages payment processing and eligible connected-account risk under its terms.",
+  },
+  {
+    question: "Does WorkCraft AI calculate sales tax automatically?",
+    answer: "No. You enter the sales-tax percentage on an estimate, and WorkCraft AI calculates from that rate. It does not decide what is taxable, use Stripe Tax, or file taxes. Check local rules with a qualified tax professional before sharing a quote.",
   },
   {
     question: "What fees apply to customer payments?",

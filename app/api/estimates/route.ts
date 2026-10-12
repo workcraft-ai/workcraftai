@@ -58,17 +58,23 @@ export async function POST(request: Request) {
   const packages = body.package_options ?? [];
   const proposalDisplayMode = body.proposal_display_mode === "summary" ? "summary" : "detailed";
   const proposalSummary = typeof body.proposal_summary === "string" ? body.proposal_summary.trim() : "";
+  const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
+  const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
 
   if (!clientName || clientName.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320
     || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(lineItems) || !validPackages(packages)
     || !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100
     || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100
     || !Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500
-    || proposalSummary.length > 1200 || (proposalDisplayMode === "summary" && !proposalSummary)) {
+    || proposalSummary.length > 1200
+    || (body.payment_terms !== undefined && body.payment_terms !== null && typeof body.payment_terms !== "string")
+    || (body.payment_terms_es !== undefined && body.payment_terms_es !== null && typeof body.payment_terms_es !== "string")
+    || paymentTerms.length > 1000 || paymentTermsEs.length > 1000
+    || (proposalDisplayMode === "summary" && !proposalSummary)) {
     return NextResponse.json({ error: "Check customer details, line items, tax, and deposit values." }, { status: 400 });
   }
 
-  const { data: estimateId, error } = await supabase.rpc("workcraft_create_estimate_with_items", {
+  const { data: estimateId, error } = await supabase.rpc("workcraft_create_estimate_with_terms", {
     p_estimate: {
       client_name: clientName,
       client_email: clientEmail,
@@ -83,6 +89,8 @@ export async function POST(request: Request) {
       proposal_language: body.proposal_language === "es" ? "es" : "en",
       proposal_display_mode: proposalDisplayMode,
       proposal_summary: proposalSummary || null,
+      payment_terms: paymentTerms || null,
+      payment_terms_es: paymentTermsEs || null,
     },
     p_line_items: lineItems,
   });

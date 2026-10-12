@@ -6,7 +6,7 @@ import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
 import { getInvoiceSubscriptionId } from "@/lib/stripe-invoice.mjs";
 import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
-import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
+import { enqueueNotification, escapeEmailHtml, notificationFrame, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
@@ -102,6 +102,50 @@ export async function POST(request: Request) {
 
   }
 
+  async function notifyConnectedPaymentDispute(disputeId: string, connectedAccountId: string) {
+    // Retrieve current state so an old webhook cannot send a stale action alert.
+    const dispute = await stripe.disputes.retrieve(disputeId, {}, { stripeAccount: connectedAccountId });
+    const intentId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : dispute.payment_intent?.id;
+    if (!intentId) return;
+    const { data: payment, error: paymentError } = await admin.from("customer_payments")
+      .select("user_id,estimate_id").eq("stripe_account_id", connectedAccountId)
+      .eq("stripe_payment_intent_id", intentId).maybeSingle();
+    if (paymentError) throw paymentError;
+    if (!payment) return;
+    const [{ data: owner, error: ownerError }, { data: estimate, error: estimateError }] = await Promise.all([
+      admin.auth.admin.getUserById(payment.user_id),
+      admin.from("estimates").select("reference_number").eq("id", payment.estimate_id).single(),
+    ]);
+    if (ownerError || estimateError) throw new Error("Could not identify the connected payment dispute owner.");
+    if (!owner.user?.email) return;
+    const spanish = owner.user.user_metadata?.app_language === "es";
+    const language = spanish ? "es" : "en";
+    const reference = estimate.reference_number || payment.estimate_id;
+    const status = dispute.status;
+    const spanishStatus: Record<string, string> = {
+      needs_response: "requiere respuesta", under_review: "en revisión", won: "ganada", lost: "perdida",
+      warning_needs_response: "advertencia que requiere respuesta", warning_under_review: "advertencia en revisión", warning_closed: "advertencia cerrada",
+    };
+    const displayStatus = spanish ? (spanishStatus[status] || status) : status.replaceAll("_", " ");
+    const amount = new Intl.NumberFormat(spanish ? "es-US" : "en-US", { style: "currency", currency: dispute.currency.toUpperCase() }).format(dispute.amount / 100);
+    const title = spanish ? "Actualización de disputa de pago" : "Customer payment dispute update";
+    const detail = spanish
+      ? `Stripe informa que la disputa de ${reference} por ${amount} está en estado: ${displayStatus}. Revisa tu panel de Stripe para ver plazos, pruebas y próximos pasos.`
+      : `Stripe reports that the dispute for ${reference} (${amount}) is now ${displayStatus}. Review your Stripe Dashboard for deadlines, evidence, and next steps.`;
+    const dashboardUrl = "https://dashboard.stripe.com/disputes";
+    const queued = await enqueueNotification(admin, {
+      user_id: payment.user_id, source: "billing", send_key: `connected-dispute-${connectedAccountId}-${dispute.id}-${status}`,
+      payload: {
+        from: getWorkCraftNoReplySender(), to: [owner.user.email],
+        subject: `${title} · ${reference}`.replace(/[\r\n]/g, " ").slice(0, 200),
+        text: `${detail}\n\n${dashboardUrl}`,
+        html: notificationFrame(language, title, `<p>${escapeEmailHtml(detail)}</p><p><a href="${dashboardUrl}">${spanish ? "Abrir el panel de Stripe" : "Open Stripe Dashboard"}</a></p>`),
+      },
+    });
+    try { await processNotifications(admin, [queued.id], 1); }
+    catch { console.error("Connected payment dispute notice remains queued."); }
+  }
+
   try {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
@@ -172,6 +216,10 @@ export async function POST(request: Request) {
 
   if (event.type === "charge.refunded") {
     if (event.account) await syncRefund(event.data.object as Stripe.Charge, event.account);
+  }
+
+  if (event.type === "charge.dispute.created" || event.type === "charge.dispute.updated" || event.type === "charge.dispute.closed") {
+    if (event.account) await notifyConnectedPaymentDispute((event.data.object as Stripe.Dispute).id, event.account);
   }
 
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {

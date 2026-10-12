@@ -184,6 +184,9 @@ export default function HeaderNav() {
             <Link role="menuitem" href="/profile" onClick={() => setDropdownOpen(false)} className="block px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">
               {translate(language, "Profile & preferences")}
             </Link>
+            <Link role="menuitem" href="/help" onClick={() => setDropdownOpen(false)} className="block px-4 py-3 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-950">
+              {language === "es" ? "Centro de ayuda" : "Help center"}
+            </Link>
             <button role="menuitem" type="button" onClick={handleSignOut} className="w-full border-t border-slate-100 px-4 py-3 text-left text-sm font-medium text-red-700 transition hover:bg-red-50">
               {translate(language, "Sign out")}
             </button>
