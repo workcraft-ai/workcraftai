@@ -53,21 +53,37 @@ export async function POST(request: Request) {
   }
 
   const [{ data: progress, error: progressError }, { data: estimates, error: estimateError }, { count: priceBookCount, error: priceBookError }] = await Promise.all([
-    admin.from("workcraft_onboarding").select("previewed_at,shared_link_at,dismissed_at").eq("user_id", user.id).single(),
+    admin.from("workcraft_onboarding").select("previewed_at,shared_link_at,dismissed_at,intro_seen_at").eq("user_id", user.id).single(),
     admin.from("estimates").select("id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(1),
     admin.from("price_book_items").select("id", { count: "exact", head: true }).eq("user_id", user.id),
   ]);
   if (progressError || estimateError || priceBookError) return NextResponse.json({ error: "Could not load onboarding progress." }, { status: 503 });
 
+  const profileComplete = Boolean(String(user.user_metadata?.business_name ?? "").trim()) &&
+    isValidOptionalBusinessPhone(String(user.user_metadata?.phone ?? ""));
+  const estimateId = estimates?.[0]?.id ?? null;
+  const priceBookReady = (priceBookCount ?? 0) > 0;
+  const complete = profileComplete && Boolean(estimateId && progress?.previewed_at && progress?.shared_link_at && priceBookReady);
+  let showIntro = false;
+  if (action === "bootstrap" && newlyAcknowledged && !progress?.intro_seen_at && !progress?.dismissed_at && !complete) {
+    // Claim the first view on the server so the overlay does not reappear after
+    // navigation, refresh, or a second device opening the Dashboard.
+    const { data: claimed, error: claimError } = await admin.from("workcraft_onboarding")
+      .update({ intro_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("user_id", user.id).is("intro_seen_at", null).select("intro_seen_at").maybeSingle();
+    if (claimError) return NextResponse.json({ error: "Could not save your progress." }, { status: 503 });
+    showIntro = Boolean(claimed);
+  }
+
   return NextResponse.json({
     eligible: newlyAcknowledged,
+    showIntro,
     dismissed: Boolean(progress?.dismissed_at),
-    profileComplete: Boolean(String(user.user_metadata?.business_name ?? "").trim()) &&
-      isValidOptionalBusinessPhone(String(user.user_metadata?.phone ?? "")),
-    estimateId: estimates?.[0]?.id ?? null,
+    profileComplete,
+    estimateId,
     previewed: Boolean(progress?.previewed_at),
     shared: Boolean(progress?.shared_link_at),
-    priceBookReady: (priceBookCount ?? 0) > 0,
+    priceBookReady,
     profile: {
       fullName: String(user.user_metadata?.full_name ?? ""),
       businessName: String(user.user_metadata?.business_name ?? ""),
