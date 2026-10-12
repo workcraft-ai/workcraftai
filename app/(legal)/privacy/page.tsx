@@ -28,7 +28,7 @@ export default function PrivacyPage() {
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700"><LocalizedText text="WorkCraft AI · Legal" /></p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900"><LocalizedText text="Privacy Policy" /></h1>
-          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 11, 2026" /></p>
+          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 12, 2026" /></p>
         </header>
 
         <section className="space-y-3">
@@ -49,6 +49,8 @@ export default function PrivacyPage() {
           <p className="text-sm leading-7 text-slate-700">
             <LocalizedText text="Customer payments use Stripe Checkout as direct charges on a contractor’s connected Stripe account. Stripe hosts contractor onboarding and the connected account Dashboard; new connections use the Full Stripe Dashboard, while an existing connection may retain its previous Dashboard access. Contractors sign in to Stripe with their own credentials to manage payment activity and payout information. WorkCraft AI stores the connected account ID, payment amount and currency, Stripe transaction IDs, and payment or refund status for the contractor’s records. Stripe collects customer payment details and contractor identity, business, and payout information directly; WorkCraft AI does not store card or bank-account details or receive or hold customer funds. Stripe processes payments and manages eligible connected-account risk under its separate terms." />
           </p>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="WorkCraft AI does not sell personal information or disclose app account, contractor, customer, estimate, job, invoice, private-media, or payment-reference information for targeted advertising. We disclose limited information to service providers to host, secure, store, and operate the service and deliver features you choose. These providers include Vercel for hosting, Supabase for authentication and data storage, Resend for email, Stripe for payments, Google Gemini when you request cloud AI drafting, and Google Drive for enabled encrypted backup snapshots. Providers may process information under the terms and privacy notices that apply to their services. Optional Google Analytics on workcraftai.com is a separate, consent-based disclosure of limited public-site visit and signup-link activity described below; it does not receive signed-in account identifiers or estimate and customer content." /></p>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="WorkCraft AI currently sends customer communications by email and does not send automated customer text messages. If a contractor chooses to copy a customer link and send it by text using another service, that message is sent outside WorkCraft AI." /></p>
         </section>
 
         <section className="space-y-3">
@@ -76,8 +78,13 @@ export default function PrivacyPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="6. Data Deletion" /></h2>
           <p className="text-sm leading-7 text-slate-700">
-            <LocalizedText text="You can request deletion of your WorkCraft AI account and associated app data through account settings or by contacting support. Deletion removes app records and private estimate media, but cannot erase copies already held by payment or email providers under their own retention rules. Encrypted backup copies expire under the backup schedule above, and minimal admin audit records may remain. A contractor's separate Stripe account is not deleted by deleting a WorkCraft AI account." />
+            <LocalizedText text="You can request deletion of your WorkCraft AI account and associated app data through account settings or by emailing support@workcraftai.com. Deletion removes app records and private estimate media, but cannot erase copies already held by payment or email providers under their own retention rules. Encrypted backup copies expire under the backup schedule above, and minimal admin audit records may remain. A contractor's separate Stripe account is not deleted by deleting a WorkCraft AI account." />
           </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="7. Privacy Contact" /></h2>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="For questions about this Privacy Policy or requests about your information, email support@workcraftai.com. Please do not email passwords, payment-card details, or other sensitive authentication information." /></p>
         </section>
       </article>
     </div>
