@@ -8,8 +8,12 @@ import { getInvoiceSubscriptionId } from "@/lib/stripe-invoice.mjs";
 import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
 import { enqueueNotification, escapeEmailHtml, notificationFrame, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
@@ -19,11 +23,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stripe webhook is not configured." }, { status: 503 });
   }
 
-  const stripe = new Stripe(stripeKey, { timeout: 15_000, maxNetworkRetries: 1 });
+  // Stripe retries non-2xx responses. Keep a single bounded provider attempt
+  // and let its durable delivery retry policy handle transient failures.
+  const stripe = new Stripe(stripeKey, { timeout: 8_000, maxNetworkRetries: 0 });
   const signature = request.headers.get("stripe-signature");
   if (!signature) return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
 
-  const body = await readLimitedText(request, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+  const body = await readLimitedText(request, MAX_STRIPE_WEBHOOK_BODY_BYTES, 10_000);
   if (!body.ok) return NextResponse.json({ error: body.reason === "too_large" ? "Webhook request is too large." : "Invalid webhook request." }, { status: body.reason === "too_large" ? 413 : 400 });
   const payload = body.value;
   let event: Stripe.Event | undefined;
@@ -37,7 +43,10 @@ export async function POST(request: Request) {
   }
   if (!event) return NextResponse.json({ error: "Invalid webhook signature." }, { status: 400 });
 
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, { auth: { persistSession: false } });
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+    auth: { persistSession: false },
+    global: { fetch: createBoundedFetch(5_000) },
+  });
   const { data: claimState, error: claimError } = await admin.rpc("workcraft_claim_stripe_webhook_state", {
     p_event_id: event.id,
     p_event_type: event.type,
@@ -97,7 +106,7 @@ export async function POST(request: Request) {
     });
     // Entitlement sync must complete even if a provider is down or the reserved
     // billing pool is full. The durable worker retries the notice separately.
-    try { await processNotifications(admin, [queued.id], 1); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000); }
     catch { console.error("Billing notification remains queued."); }
 
   }
@@ -142,7 +151,7 @@ export async function POST(request: Request) {
         html: notificationFrame(language, title, `<p>${escapeEmailHtml(detail)}</p><p><a href="${dashboardUrl}">${spanish ? "Abrir el panel de Stripe" : "Open Stripe Dashboard"}</a></p>`),
       },
     });
-    try { await processNotifications(admin, [queued.id], 1); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000); }
     catch { console.error("Connected payment dispute notice remains queued."); }
   }
 

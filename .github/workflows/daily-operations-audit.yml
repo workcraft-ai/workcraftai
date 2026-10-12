@@ -1,0 +1,43 @@
+name: Daily operations audit
+
+on:
+  schedule:
+    - cron: "15 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  operational-audit:
+    name: Check production provider budgets and backup age
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+
+      - name: Check latest successful encrypted backups
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/check-backup-freshness.mjs
+
+      - name: Check production signals and provider admission budgets
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "::error::Set the repository CRON_SECRET to match Vercel Production. Operational checks cannot run without it."
+            exit 1
+          fi
+          body="$RUNNER_TEMP/workcraft-operations-audit.json"
+          status=$(curl --silent --show-error --output "$body" --write-out '%{http_code}' --max-time 25 --header "Authorization: Bearer $CRON_SECRET" "https://app.workcraftai.com/api/cron/operations-check?strict_usage=1")
+          cat "$body"
+          echo "Daily operational audit HTTP status: ${status}"
+          [[ "$status" == "200" ]]

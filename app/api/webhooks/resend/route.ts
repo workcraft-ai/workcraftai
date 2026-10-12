@@ -2,8 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { verifyResendWebhook } from "@/lib/resend-webhook.mjs";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export const runtime = "nodejs";
+export const maxDuration = 15;
 const MAX_WEBHOOK_BODY_BYTES = 128 * 1024;
 const eventStatuses: Record<string, string> = {
   "email.delivered": "delivered",
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ error: "Email webhook is not configured." }, { status: 503 });
 
-  const body = await readLimitedText(request, MAX_WEBHOOK_BODY_BYTES);
+  const body = await readLimitedText(request, MAX_WEBHOOK_BODY_BYTES, 8_000);
   if (!body.ok) return NextResponse.json({ error: "Invalid webhook request." }, { status: body.reason === "too_large" ? 413 : 400 });
 
   const headers = {
@@ -56,7 +58,10 @@ export async function POST(request: Request) {
   if (!supabaseUrl || !serviceRoleKey) {
     return NextResponse.json({ error: "Email event storage is not configured." }, { status: 503 });
   }
-  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+    global: { fetch: createBoundedFetch(5_000) },
+  });
 
   const { error } = await admin.rpc("workcraft_record_email_delivery", {
     p_event_id: headers["svix-id"], p_email_id: emailId, p_event: status,
