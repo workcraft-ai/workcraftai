@@ -88,6 +88,11 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const complete = Boolean(progress?.profileComplete && progress?.estimateId && progress?.previewed && progress?.shared && progress?.priceBookReady);
   const visible = Boolean(progress?.eligible && !progress?.dismissed);
   useEffect(() => { onVisibilityChange?.(visible); }, [onVisibilityChange, visible]);
+  useEffect(() => {
+    if (!progress?.eligible || window.location.hash !== "#first-five-minutes") return;
+    const task = window.setTimeout(() => document.getElementById("first-five-minutes")?.scrollIntoView({ block: "start" }), 0);
+    return () => window.clearTimeout(task);
+  }, [progress?.eligible, progress?.profileComplete, progress?.estimateId, progress?.previewed, progress?.shared, progress?.priceBookReady]);
 
   async function mark(action: Exclude<Action, "bootstrap">) {
     const response = await fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }), cache: "no-store" });
@@ -115,7 +120,7 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   async function preview() {
     if (!progress?.estimateId) return;
     setBusy(true); setError("");
-    try { await mark("previewed"); router.push(`/estimate/${encodeURIComponent(progress.estimateId)}`); }
+    try { await mark("previewed"); router.push(`/estimate/${encodeURIComponent(progress.estimateId)}?setup=1`); }
     catch { setError(t.error); setBusy(false); }
   }
 
@@ -139,15 +144,15 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   }
 
   if (!progress?.eligible) return null;
-  if (complete) return progress.dismissed ? null : <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm"><div><h2 className="text-lg font-bold">{t.finishedTitle}</h2><p className="mt-1 text-sm">{t.finishedBody}</p>{error && <p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}</div><button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 rounded-lg border border-green-700 px-4 text-sm font-semibold disabled:opacity-50">{t.done}</button></section>;
+  if (complete) return progress.dismissed ? null : <section id="first-five-minutes" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-green-200 bg-green-50 p-5 text-green-950 shadow-sm"><div><h2 className="text-lg font-bold">{t.finishedTitle}</h2><p className="mt-1 text-sm">{t.finishedBody}</p>{error && <p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}</div><button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 rounded-lg border border-green-700 px-4 text-sm font-semibold disabled:opacity-50">{t.done}</button></section>;
   if (progress.dismissed) return (
-    <button type="button" onClick={() => void mark("reopen").catch(() => setError(t.error))} className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-orange-800 shadow-sm">{t.resume}</button>
+    <button id="first-five-minutes" type="button" onClick={() => void mark("reopen").catch(() => setError(t.error))} className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-orange-800 shadow-sm">{t.resume}</button>
   );
 
   const completed = [progress.profileComplete, Boolean(progress.estimateId), progress.previewed, progress.shared, progress.priceBookReady];
   const active = completed.findIndex((item) => !item);
   return (
-    <section aria-labelledby="first-five-title" className="rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
+    <section id="first-five-minutes" aria-labelledby="first-five-title" className="scroll-mt-6 rounded-2xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">{t.kicker}</p><h2 id="first-five-title" className="mt-1 text-xl font-bold text-slate-900">{t.title}</h2><p className="mt-2 text-sm text-slate-600">{t.intro}</p></div>
         <button type="button" disabled={busy} onClick={() => void dismiss()} className="min-h-11 text-sm font-semibold text-slate-600 underline disabled:opacity-50">{t.later}</button>
@@ -166,10 +171,10 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
           <p className="text-xs leading-5 text-slate-600 sm:col-span-2">{t.taxHelp}</p>
           <button type="submit" disabled={busy} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50 sm:justify-self-start">{busy ? t.saving : t.save}</button>
         </form>}
-        {active === 1 && <Link href="/estimate/new" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}
+        {active === 1 && <Link href="/estimate/new?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}
         {active === 2 && <button type="button" disabled={busy} onClick={() => void preview()} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50">{t.preview}</button>}
         {active === 3 && <div><p className="mb-3 text-sm text-slate-600">{t.shareHelp}</p><button type="button" disabled={busy} onClick={() => void share()} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50">{t.share}</button>{fallbackUrl && <div className="mt-3"><label className="block text-sm text-slate-700">{t.fallback}<input readOnly value={fallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-2 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3" /></label><button type="button" onClick={() => void mark("shared").catch(() => setError(t.error))} className="mt-2 min-h-12 font-semibold text-orange-800 underline">{t.copied}</button></div>}</div>}
-        {active === 4 && <div><Link href="/pricebook" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.rate}</Link><p className="mt-2 text-xs text-slate-600">{t.optional}</p></div>}
+        {active === 4 && <div><Link href="/pricebook?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.rate}</Link><p className="mt-2 text-xs text-slate-600">{t.optional}</p></div>}
       </div>
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-800">{error}</p>}
       <p className="mt-4 text-xs text-slate-600"><Link href="/help" className="font-semibold text-orange-800 underline">{t.help}</Link></p>

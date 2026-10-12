@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney, percentageOfCents } from "@/lib/estimate-money.mjs";
+import SetupReturnLink from "@/app/components/SetupReturnLink";
 
 interface LineItem {
   id: string;
@@ -220,7 +221,19 @@ export default function ClientEstimatePage() {
       const response = await fetch(`/api/estimates/${id}/share`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action, expiresInDays: shareDays === "none" ? null : Number(shareDays)})});
       const result = await response.json();
       if (!response.ok) throw new Error("Could not update the customer link. Refresh and try again.");
-      if (result.url) { await navigator.clipboard.writeText(result.url); setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied."); }
+      if (result.url) {
+        await navigator.clipboard.writeText(result.url);
+        setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied.");
+        if (isOwner && new URLSearchParams(window.location.search).get("setup") === "1") {
+          const progressResponse = await fetch("/api/onboarding", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "shared" }),
+          }).catch(() => null);
+          if (!progressResponse?.ok) setShareNotice(language === "es"
+            ? "Enlace copiado. Vuelve a la lista y usa su botón para copiar el enlace de prueba y completar el paso."
+            : "Link copied. Return to the checklist and use its test-link button to complete this step.");
+        }
+      }
       else setShareNotice("Customer sharing is disabled. Existing Stripe checkout sessions may remain open.");
     } catch (error) {setShareNotice(error instanceof Error ? error.message : "Could not copy the customer link.");}
     finally {setShareBusy(false);}
@@ -368,6 +381,7 @@ export default function ClientEstimatePage() {
     <LocalizedTree languageOverride={viewLanguage}>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
+        {isOwner && <SetupReturnLink step="proposal" />}
         {/* Contractor-only status and navigation controls */}
         {isOwner && <div className="print:hidden bg-slate-900 text-white p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center space-x-2">

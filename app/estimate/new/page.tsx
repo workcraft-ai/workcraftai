@@ -13,6 +13,7 @@ import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estima
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
+import SetupReturnLink from "@/app/components/SetupReturnLink";
 
 interface LineItemInput {
   description: string;
@@ -614,7 +615,7 @@ export default function CreateEstimatePage() {
 
       // 3. Return to the dashboard so the contractor can review and share the proposal.
       await clearOfflineEstimateDraft(user.id).catch(() => undefined);
-      router.push("/dashboard");
+      router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard#first-five-minutes" : "/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const quotaMessage = isEstimateQuotaLimitError(err)
@@ -640,6 +641,7 @@ export default function CreateEstimatePage() {
     <LocalizedTree>
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-5xl mx-auto space-y-6">
+        <SetupReturnLink step="estimate" />
         {/* Subscription plan status */}
         <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
           <div className="flex items-center space-x-2">
