@@ -6,11 +6,13 @@ import {getTrustedAppOrigin} from "@/lib/security.mjs";
 import {getServiceSupabase} from "@/lib/stripe-server";
 import {authEmailMessages} from "@/lib/auth-email.mjs";
 import {enqueueNotification,processNotifications} from "@/lib/notification-outbox";
+export const runtime="nodejs";
+export const maxDuration=30;
 export async function POST(request:Request){
  const secret=process.env.SUPABASE_SEND_EMAIL_HOOK_SECRET?.replace(/^v1,/,"");
  const origin=getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
  if(!secret||!origin||!process.env.RESEND_API_KEY)return NextResponse.json({error:{http_code:503,message:"Email hook is not configured."}},{status:503});
- const raw=await readLimitedText(request,32000);
+ const raw=await readLimitedText(request,32000,8000);
  if(!raw.ok)return NextResponse.json({error:{http_code:400,message:"Invalid email hook."}},{status:400});
  // Supabase uses Standard Webhooks; the signed content and v1 HMAC algorithm
  // match Svix. Map the header names without parsing/changing the signed body.
@@ -19,7 +21,7 @@ export async function POST(request:Request){
  try{
   phase="build";
   const payload=JSON.parse(raw.value);const messages=authEmailMessages(payload,process.env.NEXT_PUBLIC_SUPABASE_URL!,origin);
-  const admin=getServiceSupabase();const ids:string[]=[];
+  const admin=getServiceSupabase(5000);const ids:string[]=[];
   for(const [index,mail] of messages.entries()){
    // Stable across signed-hook retries, without exposing OTPs in the send key.
    const digest=createHash("sha256").update(`${payload.user.id}:${payload.email_data.email_action_type}:${payload.email_data.token_hash}:${payload.email_data.token}:${index}`).digest("hex");

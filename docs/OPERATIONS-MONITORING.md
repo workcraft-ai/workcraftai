@@ -2,7 +2,7 @@
 
 # WorkCraft AI monitoring and incident checklist
 
-Last refreshed: 2026-10-10. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
+Last refreshed: 2026-10-12. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
 
 ## Current verified state
 
@@ -29,6 +29,23 @@ The UptimeRobot free plan currently checks every five minutes. Monitors are conf
 
 Both monitors currently show **Up**, 100% uptime, and no incidents in the last 24 hours. The owner confirmed both UptimeRobot test emails arrived at `support@workcraftai.com`. The owner has confirmed monitoring delivery; provider-native configuration should still be reviewed periodically. A health monitor does not detect a bad Stripe signing secret, Resend quota exhaustion, Gemini provider failure, or a subscription billing issue.
 
+## Automated operational alerts
+
+The application and GitHub workflow changes add two server-side monitors:
+
+- The 15-minute Availability monitor checks aggregate Production records for failed or stuck Stripe webhook processing, failed/overdue/stuck notification outbox rows, and recent Resend failure, suppression, bounce, complaint, or long-delay events. It prints counts and a suggested response in the Actions run and fails the job when an issue needs attention.
+- A daily audit at 07:15 UTC checks the latest successful encrypted database/Auth snapshot (26-hour freshness target) and private-media snapshot (8-day target). It also fails when Resend provider email usage reaches 80% of its live daily/monthly limit, or when app-enforced Resend admission pools or the global AI allowance reach 80% of their daily allocation. The workflow token is read-only (`actions: read`, `contents: read`); it uses the existing `CRON_SECRET` for the Production aggregate endpoint.
+
+Resend usage comes from the provider's `GET /usage` endpoint, using the existing server-only `RESEND_API_KEY`; the endpoint requires a full-access key. It reports the provider's live daily and monthly email usage and limits. If the key cannot read usage, the daily audit calls that out and points to the Resend Usage page. App mail and AI counters are **application admission allocations**, not billing totals. They help identify when WorkCraft AI's own caps are near; the Gemini warning still reflects the app-enforced global cap and must be compared with Gemini's provider console. This change does not create provider console alert rules or change Vercel/Supabase/Resend/Gemini plans. See [Resend's Account Usage API](https://www.resend.com/changelog/account-usage-api).
+
+The main branch ruleset is active and requires both CI status checks: `Lint, typecheck, and build` and `Supabase database security tests`. The ruleset does not require the branch to be up to date with `main`. Keep the required CI contexts unchanged when editing workflow names.
+
+Webhook request and outbound service calls now have explicit bounds: raw request bodies time out after 8–10 seconds, Supabase REST calls after 5 seconds, Stripe calls after 8 seconds with no internal retry, and Resend event handling has a 15-second function budget. The Supabase Auth email hook has a 30-second budget and bounded 5-second database requests; its Resend attempt remains limited to 3 seconds. Stripe retries transient server/network failures, and the existing idempotent event claim protects retried work. The Vercel route budgets are within the current Hobby function duration ceiling.
+
+These GitHub Actions failure notifications can be delivered only according to repository notification settings. The owner has already received workflow failure emails. After the code is merged and deployed, manually run **Availability monitor** and **Daily operations audit** once to verify the new steps and confirm the failure-notification path if desired; do not induce production webhook or backup failures just to test alerts.
+
+Read-only Production snapshot on 2026-10-12: no failed Stripe webhook rows or failed notification outbox rows; app mail pool 1/75, Auth pool 2/20, AI pool 0/250. Resend's account usage API reported 3/100 daily emails and 124/3,000 monthly emails. This point-in-time sample does not prove alert delivery.
+
 ## Provider usage and error alerts
 
 Route provider and monitoring notifications to the owner-controlled `alerts@workcraftai.com` inbox (or an alias that forwards to it). Keep each provider's own authenticated sender identity; `alerts@` is the receiving address, not a replacement From address for UptimeRobot, GitHub, Vercel, Supabase, Stripe, or Resend. The app sends its own automated notices through Resend using `WorkCraft AI <no-reply@workcraftai.com>`. For the address roles and remaining setup, see [`EMAIL-ADDRESS-ROLES.md`](EMAIL-ADDRESS-ROLES.md).
@@ -40,7 +57,7 @@ Configure provider-native alerts where available. Confirm each by checking the d
 | Vercel | Connected project and environment-name metadata is accessible; private values are redacted. Reviewed release `7ef5757` reached Ready for the app Production project. | Hosting plan review is deferred by the owner. |
 | Supabase | Database size, egress, Storage, Auth/API usage, project health, and backup availability. | Enable available usage notifications. A successful health check is not a backup or restore test. |
 | Stripe | October 10 Preview provider tests verified async success, in-flight 503, stale-claim recovery, duplicate 200, late failure/expiry preservation, subscription activation/past-due/recovery/cancellation, and cumulative USD refunds with stale replays. See the provider evidence report. | Full checkout UI/effective Free entitlement and billing-email inbox acceptance are separate. |
-| Resend | Estimate email on October 10 21:46 UTC was delivered; From is WorkCraft AI no-reply and Reply-To is the contractor. Both sent and delivered appear in the Production ledger. Auth reset delivery was also confirmed. | Invoice send-from-app is pending owner login; Preview billing queuing passed, but delivery needs Preview Resend configuration. The obsolete test queue row was removed. |
+| Resend | Estimate email on October 10 21:46 UTC was delivered; From is WorkCraft AI no-reply and Reply-To is the contractor. Both sent and delivered appear in the Production ledger. Auth reset delivery was also confirmed. The Operations API check reads provider daily/monthly quotas. | Invoice send-from-app is pending owner login; Preview billing queuing passed, but delivery needs Preview Resend configuration. Confirm the Vercel `RESEND_API_KEY` has full-access permission so the Usage API check succeeds. |
 | Gemini | Model usage, quota, and provider errors. | The app enforces per-account and global daily generation limits; also monitor provider-level quotas. |
 
 ## Backups and usage limits
