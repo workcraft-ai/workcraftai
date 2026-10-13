@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     });
     // Entitlement sync must complete even if a provider is down or the reserved
     // billing pool is full. The durable worker retries the notice separately.
-    try { await processNotifications(admin, [queued.id], 1, 3_000); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000, deadlineAt); }
     catch { console.error("Billing notification remains queued."); }
 
   }
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
         html: notificationFrame(language, title, `<p>${escapeEmailHtml(detail)}</p><p><a href="${dashboardUrl}">${spanish ? "Abrir el panel de Stripe" : "Open Stripe Dashboard"}</a></p>`),
       },
     });
-    try { await processNotifications(admin, [queued.id], 1, 3_000); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000, deadlineAt); }
     catch { console.error("Connected payment dispute notice remains queued."); }
   }
 

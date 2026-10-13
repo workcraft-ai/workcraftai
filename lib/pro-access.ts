@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export type ProAccess = {
   hasPro: boolean;
@@ -8,11 +9,11 @@ export type ProAccess = {
   expiresAt: string | null;
 };
 
-export function createProAccessAdminClient() {
+export function createProAccessAdminClient(deadlineAt?:number) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) throw new Error("Pro access is not configured.");
-  return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false },global:{fetch:createBoundedFetch(5_000,deadlineAt)} });
 }
 
 export async function getProAccess(admin: SupabaseClient, userId: string): Promise<ProAccess> {
@@ -50,6 +51,6 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
   return { hasPro: false, source: "free", stripeStatus, grantType: null, expiresAt: null };
 }
 
-export async function getServerProAccess(userId: string) {
-  return getProAccess(createProAccessAdminClient(), userId);
+export async function getServerProAccess(userId: string, deadlineAt?:number) {
+  return getProAccess(createProAccessAdminClient(deadlineAt), userId);
 }

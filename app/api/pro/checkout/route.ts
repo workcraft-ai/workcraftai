@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getAppOrigin, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -14,13 +15,13 @@ export async function POST(request: Request) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
+    { cookies: { getAll: () => cookieStore.getAll() },global:{fetch:createBoundedFetch(5_000,deadlineAt)} }
   );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return response({ error: "Sign in to upgrade." }, 401);
 
   try {
-    if ((await getServerProAccess(user.id)).hasPro) {
+    if ((await getServerProAccess(user.id,deadlineAt)).hasPro) {
       return response({ error: "Your account already has Pro access." }, 409);
     }
   } catch {
