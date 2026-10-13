@@ -72,4 +72,8 @@ See `READINESS-FIXES-2026-10-10.md` for the test boundaries and final-run comman
 - Footer wraps at mobile width, input text is 16px on mobile, standalone secondary dashboard actions are 48px, and quota/line-item descriptions are explicitly localized. Scheduled follow-ups disappear after approval while sent history remains.
 - Forward migration: `20261013000010_launch_readiness_fixes` (UTC date October 13; release work is October 12 in North Carolina). Staging migration and rollback-only regression checks passed before Production rollout.
 
-Validation and deployment evidence will be appended after release. The original October 12 audit is a historical finding record; these are its remediation notes.
+Initial release PR 130 merged as `07f299b`; the app and public-site Production deployments both reached Ready. 85 unit tests, TypeScript, ESLint, production build and the required GitHub database security/concurrency checks passed. Seventeen new rollback-only database checks passed locally and in Staging. The Production service-role retention claim calls now complete without the Auth permission error, all three existing jobs have verified tax snapshots, and no legacy share ciphertext remains. Production public health/security checks passed (19); the complete English/Spanish browser sweep is recorded in ignored `.audit-results/launch-readiness.json`.
+
+The final follow-up completes pagination in the new-estimate saved-customer and price-book selectors as well as the main lists. AI cannot generate against an incompletely loaded rate library; the user receives a localized retry message. The original October 12 audit is a historical finding record; these are its remediation notes.
+
+Live signup/reset inbox delivery, native-device interaction and a complete customer checkout/private-media download acceptance still need owner-controlled test sessions/fixtures. Automated public checks do not mark those exercises passed.

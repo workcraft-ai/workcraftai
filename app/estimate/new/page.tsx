@@ -2,6 +2,7 @@
 
 import React, { startTransition, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { readAllPages } from "@/lib/read-all-pages";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
@@ -145,6 +146,8 @@ export default function CreateEstimatePage() {
     { description: "", quantity: 1, unit: "each", unit_price: 0, pricing_source: "manual" },
   ]);
   const [priceBookItems, setPriceBookItems] = useState<PriceBookItem[]>([]);
+  const [priceBookLoading, setPriceBookLoading] = useState(true);
+  const [priceBookLoadFailed, setPriceBookLoadFailed] = useState(false);
   const [showPriceBook, setShowPriceBook] = useState(false);
   const [selectedPriceBookItemId, setSelectedPriceBookItemId] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -290,23 +293,25 @@ export default function CreateEstimatePage() {
           setAiDailyAllowance(null);
         }
         if (!activePro) { setRequireDeposit(false); setPackageOptions([]); }
-        const { data: customerData, error: customerError } = await supabase
+        const { data: customerData, error: customerError } = await readAllPages((from, to) => supabase
           .from("customer_contacts")
           .select("id, name, email, phone, job_address")
-          .order("name", { ascending: true });
+          .order("name", { ascending: true }).order("id").range(from, to));
         if (customerError) setSavedCustomerLoadError("Saved customers are unavailable until the customer contacts database update is applied.");
         else setSavedCustomers((customerData ?? []) as SavedCustomer[]);
       } else {
         setRequireDeposit(false); setPackageOptions([]);
       }
-      const { data } = await supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name");
+      const { data, error: priceBookError } = await readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to));
+      setPriceBookLoadFailed(Boolean(priceBookError));
+      setPriceBookLoading(false);
       setPriceBookItems((data ?? []) as PriceBookItem[]);
     })();
   }, []);
 
   // Handle Pro cloud AI line-item drafting.
   const handleGenerateItems = async () => {
-    if (!isProSubscriber || !promptText.trim()) return;
+    if (!isProSubscriber || !promptText.trim() || priceBookLoading || priceBookLoadFailed) return;
     setIsGenerating(true);
 
     try {
@@ -844,7 +849,7 @@ export default function CreateEstimatePage() {
             </div>
 
             {showPriceBook && <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              {priceBookItems.length ? <>
+              {priceBookLoading ? <p role="status">{language === "es" ? "Cargando lista de precios…" : "Loading price book…"}</p> : priceBookLoadFailed ? <p role="alert">{language === "es" ? "No se pudo cargar la lista de precios completa. Actualiza la página para reintentar." : "Could not load the complete price book. Refresh to try again."}</p> : priceBookItems.length ? <>
                 <label className="sr-only" htmlFor="estimate-price-book-item">Choose a saved price book item</label>
                 <select id="estimate-price-book-item" value={selectedPriceBookItemId} onChange={(event) => setSelectedPriceBookItemId(event.target.value)} className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
                   <option value="">Choose a saved item</option>
@@ -975,7 +980,7 @@ export default function CreateEstimatePage() {
                 <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
               </label>}
               <div className="flex flex-col gap-2 sm:flex-row">
-                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || priceBookLoading || priceBookLoadFailed || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
               </div>
             </div> : <div className="space-y-2" aria-label={language === "es" ? "Vista previa de la función Pro" : "Pro feature preview"}>
               <label className="block text-xs font-medium text-slate-700">{language === "es" ? "Detalles del trabajo" : "Job scope and details"}
@@ -983,6 +988,7 @@ export default function CreateEstimatePage() {
               </label>
               <button type="button" disabled className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white opacity-50">{language === "es" ? "Preparar partidas" : "Draft Line Items"}</button>
             </div>}
+            {priceBookLoadFailed && <p role="alert" className="text-sm text-red-800">{language === "es" ? "No se pudo cargar la lista de precios completa. Actualiza la página antes de generar partidas con IA." : "Could not load the complete price book. Refresh before generating AI line items."}</p>}
             {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
           </section>
 
