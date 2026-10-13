@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getCronCredential } from "@/lib/cron-authorization";
 import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
+import { AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS } from "@/lib/operational-heartbeats";
 
 export const runtime = "nodejs";
 export const maxDuration = 20;
@@ -127,7 +128,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
       criticalAlerts.push({ code, count: 1, action: `${label} last succeeded ${Number.isFinite(ageMs) ? `${Math.max(0, Math.round(ageMs / 60_000))} minutes ago` : "at an invalid timestamp"}; inspect its scheduled run and credentials.` });
     }
   };
-  checkHeartbeat("availability_monitor", "availability_monitor_missed", "The GitHub availability monitor", 35 * 60_000);
+  checkHeartbeat("availability_monitor", "availability_monitor_missed", "The GitHub availability monitor", AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS);
   checkHeartbeat("database_backup", "database_backup_stale", "The encrypted database/Auth backup", 26 * 60 * 60_000);
   checkHeartbeat("private_media_backup", "private_media_backup_stale", "The encrypted private-media backup", 8 * 24 * 60 * 60_000);
   const { error: probeWriteError } = await admin.from("operational_api_probes").insert(probe);

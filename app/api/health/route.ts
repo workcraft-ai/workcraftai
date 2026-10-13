@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS } from "@/lib/operational-heartbeats";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,10 @@ export async function GET() {
         const availabilityHeartbeat = entries.find((row) => row.name === "availability_monitor")?.last_success_at;
         const notificationsFresh = typeof notificationHeartbeat === "string" && Date.now() - Date.parse(notificationHeartbeat) < 20 * 60_000;
         // Do not fail health before the monitor has recorded its first heartbeat.
-        // Once initialized, a missed GitHub run also trips the independent uptime monitor.
+        // GitHub's 15-minute schedule is best-effort; allow one delayed interval
+        // so a late check does not make this health endpoint fail itself.
         const availabilityFresh = typeof availabilityHeartbeat !== "string"
-          || Date.now() - Date.parse(availabilityHeartbeat) < 35 * 60_000;
+          || Date.now() - Date.parse(availabilityHeartbeat) < AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS;
         if (notificationsFresh && availabilityFresh) scheduler = "ok";
       }
     } catch {
