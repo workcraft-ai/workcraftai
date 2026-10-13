@@ -7,6 +7,8 @@ export type ProAccess = {
   stripeStatus: string;
   grantType: "temporary" | "permanent" | null;
   expiresAt: string | null;
+  trialAvailable: boolean;
+  trialEndsAt: string | null;
 };
 
 export function createProAccessAdminClient(deadlineAt?:number) {
@@ -19,7 +21,7 @@ export function createProAccessAdminClient(deadlineAt?:number) {
 export async function getProAccess(admin: SupabaseClient, userId: string): Promise<ProAccess> {
   const now = new Date().toISOString();
   const [{ data: subscription, error: subscriptionError }, { data: grant, error: grantError }] = await Promise.all([
-    admin.from("subscriptions").select("status").eq("user_id", userId).maybeSingle(),
+    admin.from("subscriptions").select("status,stripe_customer_id,stripe_subscription_id,current_period_end").eq("user_id", userId).maybeSingle(),
     admin.from("tradeflow_pro_access_grants")
       .select("grant_type, expires_at")
       .eq("user_id", userId)
@@ -36,8 +38,17 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
   }
 
   const stripeStatus = subscription?.status ?? "free";
+  const trialAvailable = !subscription?.stripe_customer_id && !subscription?.stripe_subscription_id;
   if (stripeStatus === "active" || stripeStatus === "trialing") {
-    return { hasPro: true, source: "stripe", stripeStatus, grantType: null, expiresAt: null };
+    return {
+      hasPro: true,
+      source: "stripe",
+      stripeStatus,
+      grantType: null,
+      expiresAt: null,
+      trialAvailable: false,
+      trialEndsAt: stripeStatus === "trialing" ? subscription?.current_period_end ?? null : null,
+    };
   }
   if (grant) {
     return {
@@ -46,9 +57,11 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
       stripeStatus,
       grantType: grant.grant_type,
       expiresAt: grant.expires_at,
+      trialAvailable,
+      trialEndsAt: null,
     };
   }
-  return { hasPro: false, source: "free", stripeStatus, grantType: null, expiresAt: null };
+  return { hasPro: false, source: "free", stripeStatus, grantType: null, expiresAt: null, trialAvailable, trialEndsAt: null };
 }
 
 export async function getServerProAccess(userId: string, deadlineAt?:number) {

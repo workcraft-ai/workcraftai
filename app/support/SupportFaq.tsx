@@ -29,6 +29,10 @@ const questions = [
     answer: "Pro ($9.99/month) includes up to 50 saved estimates per UTC day and 500 per UTC month; 5 cloud AI drafts per day and 50 per month; and 5 customer-facing emails—including estimate emails, follow-ups, customer-question alerts, and invoice emails—per day and 100 per month. Pro also includes 100 MB of new private media uploads per month, up to 250 MB and 100 files retained. View your current usage and how much remains in Profile. Counters reset at 00:00 UTC or the start of each UTC month. Failed AI provider attempts count. These are account allowances; shared provider capacity may pause an action sooner.",
   },
   {
+    question: "How does the free Pro trial work?",
+    answer: "Eligible WorkCraft AI accounts can start one 14-day Pro trial from Profile. No payment method is required to start. The trial ends automatically and the account returns to Free if you do not add billing details. To keep Pro, add a payment method in Manage billing before the trial ends; the subscription then costs $9.99/month. Saved estimates and other account data remain if the trial ends.",
+  },
+  {
     question: "Can my customer review a proposal without an account?",
     answer: "Yes. Share the proposal link from the estimate. Your customer can review the proposal and respond through its customer-facing page without signing in to WorkCraft AI.",
   },

@@ -28,7 +28,7 @@ export default function TermsPage() {
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700"><LocalizedText text="WorkCraft AI · Legal" /></p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900"><LocalizedText text="Terms of Service" /></h1>
-          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 12, 2026" /></p>
+          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 13, 2026" /></p>
         </header>
 
         <section className="space-y-3">
@@ -48,7 +48,7 @@ export default function TermsPage() {
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900"><LocalizedText text="3. Paid Plans and Payments" /></h2>
           <p className="text-sm leading-7 text-slate-700">
-            <LocalizedText text="Your WorkCraft AI Pro subscription renews automatically at the price and billing interval shown at checkout until you cancel it. You can cancel anytime through Manage billing. Cancellation takes effect at the end of your current paid billing period, and your Pro access remains active until then. We do not issue refunds or credits for subscriptions, partial billing periods, or unused time except where required by law. This WorkCraft AI subscription policy is separate from payments your customers make to your business." />
+            <LocalizedText text="Eligible new accounts may start one 14-day WorkCraft AI Pro trial without a payment method. The trial ends automatically and access returns to Free if you do not add billing details. If you add a payment method through Manage billing before the trial ends, Pro continues at $9.99 per month after the trial unless you cancel before then. Your saved data remains available if the trial ends. A paid WorkCraft AI Pro subscription renews automatically at the price and billing interval shown at checkout until you cancel it. You can cancel anytime through Manage billing. Cancellation takes effect at the end of your current paid billing period, and your Pro access remains active until then. We do not issue refunds or credits for subscriptions, partial billing periods, or unused time except where required by law. This WorkCraft AI subscription policy is separate from payments your customers make to your business." />
           </p>
           <p className="text-sm leading-7 text-slate-700">
             <LocalizedText text="If Stripe reports your subscription as past due, your Pro access moves to the Free plan immediately. Your saved estimates, jobs, and other account data remain in WorkCraft AI; the downgrade does not delete them. To restore Pro, sign in and use Manage billing from your Profile to update your payment method or pay the open invoice. Stripe restores Pro access after it confirms payment. We may send transactional billing notices about failed payments and account access." />

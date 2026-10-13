@@ -28,7 +28,9 @@ The app shows current usage and remaining allowances on Profile and surfaces est
 
 Jobs, invoices, and uploaded estimate media remain in the database/storage if a Pro subscription ends. Owners retain read access to those records and can use them again if Pro is reactivated; database row-level security blocks free-tier writes to job/invoice data, new estimate attachments, and storage uploads. The database also blocks free-tier changes that enable deposit terms or package options.
 
-Pro checkout and subscription management are available from **Profile & Preferences → Your plan**. The marketing site's plan links lead to app signup; customers can create a free account and upgrade from Profile. Pro has no separate trial requirement.
+Eligible WorkCraft AI accounts can start one **14-day Pro trial** from **Profile & Preferences → Your plan**. Checkout does not require a payment method to start. The trial cancels automatically at the end if no payment method is added; access returns to Free and saved estimates, jobs, and other account data remain available. A user can add a payment method in Manage billing before the trial ends to continue Pro at **$9.99/month**. A retained Stripe customer record makes the account ineligible for another trial; returning subscribers check out at the displayed paid price. Pro subscriptions remain on the existing $9.99 monthly Stripe Price; no additional Stripe product or price ID is required.
+
+The marketing site's plan links lead to app signup. Customers create a free account, then start the trial from Profile. English and Spanish pricing copy and support FAQs explain where to start the trial, that no card is required, what happens at trial end, and the $9.99 monthly price if the user chooses to continue.
 
 The public support form remains available to prospective customers and is protected by request size checks, origin validation, a honeypot, and IP-based rate limits. Support and retention mail count against the shared 75/day platform email ceiling, but not an individual Pro customer's 5/day and 100/month allowance. Those business-support messages are operational overhead rather than an app tier feature.
 
