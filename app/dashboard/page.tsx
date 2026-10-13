@@ -148,6 +148,18 @@ export default function DashboardPage() {
     return () => window.clearTimeout(task);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("estimateSaved") !== "1") return;
+    const task = window.setTimeout(() => {
+      setSendMessage(language === "es"
+        ? "Cotización guardada. Revisa los detalles y copia el enlace del cliente para compartirla."
+        : "Estimate saved. Review it below and copy the customer link when you’re ready to share.");
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash || "#estimates"}`);
+    }, 0);
+    return () => window.clearTimeout(task);
+  }, [language]);
+
   const markQuestionRead = async (question: ProposalQuestion) => {
     const readAt = new Date().toISOString();
     const { error } = await supabase.from("proposal_questions").update({ read_at: readAt }).eq("id", question.id);
@@ -220,10 +232,10 @@ export default function DashboardPage() {
         setSendMessage("Could not update pipeline stage. Please try again.");
       } else {
         setEstimates((current) => current.map((estimate) => estimate.id === id ? { ...estimate, pipeline_stage: stage } : estimate));
-        setSendMessage("Pipeline stage updated.");
+        setSendMessage(language === "es" ? "Se actualizó tu seguimiento." : "Your follow-up stage was updated.");
       }
     } catch {
-      setSendMessage("Could not update pipeline stage. Please try again.");
+      setSendMessage(language === "es" ? "No se pudo actualizar tu seguimiento. Inténtalo de nuevo." : "Could not update your follow-up stage. Please try again.");
     } finally {
       setStatusSavingId(null);
     }
@@ -401,9 +413,9 @@ export default function DashboardPage() {
                     <Link href={`/estimate/${est.id}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-orange-800 px-3 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "View Estimate")}</Link>
                     <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                   </div>
-                  {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
-                  <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Pipeline stage")}
-                    <select aria-label={`${translate(language, "Pipeline stage")} — ${est.client_name}`} value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"} disabled={statusSavingId !== null} onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
+                  {isPro && <><button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>{!est.client_email.trim() && <p className="text-xs text-slate-600">{language === "es" ? "Agrega un correo al editar la cotización para enviarla por email." : "Add an email while editing this estimate to send it by email."}</p>}</>}
+                  <label className="mt-3 block text-xs font-semibold text-slate-700">{translate(language, "My follow-up")}
+                    <select aria-label={`${translate(language, "My follow-up")} — ${est.client_name}`} value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"} disabled={statusSavingId !== null} onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 disabled:opacity-60">
                       {pipelineStages.map((stage) => <option key={stage} value={stage}>{translate(language, stage === "active" ? "Active" : stage === "follow_up" ? "Follow-up" : stage === "closed_won" ? "Closed won" : "Closed lost")}</option>)}
                     </select>
                   </label>
@@ -454,9 +466,9 @@ export default function DashboardPage() {
                           {translate(language, est.status)}
                         </span>
                         <label className="mt-2 block">
-                          <span className="sr-only">{translate(language, "Pipeline stage")}</span>
+                          <span className="sr-only">{translate(language, "My follow-up")}</span>
                           <select
-                            aria-label={`${translate(language, "Pipeline stage")} — ${est.client_name}`}
+                            aria-label={`${translate(language, "My follow-up")} — ${est.client_name}`}
                             value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"}
                             disabled={statusSavingId !== null}
                             onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)}
@@ -474,7 +486,7 @@ export default function DashboardPage() {
                           {translate(language, "View Estimate")}
                         </Link>
                         <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
-                        {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
+                        {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} title={!est.client_email.trim() ? (language === "es" ? "Agrega un correo al editar esta cotización" : "Add an email while editing this estimate") : undefined} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                         {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
                         {(est.followup_sent_at || (est.status.toLowerCase() === "pending" && est.followup_at)) && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date((est.followup_sent_at || est.followup_at)!).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
                         {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}

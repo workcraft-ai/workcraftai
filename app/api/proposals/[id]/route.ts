@@ -21,7 +21,7 @@ export async function GET(
   if (!(await customerShareAllowed(admin, id, request, true))) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404, headers: { "Cache-Control": "no-store" } });
   const { data: estimate, error } = await admin
     .from("estimates")
-    .select("id, reference_number, user_id, client_name, client_email, client_phone, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, payment_terms, payment_terms_es, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at, customer_declined_at")
+    .select("id, reference_number, user_id, client_name, job_address, status, require_deposit, deposit_percentage, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, payment_terms, payment_terms_es, converted_job_id, created_at, package_options, signature_name, selected_package, accepted_at, customer_declined_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -83,9 +83,14 @@ export async function GET(
     available: hasPro && connectedAccount?.charges_enabled === true && connectedAccount.stripe_livemode === stripeLivemode(),
   };
 
+  const publicFields = [
+    "id", "reference_number", "client_name", "job_address", "status", "require_deposit",
+    "deposit_percentage", "tax_rate", "markup_percentage", "proposal_language", "proposal_display_mode",
+    "proposal_summary", "payment_terms", "payment_terms_es", "created_at", "package_options",
+    "signature_name", "selected_package", "accepted_at", "customer_declined_at",
+  ];
   const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) =>
-    key !== "user_id" && key !== "converted_job_id"
-      && !(estimate.proposal_display_mode === "summary" && ["tax_rate", "markup_percentage"].includes(key))
+    publicFields.includes(key) && !(estimate.proposal_display_mode === "summary" && ["tax_rate", "markup_percentage"].includes(key))
   ));
   return NextResponse.json({ estimate: publicEstimate, converted: Boolean(estimate.converted_job_id), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean), paymentSummary }, {
     headers: {

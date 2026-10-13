@@ -62,7 +62,7 @@ export const POST = withApiFailureMetrics("/api/estimates", async (request: Requ
   const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
   const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
 
-  if (!clientName || clientName.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320
+  if (!clientName || clientName.length > 200 || (clientEmail.length > 0 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320))
     || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(lineItems) || !validPackages(packages)
     || !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100
     || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100
