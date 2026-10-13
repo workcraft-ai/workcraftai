@@ -4,13 +4,14 @@ import { after, NextResponse } from "next/server";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { processVerifiedStripeEvent } from "@/lib/stripe-webhook-processor";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/webhooks/stripe", async (request: Request) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecrets = [...new Set([process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((secret): secret is string => Boolean(secret)))];
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -58,4 +59,4 @@ export async function POST(request: Request) {
     });
   }
   return NextResponse.json({ received: true, queued: Boolean(queued) });
-}
+});

@@ -1,6 +1,6 @@
 # Production readiness release and acceptance checklist
 
-Updated October 10, 2026. This is the current checklist; earlier audits remain historical evidence.
+Updated October 13, 2026. The October 13 code and migration changes below are pending release; older entries are historical evidence.
 
 ## Implemented and verified
 
@@ -31,9 +31,15 @@ The owner enabled the Send Email Hook. A subsequent phone reset reached Producti
 4. **Restore:** run the backup workflow on main with `restore_drill: true`. It creates a full encrypted snapshot, decrypts it in a temporary runner, restores an isolated local Supabase stack, checks Auth/schema compatibility, RLS, owner relationships and private media, and destroys plaintext copies. Two active free cloud projects occupy the organization allowance; no paid project or existing-project pause is authorized. Password/MFA and full app recovery acceptance still need a compatible recovery environment.
 5. **Stripe and email:** October 10 Preview provider/state checks passed in-flight retry, stale recovery, duplicate replay, async success and late failure/expiry, subscription activation/past-due/recovery/cancellation, and cumulative USD refunds with stale replays. See [provider evidence](PROVIDER-ACCEPTANCE-2026-10-10.md). Production estimate delivery and contractor Reply-To passed. Invoice send-from-app is pending owner login. Preview billing mail queue passed but delivery is pending Preview Resend configuration. Signed-in checkout/effective account downgrade acceptance remains separate; the test owner has an admin Pro grant. Do not disable Production CAPTCHA or use live payments to work around these acceptance steps.
 
-The owner previously confirmed monitoring delivery and subscription Terms review. These are owner-confirmed. Policies remain immediate Free downgrade on `past_due`, period-end cancellation, no refunds except where required by law; Zoho is out of scope. Vercel Hobby remains a pre-sales decision; review commercial-use eligibility before selling.
+The owner previously confirmed monitoring delivery and subscription Terms review. These are owner-confirmed. Policies remain immediate Free downgrade on `past_due`, period-end cancellation, no refunds except where required by law. Vercel Hobby remains a pre-sales decision; review commercial-use eligibility before selling.
 
 ## Sharing and recovery notes
+
+### October 13 pending release
+
+The October 13 migration pair is pending: `20261013140255_durable_stripe_webhook_queue` adds the durable Stripe inbox/worker and heartbeat tables; `20261013160000_pipeline_and_ops_observability` separates internal pipeline stages from customer acceptance/payment state, prevents unapproved checkout/invoice conversion, adds critical-route 5xx aggregation, and expands database pressure metrics. The paired application uses the accepted snapshot as the payable total. Apply both migrations in timestamp order to Staging and deploy its matching app before applying the same pair to Production and deploying there. Do not mark this work live until both environments and the production checks are complete.
+
+The same release removes stale CRM/mail-provider references from repository documentation. No CRM or mailbox integration code or configuration existed in the app.
 
 Owners can copy, replace or disable customer proposal links. Existing UUID links remain usable until the owner replaces/disables them. New tokens are hashed for verification and encrypted for outbound email using a domain-separated key derived from the backend service key. Rotating that key can require replacing stored share tokens for future email; the public hash verification remains valid. Disabled/expired customer links cannot read, accept, ask questions or initiate payments. Owner access remains available.
 

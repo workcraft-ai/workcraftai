@@ -8,9 +8,10 @@ import { authEmailMessages } from "@/lib/auth-email.mjs";
 import { sendAuthMessages } from "@/lib/auth-email-send.mjs";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 export const runtime = "nodejs";
 export const maxDuration = 10;
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/auth/email-hook", async (request: Request) => {
  const deadlineAt = Date.now() + 4_300;
  const secret = process.env.SUPABASE_SEND_EMAIL_HOOK_SECRET?.replace(/^v1,/, "");
  const origin = getTrustedAppOrigin(process.env.NEXT_PUBLIC_APP_URL);
@@ -30,5 +31,5 @@ export async function POST(request: Request) {
   });
   return NextResponse.json({});
  } catch {console.error("Synchronous Auth email failed; no token or recipient logged.");return failure("Email is temporarily unavailable. Please try again later.");}
-}
+});
 function failure(message:string,status=503){return NextResponse.json({error:{http_code:status,message}},{status});}

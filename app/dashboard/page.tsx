@@ -25,6 +25,7 @@ interface Estimate {
   client_email: string;
   job_address: string;
   status: string;
+  pipeline_stage: string;
   require_deposit: boolean;
   deposit_percentage: number;
   is_archived: boolean;
@@ -34,8 +35,8 @@ interface Estimate {
   proposal_viewed_at: string | null;
 }
 
-type EstimateStatus = "pending" | "accepted" | "paid" | "declined";
-const estimateStatuses: EstimateStatus[] = ["pending", "accepted", "paid", "declined"];
+type PipelineStage = "active" | "follow_up" | "closed_won" | "closed_lost";
+const pipelineStages: PipelineStage[] = ["active", "follow_up", "closed_won", "closed_lost"];
 type EmailAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
 
 interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
@@ -207,24 +208,22 @@ export default function DashboardPage() {
     }
   };
 
-  const updateEstimateStatus = async (id: string, status: EstimateStatus) => {
+  const updatePipelineStage = async (id: string, stage: PipelineStage) => {
     setStatusSavingId(id);
     setSendMessage("");
     try {
-      const { error } = await supabase.rpc("workcraft_update_estimate_status", {
+      const { error } = await supabase.rpc("workcraft_update_estimate_pipeline_stage", {
         p_estimate_id: id,
-        p_status: status,
+        p_stage: stage,
       });
       if (error) {
-        setSendMessage(error.message.includes("SIGNED_APPROVAL_STATUS_LOCKED")
-          ? "A customer-approved estimate can only stay accepted or be marked paid."
-          : "Could not update estimate status. Please try again.");
+        setSendMessage("Could not update pipeline stage. Please try again.");
       } else {
-        setEstimates((current) => current.map((estimate) => estimate.id === id ? { ...estimate, status } : estimate));
-        setSendMessage("Estimate status updated.");
+        setEstimates((current) => current.map((estimate) => estimate.id === id ? { ...estimate, pipeline_stage: stage } : estimate));
+        setSendMessage("Pipeline stage updated.");
       }
     } catch {
-      setSendMessage("Could not update estimate status. Please try again.");
+      setSendMessage("Could not update pipeline stage. Please try again.");
     } finally {
       setStatusSavingId(null);
     }
@@ -403,9 +402,9 @@ export default function DashboardPage() {
                     <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                   </div>
                   {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
-                  <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Change estimate status")}
-                    <select aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`} value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"} disabled={statusSavingId !== null} onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
-                      {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
+                  <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Pipeline stage")}
+                    <select aria-label={`${translate(language, "Pipeline stage")} — ${est.client_name}`} value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"} disabled={statusSavingId !== null} onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
+                      {pipelineStages.map((stage) => <option key={stage} value={stage}>{translate(language, stage === "active" ? "Active" : stage === "follow_up" ? "Follow-up" : stage === "closed_won" ? "Closed won" : "Closed lost")}</option>)}
                     </select>
                   </label>
                   <details className="mt-2 border-t border-slate-100 pt-2">
@@ -455,15 +454,15 @@ export default function DashboardPage() {
                           {translate(language, est.status)}
                         </span>
                         <label className="mt-2 block">
-                          <span className="sr-only">Change estimate status</span>
+                          <span className="sr-only">{translate(language, "Pipeline stage")}</span>
                           <select
-                            aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`}
-                            value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"}
+                            aria-label={`${translate(language, "Pipeline stage")} — ${est.client_name}`}
+                            value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"}
                             disabled={statusSavingId !== null}
-                            onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)}
+                            onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)}
                             className="min-h-12 max-w-36 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 disabled:opacity-60"
                           >
-                            {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
+                            {pipelineStages.map((stage) => <option key={stage} value={stage}>{translate(language, stage === "active" ? "Active" : stage === "follow_up" ? "Follow-up" : stage === "closed_won" ? "Closed won" : "Closed lost")}</option>)}
                           </select>
                         </label>
                       </td>

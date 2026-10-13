@@ -4,9 +4,10 @@ import { processNotifications } from "@/lib/notification-outbox";
 import { upgradeLegacyShareSecrets } from "@/lib/proposal-sharing";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getCronCredential } from "@/lib/cron-authorization";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const maxDuration = 60;
-export async function GET(request: Request) {
+export const GET = withApiFailureMetrics("/api/cron/notifications", async (request: Request) => {
   const deadlineAt=Date.now()+50_000;
   const credential = getCronCredential(request);
   if (!credential) {
@@ -33,4 +34,4 @@ export async function GET(request: Request) {
     console.error("Notification retry could not complete.");
     return NextResponse.json({error: "Notification retry is temporarily unavailable."}, {status: 503});
   }
-}
+});

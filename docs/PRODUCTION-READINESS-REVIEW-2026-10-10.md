@@ -29,7 +29,7 @@ Audit date: October 10, 2026 America/New_York; some provider timestamps are Octo
 
 Inspected scope: app/API handlers, authentication helpers, money/AI/share/email services, Supabase migrations and live policies/functions, marketing assets/pages, CI/backup/monitoring workflows, deployment/environment metadata. Generated bundles and dependencies were assessed through build/dependency tools. Environment values and account credentials were not printed.
 
-Current scope incorporates the owner's previous decisions: Zoho is excluded; Pro is capped, not unlimited; past_due downgrades immediately; cancellations end at the billing-period boundary; refunds only where legally required. Monitoring and legal review have been owner-confirmed. Hosting-plan review was deferred; before paid commercialization, confirm the plan permits the intended commercial use. [Vercel Hobby documentation](https://vercel.com/docs/plans/hobby).
+Current scope incorporates the owner's previous decisions: Pro is capped, not unlimited; past_due downgrades immediately; cancellations end at the billing-period boundary; refunds only where legally required. Monitoring and legal review have been owner-confirmed. Hosting-plan review was deferred; before paid commercialization, confirm the plan permits the intended commercial use. [Vercel Hobby documentation](https://vercel.com/docs/plans/hobby).
 
 Fresh checks:
 
@@ -166,11 +166,11 @@ Deploy the SQL reducer support before the handler/provider subscription change. 
 
 **Vector:** The domain is verified for sending, but this record does not request receiver enforcement against spoofed messages and supplies no aggregate-report mailbox. Provider domain verification is not proof that every legitimate sender aligns.
 
-**Fix:** Inventory Resend, Supabase Auth hook and Zoho mailbox sending, establish a monitored aggregate-report destination, observe alignment, then incrementally apply quarantine/reject. Do not immediately reject until legitimate senders have been checked. Example initial record after creating the mailbox: `v=DMARC1; p=none; rua=mailto:dmarc@workcraftai.com`.
+**Fix:** Inventory Resend, the Supabase Auth hook and any other legitimate domain senders, establish a monitored aggregate-report destination, observe alignment, then incrementally apply quarantine/reject. Do not immediately reject until legitimate senders have been checked. Example initial record after creating the mailbox: `v=DMARC1; p=none; rua=mailto:dmarc@workcraftai.com`.
 
 ### Verified / unverified
 
-Resend domain is verified; delivery webhook is enabled; click/open tracking is off. Bounded provider timeouts and durable outbox retries, idempotency keys, shared provider budgets and per-user quotas are present. No pending/sending or failed outbox rows were found at the read-only check. Estimate/invoice Reply-To is sourced from the contractor, and question notifications from the customer, as inspected in code. Fresh invoice delivery and headers were not confirmed. Zoho CRM/OAuth is outside the current scope; Zoho mailbox use is a separate operational service.
+Resend domain is verified; delivery webhook is enabled; click/open tracking is off. Bounded provider timeouts and durable outbox retries, idempotency keys, shared provider budgets and per-user quotas are present. No pending/sending or failed outbox rows were found at the read-only check. Estimate/invoice Reply-To is sourced from the contractor, and question notifications from the customer, as inspected in code. Fresh invoice delivery and headers were not confirmed. External mailbox administration is separate from app email delivery.
 
 ## Pillar 5 — Business logic and edge cases
 

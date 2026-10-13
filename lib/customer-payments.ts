@@ -1,7 +1,5 @@
 import type Stripe from "stripe";
 import { getCardPaymentsState, getServiceSupabase, getStripeClient, stripeLivemode } from "@/lib/stripe-server";
-import { estimateTotalCents } from "@/lib/customer-payment-calculations.mjs";
-
 export { estimateTotalCents, paidCents } from "@/lib/customer-payment-calculations.mjs";
 
 type EstimateRow = {
@@ -102,20 +100,22 @@ export async function getEstimatePaymentData(admin: ReturnType<typeof getService
     .eq("id", estimateId).maybeSingle();
   if (error) throw new Error("Could not load estimate payment data.");
   if (!estimate) return { estimate: null, lines: [], totalCents: 0, payments: [] as PaymentRow[] };
-  const [{ data: lines, error: lineError }, { data: payments, error: paymentError }] = await Promise.all([
+  const [{ data: lines, error: lineError }, { data: payments, error: paymentError }, { data: acceptance, error: acceptanceError }] = await Promise.all([
     admin.from("line_items").select("quantity, unit_price").eq("estimate_id", estimateId),
     admin.from("customer_payments")
     .select("id, payment_kind, amount_cents, status, amount_refunded_cents, stripe_checkout_session_id, checkout_url")
       .eq("estimate_id", estimateId).order("created_at", { ascending: true }),
+    admin.from("estimate_acceptances").select("accepted_total_cents").eq("estimate_id", estimateId).eq("user_id", estimate.user_id).maybeSingle(),
   ]);
-  if (lineError || paymentError) throw new Error("Could not load estimate payment data.");
+  if (lineError || paymentError || acceptanceError) throw new Error("Could not load estimate payment data.");
   const typedEstimate = estimate as EstimateRow;
   const typedLines = (lines ?? []) as LineRow[];
   const typedPayments = (payments ?? []) as PaymentRow[];
   return {
     estimate: typedEstimate,
     lines: typedLines,
-    totalCents: estimateTotalCents(typedEstimate, typedLines),
+    totalCents: acceptance ? Number(acceptance.accepted_total_cents) : 0,
+    accepted: acceptance !== null,
     payments: typedPayments,
   };
 }

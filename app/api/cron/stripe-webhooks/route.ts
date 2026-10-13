@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getCronCredential } from "@/lib/cron-authorization";
 import { processVerifiedStripeEvent } from "@/lib/stripe-webhook-processor";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type PendingEvent = { event_id: string; event_type: string; payload: Stripe.Event | null };
 
-export async function GET(request: Request) {
+export const GET = withApiFailureMetrics("/api/cron/stripe-webhooks", async (request: Request) => {
   if (!getCronCredential(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -62,4 +63,4 @@ export async function GET(request: Request) {
     status: failed ? 503 : 200,
     headers: { "Cache-Control": "no-store" },
   });
-}
+});

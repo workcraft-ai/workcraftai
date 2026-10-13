@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { verifyResendWebhook } from "@/lib/resend-webhook.mjs";
 import { readLimitedText } from "@/lib/read-limited-body.mjs";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -21,7 +22,7 @@ type ResendEvent = {
   data?: { email_id?: unknown };
 };
 
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/webhooks/resend", async (request: Request) => {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ error: "Email webhook is not configured." }, { status: 503 });
 
@@ -71,4 +72,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email event processing is temporarily unavailable." }, { status: 503 });
   }
   return NextResponse.json({ received: true });
-}
+});

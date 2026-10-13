@@ -2,21 +2,21 @@
 
 # WorkCraft AI monitoring and incident checklist
 
-Last refreshed: 2026-10-12. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
+Last refreshed: 2026-10-13. The October 13 migrations and code described below are pending release; do not treat them as active Production alerts until both migrations and the matching app deployment have completed. This runbook contains no credentials or customer data. Mark an alert as verified only after its test notification has reached the intended monitored inbox.
 
 ## Current verified state
 
 | Area | Verified state | Remaining evidence |
 | --- | --- | --- |
 | Public availability | UptimeRobot monitors the site and app health at five-minute intervals. The owner confirmed test, outage/recovery and provider alert delivery. | Review provider configuration periodically. |
-| Database migrations | Production and Staging have matching 40 versions through `20261010181745_revocable_proposal_sharing`. Server-only claim/payment/outbox/share RPCs are installed. | Reconfirm histories after future migrations. |
+| Database migrations | Last verified October 12: Production and Staging matched at 43 versions through `20261011024002_atomic_customer_share_validation_and_indexes`. Server-only claim/payment/outbox/share RPCs are installed. | The October 13 migration below remains pending release. Reconfirm histories after applying it. |
 | Vercel | Connected project and environment-name metadata is accessible; private values are redacted. Reviewed release `7ef5757` reached Ready for the app Production project. | Hosting plan review is deferred by the owner. |
 | Stripe | October 10 Preview provider tests verified async success, in-flight 503, stale-claim recovery, duplicate 200, late failure/expiry preservation, subscription activation/past-due/recovery/cancellation, and cumulative USD refunds with stale replays. See the provider evidence report. | Full checkout UI/effective Free entitlement and billing-email inbox acceptance are separate. |
 | Resend | Estimate email on October 10 21:46 UTC was delivered; From is WorkCraft AI no-reply and Reply-To is the contractor. Both sent and delivered appear in the Production ledger. Auth reset delivery was also confirmed. | Invoice send-from-app is pending owner login; Preview billing queuing passed, but delivery needs Preview Resend configuration. The obsolete test queue row was removed. |
 | UptimeRobot | Both monitors and alert delivery are owner-confirmed. | Periodic monitor and destination review. |
 | Backups | Corrected Auth separation passes a fresh local fixture restore. Guarded run `38092126519` decrypted and restored database/Auth, 40 migrations, private policies and all 3 private media files after the owner corrected Storage secrets. | Password/MFA sign-in and full recovery-app acceptance remain separate. |
 | Billing policy | Immediate past-due downgrade, period-end cancellation, and no refunds except where law requires are owner-approved; subscription state transitions and queued notice passed Preview tests. Terms review is owner-confirmed. | Billing-email inbox acceptance remains pending Preview mail configuration. |
-| Scope | Zoho is no longer in scope. | No Zoho integration work is required. |
+| Mail delivery | Application transactional mail is sent through Resend. | No external CRM/mailbox API is part of the application. |
 
 ## Availability checks
 
@@ -30,6 +30,16 @@ The UptimeRobot free plan currently checks every five minutes. Monitors are conf
 Both monitors currently show **Up**, 100% uptime, and no incidents in the last 24 hours. The owner confirmed both UptimeRobot test emails arrived at `support@workcraftai.com`. The owner has confirmed monitoring delivery; provider-native configuration should still be reviewed periodically. A health monitor does not detect a bad Stripe signing secret, Resend quota exhaustion, Gemini provider failure, or a subscription billing issue.
 
 ## Automated operational alerts
+
+### Changes pending release
+
+- GitHub's 15-minute Availability monitor records a scheduler heartbeat after its checks, even if a check fails. The five-minute Supabase Cron operations audit alerts when an initialized heartbeat is older than 35 minutes. The existing UptimeRobot check of `/api/health` also degrades after a missed GitHub heartbeat. Supabase Cron remains the primary five-minute retry scheduler; GitHub Actions is a secondary retry path and heartbeat source.
+- The daily encrypted backup workflow records database/Auth freshness after a snapshot is saved and private-media freshness after a full-media snapshot is saved. The operations audit warns at 26 hours for database/Auth and 8 days for private media. Heartbeats are freshness indicators, not proof of a successful restore.
+- Critical API handlers aggregate 5xx counts by static route template and minute. The operations audit warns at 3 and raises a critical alert at 10 failures over 15 minutes. This covers the instrumented payment, estimate, auth-email, support, notification, and webhook paths; it is not a complete request/error tracker and does not store bodies, query strings, user identifiers, or provider error text.
+- Database session pressure alerts at 70% and 85% of `max_connections`; lock/I/O waiters and idle-in-transaction sessions have separate alerts. `pg_stat_activity` reports database backends, not Supavisor/PgBouncer client queues. Check Supabase's project/database telemetry for pooler queue pressure; no plan upgrade or provider add-on is assumed.
+- Stripe webhooks are durably recorded and acknowledged before event processing. The existing five-minute worker retries the ledger idempotently; GitHub availability workflow is an independent backup retry path. Keep monitoring the queue age and failed rows.
+
+The known Staging/Production baseline is 43 migrations through `20261011024002_atomic_customer_share_validation_and_indexes`. Apply `20261013140255_durable_stripe_webhook_queue` and then `20261013160000_pipeline_and_ops_observability` to Staging, deploy the matching app, and inspect the new checks there. Then apply the same pair in order to Production and deploy the matching app. The schema and app are a coordinated release. After release, run the availability workflow and daily operations audit once, then wait for the first scheduled database and full-media backups to seed their heartbeats. A missing heartbeat is not reported as stale until its first successful run; the pre-existing backup freshness check remains responsible during bootstrap.
 
 The application and GitHub workflow changes add two server-side monitors:
 

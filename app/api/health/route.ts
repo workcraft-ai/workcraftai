@@ -39,15 +39,25 @@ export async function GET() {
   if (process.env.SCHEDULER_SECRET && supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     try {
-      const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/operational_heartbeats?name=eq.supabase_scheduler_notifications&select=last_success_at`, {
+      const heartbeatUrl = new URL(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/operational_heartbeats`);
+      heartbeatUrl.searchParams.set("name", "in.(supabase_scheduler_notifications,availability_monitor)");
+      heartbeatUrl.searchParams.set("select", "name,last_success_at");
+      const response = await fetch(heartbeatUrl, {
         headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
         cache: "no-store",
         signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
       });
       if (response.ok) {
         const rows: unknown = await response.json();
-        const lastSuccess = Array.isArray(rows) ? rows[0]?.last_success_at : undefined;
-        if (typeof lastSuccess === "string" && Date.now() - Date.parse(lastSuccess) < 20 * 60_000) scheduler = "ok";
+        const entries = Array.isArray(rows) ? rows as Array<{ name?: unknown; last_success_at?: unknown }> : [];
+        const notificationHeartbeat = entries.find((row) => row.name === "supabase_scheduler_notifications")?.last_success_at;
+        const availabilityHeartbeat = entries.find((row) => row.name === "availability_monitor")?.last_success_at;
+        const notificationsFresh = typeof notificationHeartbeat === "string" && Date.now() - Date.parse(notificationHeartbeat) < 20 * 60_000;
+        // Do not fail health before the monitor has recorded its first heartbeat.
+        // Once initialized, a missed GitHub run also trips the independent uptime monitor.
+        const availabilityFresh = typeof availabilityHeartbeat !== "string"
+          || Date.now() - Date.parse(availabilityHeartbeat) < 35 * 60_000;
+        if (notificationsFresh && availabilityFresh) scheduler = "ok";
       }
     } catch {
       // An independent availability monitor will alert on this degraded check.

@@ -149,7 +149,7 @@ For the subscription helper, check a shared absolute deadline before each provid
 
 Dispute notices are sent, but dispute status is not separately displayed in the app payment summary (`app/api/webhooks/stripe/route.ts:114`). Add a dispute badge/Stripe Dashboard link when payment reporting expands. A historically successful charge is not proof the contractor retains its proceeds after a lost dispute. Do not automatically recharge or reopen the customer's payable balance on a dispute event.
 
-## Pillar 4 — Resend and Zoho
+## Pillar 4 — Resend and email delivery
 
 ### H1 — Auth hook and generic notification retries have incompatible lifecycles
 
@@ -181,11 +181,11 @@ Resend verifies `resend._domainkey` DKIM and the `send` SPF records. Both tracki
 
 The current live outbox aggregate contained seven sent rows and no pending/sending rows. That is a point-in-time result, not a guarantee future sends cannot fail. No audit email was sent.
 
-**Zoho:** no Zoho OAuth/API integration exists in the reviewed app. Zoho is an inbox/address provider; transactional application sending uses Resend. Token refresh/storage review is not applicable. `docs/EMAIL-ADDRESS-ROLES.md:18` still describes separate Auth SMTP as the active path even though Production uses the Send Email Hook; update that operational note with H1 so future operators do not configure the wrong sender path.
+The reviewed app has no third-party CRM or mailbox API integration; transactional application sending uses Resend. Token refresh/storage review is not applicable. `docs/EMAIL-ADDRESS-ROLES.md:18` still describes separate Auth SMTP as the active path even though Production uses the Send Email Hook; update that operational note with H1 so future operators do not configure the wrong sender path.
 
 ### L3 — DMARC is monitoring-only
 
-**Severity: Low.** `_dmarc.workcraftai.com` currently publishes `v=DMARC1; p=none`. This does not enforce rejection/quarantine of unauthenticated impersonation. After verifying alignment for **both** Resend and legitimate Zoho mail, add a controlled reporting destination and stage quarantine, then reject. Do not switch directly to reject without checking legitimate senders. This is domain configuration, not an application-code change.
+**Severity: Low.** `_dmarc.workcraftai.com` currently publishes `v=DMARC1; p=none`. This does not enforce rejection/quarantine of unauthenticated impersonation. After verifying alignment for Resend and any other legitimate domain senders, add a controlled reporting destination and stage quarantine, then reject. Do not switch directly to reject without checking legitimate senders. This is domain configuration, not an application-code change.
 
 ## Pillar 5 — Financial logic, scheduling and field workflows
 

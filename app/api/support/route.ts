@@ -6,6 +6,7 @@ import { sameOrigin } from "@/lib/admin-support";
 import { emailAddressFromConfig } from "@/lib/email-address";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ function supportResponse(request: Request, payload: { success?: boolean; error?:
   return NextResponse.json(payload, { status });
 }
 
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/support", async (request: Request) => {
   if (!sameOrigin(request)) return supportResponse(request, { error: "This request could not be verified." }, 403);
   const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
   const isJson = contentType === "application/json";
@@ -152,4 +153,4 @@ export async function POST(request: Request) {
   }
 
   return supportResponse(request, { success: true, caseReference });
-}
+});

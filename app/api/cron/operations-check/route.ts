@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getCronCredential } from "@/lib/cron-authorization";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const runtime = "nodejs";
 export const maxDuration = 20;
@@ -56,7 +57,7 @@ async function probeAppHealth(requestUrl: string) {
   }
 }
 
-export async function GET(request: Request) {
+export const GET = withApiFailureMetrics("/api/cron/operations-check", async (request: Request) => {
   if (!getCronCredential(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
     admin.from("email_delivery_inbox").select("provider_event_id", { count: "exact", head: true }).eq("event", "delivery_delayed").lte("received_at", hourAgo).gte("received_at", dayAgo),
   ];
 
-  const [metrics, emailUsageResult, aiUsageResult, settingsResult, resendUsage, pressureResult, exceptionResult, probe] = await Promise.all([
+  const [metrics, emailUsageResult, aiUsageResult, settingsResult, resendUsage, pressureResult, exceptionResult, probe, apiFailuresResult, heartbeatResult] = await Promise.all([
     Promise.all(metricQueries),
     admin.from("provider_email_daily_usage").select("source,emails_started").eq("usage_date", utcToday),
     admin.from("tradeflow_ai_global_daily_usage").select("attempts_started").eq("usage_date", utcToday).maybeSingle(),
@@ -102,10 +103,13 @@ export async function GET(request: Request) {
     admin.rpc("workcraft_db_pressure"),
     admin.from("operational_exceptions").select("id", { count: "exact", head: true }).gte("occurred_at", new Date(now.getTime() - 15 * 60_000).toISOString()),
     probeAppHealth(request.url),
+    admin.rpc("workcraft_recent_api_failures", { p_since: new Date(now.getTime() - 15 * 60_000).toISOString() }),
+    admin.from("operational_heartbeats").select("name,last_success_at").in("name", ["availability_monitor", "database_backup", "private_media_backup"]),
   ]);
 
   if (metrics.some((metric: MetricResult) => metric.error)
-    || emailUsageResult.error || aiUsageResult.error || settingsResult.error || pressureResult.error || exceptionResult.error) {
+    || emailUsageResult.error || aiUsageResult.error || settingsResult.error || pressureResult.error || exceptionResult.error
+    || apiFailuresResult.error || heartbeatResult.error) {
     console.error("Operations monitoring could not read aggregate health metrics.");
     return NextResponse.json({ error: "Operations metrics are temporarily unavailable." }, { status: 503 });
   }
@@ -113,6 +117,19 @@ export async function GET(request: Request) {
   const counts = metrics.map((metric: MetricResult) => metric.count ?? 0);
   const criticalAlerts: Array<{ code: string; count: number; action: string }> = [];
   const warnings: Array<{ code: string; source: string; used?: number; limit?: number; action: string }> = [];
+  const heartbeats = new Map((heartbeatResult.data ?? []).map((row) => [row.name, row.last_success_at]));
+  const checkHeartbeat = (name: string, code: string, label: string, maxAgeMs: number) => {
+    const lastSuccess = heartbeats.get(name);
+    // Existing backup freshness jobs cover the pre-heartbeat bootstrap period.
+    if (!lastSuccess) return;
+    const ageMs = now.getTime() - Date.parse(lastSuccess);
+    if (!Number.isFinite(ageMs) || ageMs > maxAgeMs) {
+      criticalAlerts.push({ code, count: 1, action: `${label} last succeeded ${Number.isFinite(ageMs) ? `${Math.max(0, Math.round(ageMs / 60_000))} minutes ago` : "at an invalid timestamp"}; inspect its scheduled run and credentials.` });
+    }
+  };
+  checkHeartbeat("availability_monitor", "availability_monitor_missed", "The GitHub availability monitor", 35 * 60_000);
+  checkHeartbeat("database_backup", "database_backup_stale", "The encrypted database/Auth backup", 26 * 60 * 60_000);
+  checkHeartbeat("private_media_backup", "private_media_backup_stale", "The encrypted private-media backup", 8 * 24 * 60 * 60_000);
   const { error: probeWriteError } = await admin.from("operational_api_probes").insert(probe);
   const { data: recentProbes, error: probeReadError } = await admin.from("operational_api_probes")
     .select("status_code,duration_ms").order("checked_at", { ascending: false }).limit(3);
@@ -138,7 +155,13 @@ export async function GET(request: Request) {
   addCritical("auth_email_stuck", counts[5], "Check the Supabase Send Email Hook and Resend delivery; Auth messages older than ten minutes may contain expired links.");
   addCritical("email_delivery_issue", counts[6], "Review Resend usage, suppression, bounce, complaint, failed, and delivered-event records for the last 24 hours.");
   addCritical("email_delivery_delayed", counts[7], "Inspect Resend delivery details; messages have remained delayed for over one hour.");
-  const pressure = pressureResult.data as { connections?: number; max_connections?: number } | null;
+  const pressure = pressureResult.data as {
+    connections?: number;
+    max_connections?: number;
+    active_connections?: number;
+    waiting_connections?: number;
+    idle_in_transaction?: number;
+  } | null;
   const connections = pressure?.connections ?? 0;
   const maxConnections = pressure?.max_connections ?? 0;
   const dbUtilization = maxConnections > 0 ? Math.round(connections * 100 / maxConnections) : 0;
@@ -149,6 +172,29 @@ export async function GET(request: Request) {
   } else if (dbUtilization >= 70) {
     warnings.push({ code: "db_connections_warning", source: "supabase_database", used: connections, limit: maxConnections,
       action: "Inspect Supabase connection sources and query latency; utilization is at least 70%." });
+  }
+  const waitingConnections = pressure?.waiting_connections ?? 0;
+  const idleInTransaction = pressure?.idle_in_transaction ?? 0;
+  if (waitingConnections >= 3) {
+    criticalAlerts.push({ code: "db_sessions_waiting", count: waitingConnections,
+      action: "Several database backends are waiting on locks or I/O; inspect database queries and Supabase pooling telemetry." });
+  } else if (waitingConnections > 0) {
+    warnings.push({ code: "db_sessions_waiting", source: "supabase_database", used: waitingConnections,
+      action: "Database backends are waiting on locks or I/O; inspect query latency and Supabase pooling telemetry." });
+  }
+  if (idleInTransaction >= 3) {
+    warnings.push({ code: "db_idle_transactions", source: "supabase_database", used: idleInTransaction,
+      action: "Several database sessions are idle in a transaction; inspect open transactions and function logs." });
+  }
+  const apiFailureRows = (apiFailuresResult.data ?? []) as Array<{ route: string; failure_count: number }>;
+  const apiFailureCount = apiFailureRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.failure_count)) ? Number(row.failure_count) : 0), 0);
+  const failingRoutes = apiFailureRows.filter((row) => row.failure_count > 0).map((row) => row.route).slice(0, 5);
+  if (apiFailureCount >= 10) {
+    criticalAlerts.push({ code: "api_5xx_sustained", count: apiFailureCount,
+      action: `At least ten 5xx responses occurred in fifteen minutes on monitored critical routes: ${failingRoutes.join(", ")}. Inspect Vercel logs and Supabase availability.` });
+  } else if (apiFailureCount >= 3) {
+    warnings.push({ code: "api_5xx_warning", source: "application", used: apiFailureCount,
+      action: `At least three 5xx responses occurred in fifteen minutes on monitored critical routes: ${failingRoutes.join(", ")}. Inspect Vercel logs and the database.` });
   }
   const recentExceptions = exceptionResult.count ?? 0;
   if (recentExceptions >= 10) {
@@ -196,7 +242,7 @@ export async function GET(request: Request) {
   }
 
   const urgentWarnings = warnings.some((warning) => [
-    "db_connections_warning", "api_health_latency_sustained", "api_exceptions_warning",
+    "db_connections_warning", "db_sessions_waiting", "api_health_latency_sustained", "api_exceptions_warning", "api_5xx_warning",
   ].includes(warning.code));
   const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && warnings.length > 0);
   const response = {
@@ -220,6 +266,10 @@ export async function GET(request: Request) {
       database_connections: connections,
       database_max_connections: maxConnections,
       database_utilization_percent: dbUtilization,
+      database_active_connections: pressure?.active_connections ?? null,
+      database_waiting_connections: waitingConnections,
+      database_idle_in_transaction: idleInTransaction,
+      monitored_api_5xx_in_15m: apiFailureCount,
       uncaught_api_exceptions_15m: recentExceptions,
       app_health_status_code: probe.status_code,
       app_health_duration_ms: probe.duration_ms,
@@ -232,4 +282,4 @@ export async function GET(request: Request) {
     status: failed ? 503 : 200,
     headers: { "Cache-Control": "no-store" },
   });
-}
+});
