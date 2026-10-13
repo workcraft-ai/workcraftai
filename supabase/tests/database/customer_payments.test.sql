@@ -35,10 +35,18 @@ values
 insert into public.subscriptions (user_id, status) values ('a3000000-0000-4000-8000-000000000002', 'active');
 insert into public.estimates (id, user_id, client_name, client_email, status, require_deposit, deposit_percentage)
 values
-  ('b3000000-0000-4000-8000-000000000001', 'a3000000-0000-4000-8000-000000000001', 'Free', 'free@example.test', 'accepted', false, 0),
-  ('b3000000-0000-4000-8000-000000000002', 'a3000000-0000-4000-8000-000000000002', 'Pro', 'pro@example.test', 'accepted', true, 30);
+  ('b3000000-0000-4000-8000-000000000001', 'a3000000-0000-4000-8000-000000000001', 'Free', 'free@example.test', 'pending', false, 0),
+  ('b3000000-0000-4000-8000-000000000002', 'a3000000-0000-4000-8000-000000000002', 'Pro', 'pro@example.test', 'pending', true, 30);
 insert into public.line_items (estimate_id, description, quantity, unit_price)
 values ('b3000000-0000-4000-8000-000000000002', 'Accepted job', 1, 100);
+
+-- Payment preparation now requires immutable proof that the customer accepted
+-- the estimate. Use the same acceptance RPC as the live customer flow.
+set local role service_role;
+select public.workcraft_accept_estimate_once(
+  'b3000000-0000-4000-8000-000000000002', 'Customer Signature', null
+);
+reset role;
 
 select throws_ok(
   $$insert into public.stripe_connected_accounts (user_id, stripe_account_id) values ('a3000000-0000-4000-8000-000000000001', 'acct_free')$$,
