@@ -2,13 +2,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { emailAddressFromConfig } from "@/lib/email-address";
 import { enqueueNotification, escapeEmailHtml, notificationFrame, processNotifications } from "@/lib/notification-outbox";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
-import { SIGNUP_TERMS_VERSION } from "@/lib/signup-terms";
+import { onboardingEligible } from "@/lib/onboarding-cohort.mjs";
 import { brandedEmailButton } from "@/lib/branded-email.mjs";
 
 export function isNewConfirmedAccount(user: User) {
-  return user.user_metadata?.workcraft_terms_accepted === true &&
-    user.user_metadata?.workcraft_terms_version === SIGNUP_TERMS_VERSION &&
-    Boolean(user.email_confirmed_at && user.email);
+  return onboardingEligible(user);
 }
 
 export async function queueWelcomeNotification(admin: SupabaseClient, user: User) {

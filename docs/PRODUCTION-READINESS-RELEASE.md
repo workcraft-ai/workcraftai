@@ -60,3 +60,16 @@ passed. The follow-up adds atomic share-token checks, twelve foreign-key indexes
 malformed-link handling and translated notification read feedback. Both forward
 migrations were tested in Staging before Production, preserving repository versions.
 See `READINESS-FIXES-2026-10-10.md` for the test boundaries and final-run commands.
+
+## October 12 audit-fix release
+
+- Synchronous Auth delivery uses an atomic service-only admission claim, provider idempotency and a 4.3-second total budget. No Auth token body is persisted by this sender; background claims exclude Auth. Signed-request retries reuse admission. Provider uncertainty retains quota conservatively.
+- Retention claims use only app-owned tables; the server resolves notices with Auth Admin getUserById.
+- Setup eligibility uses the initial onboarding cohort independent of later Terms revisions.
+- Reports aggregate within one owner-scoped SQL snapshot. Accepted job tax is stored separately and excluded from gross profit; manual/legacy jobs whose tax cannot be verified are explicitly excluded. Complete paginated lists replace uncapped REST reads.
+- Stripe requests have explicit per-call and shared overall deadlines; webhook failure bookkeeping has a separate short budget.
+- Production and Preview now have separate sensitive PROPOSAL_SHARE_ENCRYPTION_KEY values. Versioned v2 ciphertext survives service-role rotation. Copy/email lazily upgrades old ciphertext; the authenticated notification cron upgrades bounded batches with compare-and-swap. Do not rotate the service key until no legacy ciphertext remains. Never rotate the dedicated key without a keyring/re-encryption migration.
+- Footer wraps at mobile width, input text is 16px on mobile, standalone secondary dashboard actions are 48px, and quota/line-item descriptions are explicitly localized. Scheduled follow-ups disappear after approval while sent history remains.
+- Forward migration: `20261013000010_launch_readiness_fixes` (UTC date October 13; release work is October 12 in North Carolina). Staging migration and rollback-only regression checks passed before Production rollout.
+
+Validation and deployment evidence will be appended after release. The original October 12 audit is a historical finding record; these are its remediation notes.

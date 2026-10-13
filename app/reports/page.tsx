@@ -4,19 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
-import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
-type Estimate = { id: string; reference_number: string; status: string; created_at: string; markup_percentage: number; tax_rate: number; package_options: Array<{ name: string; total: number }> | null; selected_package: string | null };
-type LineItem = { estimate_id: string; quantity: number; unit_price: number };
-type Job = { status: string; quoted_total: number; actual_cost: number; scheduled_at: string | null };
+type Estimate = { id: string; reference_number: string; status: string; created_at: string; total_cents: number };
+type FinancialSummary = { completed_count: number; completed_total_cents: number; revenue_cents: number; cost_cents: number; unknown_tax_count: number };
+const emptySummary: FinancialSummary = { completed_count: 0, completed_total_cents: 0, revenue_cents: 0, cost_cents: 0, unknown_tax_count: 0 };
 
 export default function ReportsPage() {
   const { language } = useLanguage();
   const locale = language === "es" ? "es-US" : "en-US";
   const [estimates, setEstimates] = useState<Estimate[]>([]);
-  const [lines, setLines] = useState<LineItem[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [summary, setSummary] = useState<FinancialSummary>(emptySummary);
   const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,40 +24,34 @@ export default function ReportsPage() {
     const entitlement = user ? await getClientProEntitlement() : null;
     const pro = entitlement?.has_pro === true;
     setIsPro(pro);
-    const [estimateResult, lineResult, jobResult] = await Promise.all([
-      supabase.from("estimates").select("id, reference_number, status, created_at, markup_percentage, tax_rate, package_options, selected_package").order("created_at", { ascending: false }),
-      supabase.from("line_items").select("estimate_id, quantity, unit_price"),
-      pro ? supabase.from("jobs").select("status, quoted_total, actual_cost, scheduled_at") : Promise.resolve({ data: [], error: null }),
-    ]);
-    if (estimateResult.error || lineResult.error) setError("Could not load estimate data. Check your Supabase connection and permissions.");
-    else {
-      setEstimates((estimateResult.data ?? []) as Estimate[]);
-      setLines((lineResult.data ?? []) as LineItem[]);
+    const { data, error: reportError } = await supabase.rpc("workcraft_report_snapshot");
+    if (reportError || !data || !Array.isArray(data.estimates)) {
+      setError(language === "es" ? "No se pudieron cargar los informes completos. Actualiza la página o contacta a soporte." : "Could not load complete report data. Refresh the page or contact support.");
+      setEstimates([]); setSummary(emptySummary);
+    } else {
+      setEstimates(data.estimates as Estimate[]);
+      setSummary(data as FinancialSummary);
       setError("");
     }
-    if (jobResult.error) setError("Could not load job reports. Refresh the page or contact support if the problem continues.");
-    else setJobs((jobResult.data ?? []) as Job[]);
     setLoading(false);
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     const task = window.setTimeout(() => { void loadReport(); }, 0);
     return () => window.clearTimeout(task);
   }, [loadReport]);
 
-  const linesByEstimate = new Map<string, LineItem[]>();
-  for (const line of lines) linesByEstimate.set(line.estimate_id, [...(linesByEstimate.get(line.estimate_id) ?? []), line]);
-  const estimateTotal = (estimate: Estimate) => calculateEstimateMoney(estimate, linesByEstimate.get(estimate.id) ?? [], estimate.selected_package).totalCents / 100;
+  const estimateTotal = (estimate: Estimate) => Number(estimate.total_cents) / 100;
   const accepted = estimates.filter((estimate) => ["accepted", "paid"].includes(estimate.status.toLowerCase()));
   const sentOrDecided = estimates.filter((estimate) => !["draft", "archived"].includes(estimate.status.toLowerCase()));
   const acceptanceRate = sentOrDecided.length ? Math.round(accepted.length / sentOrDecided.length * 100) : 0;
   const pipeline = estimates.reduce((sum, estimate) => sum + estimateTotal(estimate), 0);
   const wonValue = accepted.reduce((sum, estimate) => sum + estimateTotal(estimate), 0);
-  const completedJobs = jobs.filter((job) => job.status === "completed");
-  const completedValue = completedJobs.reduce((sum, job) => sum + Number(job.quoted_total || 0), 0);
-  const completedCost = completedJobs.reduce((sum, job) => sum + Number(job.actual_cost || 0), 0);
-  const grossProfit = completedValue - completedCost;
-  const grossMargin = completedValue > 0 ? Math.round(grossProfit / completedValue * 100) : 0;
+  const completedValue = Number(summary.completed_total_cents) / 100;
+  const completedCost = Number(summary.cost_cents) / 100;
+  const grossProfit = (Number(summary.revenue_cents) - Number(summary.cost_cents)) / 100;
+  const grossMargin = Number(summary.revenue_cents) > 0
+    ? Math.round((Number(summary.revenue_cents) - Number(summary.cost_cents)) / Number(summary.revenue_cents) * 100) : 0;
   const monthBuckets = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() - (5 - index));
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -84,8 +76,8 @@ export default function ReportsPage() {
             <Metric label="Estimated pipeline" value={money(pipeline, locale)} note={`${estimates.length} estimates`} />
             <Metric label="Accepted estimate value" value={money(wonValue, locale)} note={`${accepted.length} accepted or paid`} />
             <Metric label="Acceptance rate" value={`${acceptanceRate}%`} note={`${sentOrDecided.length} active decisions`} />
-            {isPro && <Metric label="Completed job value" value={money(completedValue, locale)} note={`${completedJobs.length} completed jobs`} />}
-            {isPro && <Metric label="Gross profit" value={money(grossProfit, locale)} note={completedCost ? `${grossMargin}% margin · costs entered` : "Enter actual costs on the job board"} />}
+            {isPro && <Metric label="Completed job value" value={money(completedValue, locale)} note={`${summary.completed_count} completed jobs`} />}
+            {isPro && <Metric label="Gross profit" value={money(grossProfit, locale)} note={summary.unknown_tax_count ? (language === "es" ? `${summary.unknown_tax_count} trabajos excluidos: impuestos no verificados` : `${summary.unknown_tax_count} jobs excluded: tax not verified`) : completedCost ? (language === "es" ? `${grossMargin}% de margen · costos registrados` : `${grossMargin}% margin · costs entered`) : "Enter actual costs on the job board"} />}
           </section>
 
           <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -105,7 +97,7 @@ export default function ReportsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recent estimates</h2><p className="mt-1 text-xs text-slate-500">Your largest opportunities at a glance</p></div><Link href="/dashboard" className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline">All estimates</Link></div>
             {estimates.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Create your first estimate to see business reports here.</p> : <div className="mt-4 divide-y divide-slate-100">{[...estimates].sort((a, b) => estimateTotal(b) - estimateTotal(a)).slice(0, 5).map((estimate) => <div key={estimate.id} className="flex items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">Estimate #{estimate.reference_number}</p><p className="text-xs capitalize text-slate-500">{estimate.status} · {new Date(estimate.created_at).toLocaleDateString(locale)}</p></div><div className="flex items-center gap-4"><span className="text-sm font-bold">{money(estimateTotal(estimate), locale)}</span><Link href={`/estimate/${estimate.id}`} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline">View</Link></div></div>)}</div>}
           </section>
-          <p className="text-xs text-slate-500">Estimate reports use saved estimates. Pro job metrics use saved jobs; completed job value uses the estimate total recorded when the job was created.</p>
+          <p className="text-xs text-slate-500">{language === "es" ? "Los informes usan cotizaciones y trabajos guardados. El valor del trabajo incluye impuestos; la ganancia bruta los excluye según los datos guardados al crear el trabajo. Los trabajos con impuestos sin verificar quedan fuera de la ganancia." : "Estimate reports use saved estimates and jobs. Completed job value includes tax; gross profit excludes tax using the saved job snapshot. Jobs with unverified tax are excluded from profit."}</p>
         </>}
       </div>
     </main>

@@ -23,10 +23,36 @@ const fixture = process.env.WORKCRAFT_E2E_CROSS_ACCOUNT_ESTIMATE_ID;
 const owner = process.env.WORKCRAFT_E2E_ESTIMATE_OWNER || "pro";
 if (!["free", "pro"].includes(owner)) throw new Error("Estimate owner must be free or pro.");
 if (fixture && !/^[0-9a-f-]{36}$/i.test(fixture)) throw new Error("Invalid estimate fixture UUID.");
-const guideSlugs = ["write-a-clear-contractor-estimate", "build-a-practical-price-book",
-  "price-a-small-trade-job", "good-better-best-estimate-options",
-  "from-approved-estimate-to-invoice", "follow-up-on-an-estimate",
-  "job-photos-and-voice-notes", "clear-estimates-in-english-and-spanish"];
+// Discover the published corpus rather than silently omitting newly added
+// guides. Sitemap entries are data, never executable instructions.
+async function sitemapPaths(origin) {
+  const response = await fetch(new URL("/sitemap.xml", origin), {
+    signal: AbortSignal.timeout(15000), redirect: "error",
+  });
+  if (!response.ok) throw new Error(`Sitemap returned HTTP ${response.status}`);
+  const xml = await response.text();
+  const paths = new Set();
+  for (const match of xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/g)) {
+    const url = new URL(match[1].trim().replaceAll("&amp;", "&"));
+    if (url.origin !== new URL(origin).origin || url.search || url.hash) continue;
+    if (!/^\/[a-z0-9\/-]*$/i.test(url.pathname)) throw new Error("Unexpected sitemap path");
+    paths.add(url.pathname);
+  }
+  if (!paths.size) throw new Error("Sitemap contains no same-origin pages");
+  return [...paths];
+}
+const [marketingPaths, appPaths] = await Promise.all([sitemapPaths(marketing), sitemapPaths(app)]);
+const marketingRoutes = {
+  en: marketingPaths.filter((route) => !route.startsWith("/es/")),
+  es: marketingPaths.filter((route) => route.startsWith("/es/")),
+};
+if (!marketingRoutes.en.length || !marketingRoutes.es.length) throw new Error("Both marketing language routes are required");
+const publicAppRoutes = [...new Set(["/", "/login", "/signup", "/reset-password", "/forgot-password", ...appPaths])];
+// Do not persist customer names, email addresses, share tokens, or HTML in
+// diagnostics. CSS selectors still identify the component needing attention.
+function safeTarget(target) {
+  return String(target).replace(/\[(?:href|value|title|aria-label)[^\]]*\]/gi, "").slice(0, 240);
+}
 const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : {}) });
 async function auditPage(context, url, width, locale, account = "public") {
@@ -37,7 +63,14 @@ async function auditPage(context, url, width, locale, account = "public") {
     await page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {});
     if (response?.status() !== 200) throw new Error(`HTTP ${response?.status()}`);
     const expectedPath = new URL(url).pathname.replace(/\/+$/, "");
-    if (new URL(page.url()).pathname.replace(/\/+$/, "") !== expectedPath) {
+    const landed = new URL(page.url());
+    // The app root intentionally redirects to login; do not mistake that
+    // documented entry route for an unaudited or failed page.
+    const appEntryRedirect = new URL(url).origin === new URL(app).origin
+      && expectedPath === "" && landed.origin === new URL(app).origin
+      && landed.pathname === "/login";
+    if (landed.origin !== new URL(url).origin
+      || (landed.pathname.replace(/\/+$/, "") !== expectedPath && !appEntryRedirect)) {
       throw new Error("Unexpected redirect; requested page was not audited");
     }
     const actualLanguage = await page.locator("html").getAttribute("lang");
@@ -52,18 +85,26 @@ async function auditPage(context, url, width, locale, account = "public") {
     }));
     const layout = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      overflowTargets: [...document.querySelectorAll("body *")]
+        .filter((element) => {
+          const r = element.getBoundingClientRect(); const s = getComputedStyle(element);
+          return r.width > 0 && r.right > innerWidth + 1 && s.visibility !== "hidden";
+        }).slice(0, 12).map((element) => ({ tag: element.tagName,
+          classes: String(element.className).slice(0, 160),
+          right: Math.round(element.getBoundingClientRect().right) })),
       smallTargets: [...document.querySelectorAll("a,button,input,select,textarea")]
         .filter((element) => {
           const r = element.getBoundingClientRect(); const s = getComputedStyle(element);
           return r.width > 0 && r.height > 0 && s.visibility !== "hidden"
             && r.top < innerHeight && r.bottom > 0 && (r.height < 48 || r.width < 48);
-        }).map((element) => ({ tag: element.tagName, width: Math.round(element.getBoundingClientRect().width),
+        }).map((element) => ({ tag: element.tagName, classes: String(element.className).slice(0, 160), width: Math.round(element.getBoundingClientRect().width),
           height: Math.round(element.getBoundingClientRect().height) })),
     }));
     const entry = { account, path: new URL(url).pathname, host: new URL(url).host, width, locale,
       landedPath: new URL(page.url()).pathname, actualLanguage: await page.locator("html").getAttribute("lang"), ...layout,
       violations: a11y.violations.map(({ id, impact, nodes }) => ({ id, impact, count: nodes.length,
-        checks: [...new Set(nodes.flatMap((node) => [...node.any, ...node.all, ...node.none].map((check) => check.id)))] })),
+        checks: [...new Set(nodes.flatMap((node) => [...node.any, ...node.all, ...node.none].map((check) => check.id)))],
+        targets: [...new Set(nodes.flatMap((node) => node.target.map(safeTarget)))].slice(0, 12) })),
       incomplete: a11y.incomplete.map(({ id, nodes }) => ({ id, count: nodes.length })),
     };
     results.push(entry);
@@ -77,10 +118,10 @@ try {
   for (const locale of ["en", "es"]) {
     const context = await browser.newContext({ locale });
     for (const width of [375, 768, 1280]) {
-      for (const route of ["/", "/resources/", ...guideSlugs.map((slug) => `/resources/${slug}/`)]) {
+      for (const route of marketingRoutes[locale]) {
         await auditPage(context, `${marketing}${route}`, width, locale);
       }
-      for (const route of ["/login", "/signup", "/reset-password", "/forgot-password", "/support", "/privacy", "/terms"]) {
+      for (const route of publicAppRoutes) {
         await auditPage(context, `${app}${route}`, width, locale);
       }
     }

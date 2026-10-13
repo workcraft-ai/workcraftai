@@ -41,8 +41,8 @@ export async function POST(request: Request) {
     if (updateError) return NextResponse.json({ error: "Could not save your progress." }, { status: 503 });
   }
 
-  // Only accounts that explicitly accepted the current signup terms and then
-  // verified their email receive a welcome. Existing accounts are not backfilled.
+  // Preserve the initial onboarding cohort across future Terms revisions.
+  // Pre-onboarding accounts are not backfilled with welcome mail.
   const newlyAcknowledged = isNewConfirmedAccount(user);
   if (action === "bootstrap" && newlyAcknowledged) {
     try {

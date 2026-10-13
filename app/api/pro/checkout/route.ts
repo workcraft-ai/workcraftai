@@ -9,6 +9,7 @@ function response(body: Record<string, unknown>, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const deadlineAt = Date.now() + 25_000;
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   if (!stripeKey || !proPriceId) return response({ error: "Set STRIPE_SECRET_KEY and STRIPE_PRO_PRICE_ID to enable Pro billing." }, 503);
 
   let admin: ReturnType<typeof getServiceSupabase>;
-  try { admin = getServiceSupabase(); }
+  try { admin = getServiceSupabase(5_000, deadlineAt); }
   catch { return response({ error: "Pro billing is temporarily unavailable." }, 503); }
   const { data: currentPlan, error: planError } = await admin.from("subscriptions")
     .select("status, stripe_customer_id").eq("user_id", user.id).maybeSingle();
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   try {
-  const stripe = getStripeClient();
+  const stripe = getStripeClient(deadlineAt);
   const origin = getAppOrigin(request);
   const { data: reservations, error: reserveError } = await admin.rpc("workcraft_reserve_pro_checkout", { p_user_id: user.id });
   if (reserveError) {

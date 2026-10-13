@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
+import { readAllPages } from "@/lib/read-all-pages";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 
@@ -38,10 +39,10 @@ export default function CustomersPage() {
       return;
     }
 
-    const { data, error: loadError } = await supabase
+    const { data, error: loadError } = await readAllPages((from, to) => supabase
       .from("customer_contacts")
       .select("id, name, email, phone, job_address")
-      .order("name", { ascending: true });
+      .order("name", { ascending: true }).order("id").range(from, to));
     if (loadError) {
       setError("Saved customers are not available yet. The customer contacts database update must be applied first.");
       setContacts([]);

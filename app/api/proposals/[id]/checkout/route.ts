@@ -10,6 +10,7 @@ function errorResponse(message: string, status: number) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const deadlineAt = Date.now() + 25_000;
   const { id } = await params;
   const parsedBody = await readLimitedJsonObject(request, 1_000);
   if (!parsedBody.ok) {
@@ -24,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!kind) return errorResponse("Choose a valid payment option.", 400);
 
   try {
-    const admin = getServiceSupabase();
+    const admin = getServiceSupabase(5_000, deadlineAt);
     if (!(await customerShareAllowed(admin, id, request))) return errorResponse("Proposal not found or link expired.", 404);
     const data = await getEstimatePaymentData(admin, id);
     const estimate = data.estimate;

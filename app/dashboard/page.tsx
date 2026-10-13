@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { readAllPages } from "@/lib/read-all-pages";
 import EstimateTableScroll from "@/app/components/EstimateTableScroll";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
@@ -83,7 +84,7 @@ export default function DashboardPage() {
   async function fetchEstimates() {
     try {
       const [estimateResult, customerResult] = await Promise.all([
-        supabase.from("estimates").select("*").order("created_at", { ascending: false }),
+        readAllPages((from, to) => supabase.from("estimates").select("*").order("created_at", { ascending: false }).order("id").range(from, to)),
         supabase.from("customer_contacts").select("id, name, email, updated_at", { count: "exact" }).order("updated_at", { ascending: false }).limit(3),
       ]);
 
@@ -123,7 +124,7 @@ export default function DashboardPage() {
         setFirstName("");
         setEmailAllowance(null);
       }
-      const { data: events } = await supabase.from("estimate_email_events").select("estimate_id, provider_email_id, event, created_at").order("created_at", { ascending: false });
+      const { data: events } = await readAllPages((from, to) => supabase.from("estimate_email_events").select("estimate_id, provider_email_id, event, created_at").order("created_at", { ascending: false }).order("id").range(from, to));
       const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").order("created_at", { ascending: false }).limit(20);
       setQuestions((questionRows ?? []) as ProposalQuestion[]);
       setEmailEvents(latestEstimateEmailEvents(events ?? []));
@@ -334,7 +335,7 @@ export default function DashboardPage() {
             <div><h2 id="recent-customers-title" className="text-base font-bold text-slate-900">{translate(language, "Recent customers")}</h2><p className="mt-1 text-sm text-slate-500">{translate(language, "Saved customer contacts, ready to reuse.")}</p></div>
             {customerCount > 3 && <Link href="/customers" className="inline-flex min-h-12 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "View all")} ({customerCount})</Link>}
           </div>
-          {customers.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{customers.map((customer) => <div key={customer.id} className="flex min-h-14 items-center gap-3 py-2"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700" aria-hidden="true">{customer.name.trim().charAt(0).toUpperCase() || "?"}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{customer.name}</p>{customer.email && <p className="truncate text-xs text-slate-500">{customer.email}</p>}</div></div>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No saved customers yet.")}</p><Link href="/customers" className="mt-2 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Add your first customer")}</Link></div>}
+          {customers.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{customers.map((customer) => <div key={customer.id} className="flex min-h-14 items-center gap-3 py-2"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-700" aria-hidden="true">{customer.name.trim().charAt(0).toUpperCase() || "?"}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{customer.name}</p>{customer.email && <p className="truncate text-xs text-slate-500">{customer.email}</p>}</div></div>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No saved customers yet.")}</p><Link href="/customers" className="mt-2 inline-flex min-h-12 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Add your first customer")}</Link></div>}
         </section>
 
         {isPro && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="upcoming-jobs-title">
@@ -342,7 +343,7 @@ export default function DashboardPage() {
             <div><h2 id="upcoming-jobs-title" className="text-base font-bold text-slate-900">{translate(language, "Active jobs")}</h2><p className="mt-1 text-sm text-slate-500">{translate(language, "Scheduled and in-progress work at a glance.")}</p></div>
             {jobCount > 3 && <Link href="/schedule" className="inline-flex min-h-12 shrink-0 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "View all")} ({jobCount})</Link>}
           </div>
-          {jobs.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{jobs.map((job) => <Link key={job.id} href="/schedule" className="flex min-h-14 items-center justify-between gap-3 py-2"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{job.title}</span><span className="block truncate text-xs text-slate-500">{job.client_name} · {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : translate(language, "No date set")}</span></span><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{translate(language, job.status === "in_progress" ? "In progress" : "Scheduled")}</span></Link>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No upcoming jobs.")}</p><Link href="/schedule" className="mt-2 inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Schedule a job")}</Link></div>}
+          {jobs.length > 0 ? <div className="mt-3 divide-y divide-slate-100">{jobs.map((job) => <Link key={job.id} href="/schedule" className="flex min-h-14 items-center justify-between gap-3 py-2"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900">{job.title}</span><span className="block truncate text-xs text-slate-500">{job.client_name} · {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : translate(language, "No date set")}</span></span><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{translate(language, job.status === "in_progress" ? "In progress" : "Scheduled")}</span></Link>)}</div> : <div className="mt-3 rounded-lg bg-slate-50 px-4 py-5 text-center"><p className="text-sm text-slate-600">{translate(language, "No upcoming jobs.")}</p><Link href="/schedule" className="mt-2 inline-flex min-h-12 items-center rounded-lg px-3 text-sm font-semibold text-orange-800 underline underline-offset-2">{translate(language, "Schedule a job")}</Link></div>}
         </section>}
 
         {/* Dashboard Content Container */}
@@ -396,22 +397,22 @@ export default function DashboardPage() {
                   <p className="mt-1 text-xs text-slate-500">{translate(language, "Created")}: {new Date(est.created_at).toLocaleDateString(locale)}</p>
                   {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <p className="mt-2 text-xs font-semibold text-slate-700">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</p>}
                   {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <p className="mt-2 text-xs font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</p>}
-                  {est.followup_at && <p className="mt-1 text-xs text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</p>}
+                  {(est.followup_sent_at || (est.status.toLowerCase() === "pending" && est.followup_at)) && <p className="mt-1 text-xs text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date((est.followup_sent_at || est.followup_at)!).toLocaleDateString(locale, { month: "short", day: "numeric" })}</p>}
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Link href={`/estimate/${est.id}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-orange-800 px-3 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "View Estimate")}</Link>
                     <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                   </div>
-                  {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
+                  {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                   <label className="mt-3 block text-xs font-semibold text-slate-600">{translate(language, "Change estimate status")}
                     <select aria-label={`${translate(language, "Change estimate status")} — ${est.client_name}`} value={estimateStatuses.includes(est.status.toLowerCase() as EstimateStatus) ? est.status.toLowerCase() : "pending"} disabled={statusSavingId !== null} onChange={(event) => void updateEstimateStatus(est.id, event.target.value as EstimateStatus)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 disabled:opacity-60">
                       {estimateStatuses.map((status) => <option key={status} value={status}>{translate(language, status[0].toUpperCase() + status.slice(1))}</option>)}
                     </select>
                   </label>
                   <details className="mt-2 border-t border-slate-100 pt-2">
-                    <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-slate-700">{translate(language, "More actions")}</summary>
+                    <summary className="inline-flex min-h-12 cursor-pointer items-center text-sm font-semibold text-slate-700">{translate(language, "More actions")}</summary>
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {est.is_archived ? <button type="button" onClick={() => toggleArchiveStatus(est.id, false)} className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Restore")}</button> : <button type="button" onClick={() => toggleArchiveStatus(est.id, true)} className="inline-flex min-h-11 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Archive")}</button>}
-                      <button type="button" onClick={() => void deleteEstimate(est.id)} className="inline-flex min-h-11 items-center text-sm font-semibold text-red-700 underline">{translate(language, "Delete")}</button>
+                      {est.is_archived ? <button type="button" onClick={() => toggleArchiveStatus(est.id, false)} className="inline-flex min-h-12 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Restore")}</button> : <button type="button" onClick={() => toggleArchiveStatus(est.id, true)} className="inline-flex min-h-12 items-center text-sm font-semibold text-slate-700 underline">{translate(language, "Archive")}</button>}
+                      <button type="button" onClick={() => void deleteEstimate(est.id)} className="inline-flex min-h-12 items-center text-sm font-semibold text-red-700 underline">{translate(language, "Delete")}</button>
                     </div>
                   </details>
                 </article>
@@ -476,7 +477,7 @@ export default function DashboardPage() {
                         <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                         {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                         {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
-                        {est.followup_at && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date(est.followup_sent_at || est.followup_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
+                        {(est.followup_sent_at || (est.status.toLowerCase() === "pending" && est.followup_at)) && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date((est.followup_sent_at || est.followup_at)!).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
                         {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}
 
                         {est.is_archived ? (

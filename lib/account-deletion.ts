@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+import { getStripeClient } from "@/lib/stripe-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { finishAudit, startAudit } from "@/lib/admin-support";
 
@@ -74,7 +74,7 @@ export async function deleteTradeFlowAccount(input: {
     if (subscription?.stripe_subscription_id && !["canceled", "incomplete_expired"].includes(subscription.status)) {
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (!stripeKey) throw new AccountDeletionError("Billing cancellation is not configured. The account was not deleted.");
-      const stripe = new Stripe(stripeKey);
+      const stripe = getStripeClient();
       const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
       if (!['canceled', 'incomplete_expired'].includes(stripeSubscription.status)) {
         await stripe.subscriptions.cancel(subscription.stripe_subscription_id);

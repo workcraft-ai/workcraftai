@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { processNotifications } from "@/lib/notification-outbox";
+import { upgradeLegacyShareSecrets } from "@/lib/proposal-sharing";
 
 export const maxDuration = 60;
 export async function GET(request: Request) {
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
   });
   try {
     const result = await processNotifications(admin, undefined, 4, 6000);
-    return NextResponse.json({sent: result.sent, pending: result.pending}, {headers: {"Cache-Control": "no-store"}});
+    const shareSecretsUpgraded = await upgradeLegacyShareSecrets(admin);
+    return NextResponse.json({sent: result.sent, pending: result.pending,shareSecretsUpgraded}, {headers: {"Cache-Control": "no-store"}});
   } catch {
     console.error("Notification retry could not complete.");
     return NextResponse.json({error: "Notification retry is temporarily unavailable."}, {status: 503});
