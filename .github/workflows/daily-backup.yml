@@ -194,6 +194,18 @@ jobs:
             echo "- Repository: restricted Google Drive folder; Restic client-side encryption"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Record encrypted backup freshness heartbeats
+        continue-on-error: true
+        env:
+          PROD_SUPABASE_URL: ${{ secrets.PROD_SUPABASE_URL }}
+          PROD_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+          INCLUDE_STORAGE: ${{ steps.media.outputs.include_storage }}
+        run: |
+          node scripts/record-backup-heartbeat.mjs database_backup
+          if [[ "$INCLUDE_STORAGE" == "true" ]]; then
+            node scripts/record-backup-heartbeat.mjs private_media_backup
+          fi
+
       - name: Decrypt snapshot and run isolated restore drill
         if: inputs.restore_drill == true
         env:

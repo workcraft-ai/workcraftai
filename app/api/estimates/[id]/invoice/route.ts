@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const dynamic = "force-dynamic";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -9,10 +10,10 @@ function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(
+export const POST = withApiFailureMetrics("/api/estimates/[id]/invoice", async (
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+) => {
   const { id } = await params;
   if (!UUID_PATTERN.test(id)) return jsonError("Estimate not found.", 404);
 
@@ -44,9 +45,23 @@ export async function POST(
     return jsonError("We could not find this estimate in your account. Refresh and make sure you are signed in as its owner.", 404);
   }
 
+  // Existing invoice/job links stay accessible for historical conversions;
+  // the acceptance guard applies only when creating a new conversion.
   if (estimate.converted_job_id) {
     return NextResponse.json({ job_id: estimate.converted_job_id }, { headers: { "Cache-Control": "private, no-store" } });
   }
+
+  const { data: acceptedTotalCents, error: acceptanceError } = await supabase.rpc("workcraft_get_accepted_total_cents", {
+    p_estimate_id: id,
+  });
+  if (acceptanceError) {
+    console.error("Invoice acceptance lookup failed:", acceptanceError.message);
+    return jsonError("We could not verify customer approval for this estimate. Refresh and try again.", 503);
+  }
+  if (acceptedTotalCents === null) {
+    return jsonError("A customer must approve this estimate before you create its invoice.", 409);
+  }
+
   if (!["accepted", "paid"].includes(String(estimate.status).toLowerCase())) {
     return jsonError("This estimate is no longer accepted. Refresh the page to see its current status.", 409);
   }
@@ -69,6 +84,9 @@ export async function POST(
     if (conversionError.code === "P0001" || conversionError.message.includes("ESTIMATE_NOT_APPROVED")) {
       return jsonError("This estimate is no longer accepted. Refresh the page to see its current status.", 409);
     }
+    if (conversionError.message.includes("ESTIMATE_ACCEPTANCE_REQUIRED")) {
+      return jsonError("A customer must approve this estimate before you create its invoice.", 409);
+    }
     if (conversionError.code === "42501" || conversionError.message.toLowerCase().includes("row-level security")) {
       return jsonError("Pro access could not be confirmed for invoice creation. Refresh your plan status and try again.", 403);
     }
@@ -81,4 +99,4 @@ export async function POST(
   }
 
   return NextResponse.json({ job_id: jobId }, { headers: { "Cache-Control": "private, no-store" } });
-}
+});

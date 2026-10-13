@@ -2,6 +2,7 @@ import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -33,7 +34,7 @@ function validPackages(value: unknown) {
       && typeof item.total === "number" && Number.isFinite(item.total) && item.total >= 0 && item.total <= 100000000));
 }
 
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/estimates", async (request: Request) => {
   const supabase = await createUserSupabaseClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: "Sign in before creating an estimate." }, { status: 401 });
@@ -108,4 +109,4 @@ export async function POST(request: Request) {
     status: 201,
     headers: { "Cache-Control": "private, no-store" },
   });
-}
+});

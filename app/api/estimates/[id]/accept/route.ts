@@ -2,10 +2,11 @@ import { customerShareAllowed, requestShareTokenHash } from "@/lib/proposal-shar
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 const MAX_APPROVAL_BODY_BYTES = 2_000;
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withApiFailureMetrics("/api/estimates/[id]/accept", async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Proposal approval is not configured." }, { status: 503 });
   const { id } = await params;
@@ -43,4 +44,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "This proposal could not be approved. Please try again." }, { status: 500 });
   }
   return NextResponse.json({ success: true, acceptedTotalCents });
-}
+});

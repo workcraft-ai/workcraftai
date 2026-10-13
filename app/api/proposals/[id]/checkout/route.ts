@@ -4,12 +4,13 @@ import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { accountCanCharge, createConnectedCheckout, getEstimatePaymentData, retrieveOpenSession } from "@/lib/customer-payments";
 import { getAppOrigin, getServiceSupabase, stripeLivemode } from "@/lib/stripe-server";
 import { getProAccess } from "@/lib/pro-access";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withApiFailureMetrics("/api/proposals/[id]/checkout", async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const deadlineAt = Date.now() + 25_000;
   const { id } = await params;
   const parsedBody = await readLimitedJsonObject(request, 1_000);
@@ -58,6 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (prepareError.code === "P0002") return errorResponse("Proposal not found or link expired.", 404);
       const message = prepareError.message;
       if (message.includes("WORKCRAFT_PRO_REQUIRED")) return errorResponse("Online customer payments require an active WorkCraft AI Pro plan.", 403);
+      if (message.includes("ESTIMATE_ACCEPTANCE_REQUIRED")) return errorResponse("Approve this estimate before making a payment.", 409);
       if (message.includes("PAYMENT_CHECKOUT_ALREADY_OPEN")) return errorResponse("Another payment checkout is already open for this estimate. Finish or close it before starting a different payment.", 409);
       if (["DEPOSIT_NOT_AVAILABLE", "NO_REMAINING_BALANCE", "PAYMENT_AMOUNT_LIMIT_EXCEEDED"].some((code) => message.includes(code))) {
         if (message.includes("DEPOSIT_NOT_AVAILABLE")) return errorResponse("A deposit is not available for this estimate.", 409);
@@ -114,4 +116,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     console.error("Customer payment checkout failed:", error instanceof Error ? error.message : "unknown error");
     return errorResponse("Payment checkout is temporarily unavailable. Please try again later.", 502);
   }
-}
+});

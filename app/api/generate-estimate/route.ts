@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,7 +99,7 @@ function geminiProviderErrorSignal(error: GeminiProviderError | undefined) {
   return { providerCode: code, providerStatus: status, providerErrorCategory: category, providerFields: safeProviderFields };
 }
 
-export async function GET() {
+export const GET = withApiFailureMetrics("/api/generate-estimate", async () => {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -139,7 +140,7 @@ export async function GET() {
     monthly_used: monthlyUsed,
     monthly_remaining: Math.max(settings.ai_monthly_generation_limit - monthlyUsed, 0),
   }, { headers: { "Cache-Control": "no-store" } });
-}
+});
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
   const contentLength = Number(request.headers.get("content-length") ?? 0);
@@ -169,7 +170,7 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown> |
   }
 }
 
-export async function POST(request: Request) {
+export const POST = withApiFailureMetrics("/api/generate-estimate", async (request: Request) => {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -356,4 +357,4 @@ export async function POST(request: Request) {
     remaining_daily_generations: reservation.remaining,
     remaining_monthly_generations: reservation.remaining_monthly,
   });
-}
+});

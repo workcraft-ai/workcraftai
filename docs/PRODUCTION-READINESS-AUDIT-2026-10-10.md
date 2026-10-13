@@ -11,7 +11,7 @@
 | 1. Supabase/database security | Action required | Make monthly media accounting resistant to malicious client finalization; fix lock ordering; repeat authenticated API/Storage isolation. |
 | 2. Auth/authorization/tiering | Action required | Preserve refreshed cookies on redirects; finish authenticated browser verification. Server entitlement and ownership checks passed source review. |
 | 3. Stripe | Action required | Serialize payment state changes and prevent older refund events from lowering recorded refunds; run the Preview event matrix after fixing it. |
-| 4. Resend/integrations | Action required | Repair scheduled follow-ups, Spanish follow-up content, invoice delivery correlation, and notification retries; configure DMARC and bound aggregate email usage. Zoho is out of scope. |
+| 4. Resend/integrations | Action required | Repair scheduled follow-ups, Spanish follow-up content, invoice delivery correlation, and notification retries; configure DMARC and bound aggregate email usage. No external CRM/mailbox API integration is in scope. |
 | 5. Business workflows | Action required | Correct package totals, distinguish pricing units, preserve partial-work quantities. |
 | 6. Vercel/code/operations | Action required | Fix voice-note CSP and invoice request-body cap; complete a recovery-project restore drill. |
 | 7. Marketing/app UI | Action required | Address accessibility findings and small controls; update stale dashboard illustration and remaining Spanish strings. |
@@ -239,7 +239,7 @@ where cp.stripe_payment_intent_id=p_payment_intent_id
 
 ### Passes
 
-Resend's `workcraftai.com` domain is verified; DKIM and sending SPF records show verified. Production delivery webhook is enabled with delivered/delayed/bounced/complained events and its environment secret is present. Estimate/invoice messages use no-reply From and contractor Reply-To. Customer-question notices use customer Reply-To. HTML escaping, bounded provider timeouts, idempotency, and quota reservation are present in principal flows. Zoho application integration is no longer in scope; mailbox administration is separate.
+Resend's `workcraftai.com` domain is verified; DKIM and sending SPF records show verified. Production delivery webhook is enabled with delivered/delayed/bounced/complained events and its environment secret is present. Estimate/invoice messages use no-reply From and contractor Reply-To. Customer-question notices use customer Reply-To. HTML escaping, bounded provider timeouts, idempotency, and quota reservation are present in principal flows. External mailbox administration is separate from application sending.
 
 ### EMAIL-1 [MEDIUM] Scheduled follow-ups never run through Vercel Cron
 

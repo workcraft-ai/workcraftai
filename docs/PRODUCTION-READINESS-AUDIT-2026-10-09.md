@@ -108,7 +108,7 @@ Use a disposable estimate owned by Account A with one private photo. Verify Acco
 - Estimate email requires authentication, estimate ownership, and Pro; the contractor’s address is set as Reply-To, and mail attempts are quota-limited/idempotency-aware: app/api/estimates/[id]/send/route.ts.
 - Resend delivery webhooks verify the raw signed payload and use bounded parsing/idempotent event recording: app/api/webhooks/resend/route.ts.
 - Public support submissions validate same-origin, cap body size, reject a honeypot, and use a durable per-IP rate limit plus global app-email limits: app/api/support/route.ts.
-- Zoho has explicitly been removed from scope. No Zoho OAuth token flow or API timeout work is required.
+- No third-party CRM or mailbox API integration is in scope; application mail is sent through Resend.
 
 ### Finding
 

@@ -66,7 +66,7 @@ Confirm the encrypted repository exists with rclone (the object names are Restic
 rclone lsf drive:WorkCraftAI-Backups/production
 ```
 
-GitHub Actions notifications report failed runs to repository watchers according to their GitHub notification settings. Make sure the account that needs backup alerts watches workflow failures. A successful job shows that a snapshot was written; it does not prove that the snapshot can be restored. Complete the restore drill below before treating backups as a production recovery guarantee.
+GitHub Actions notifications report failed runs to repository watchers according to their GitHub notification settings. Make sure the account that needs backup alerts watches workflow failures. After both October 13 migrations are applied and the app is released, a successful daily database/Auth snapshot also updates the `database_backup` heartbeat; a full-media snapshot updates `private_media_backup`. The five-minute operations audit warns when those initialized heartbeats are older than 26 hours or 8 days, respectively. A heartbeat confirms the workflow reached its post-snapshot step; it does not prove that a snapshot can be restored. The existing daily backup-age workflow remains an independent check. Complete the restore drill below before treating backups as a production recovery guarantee.
 
 ## Restore drill or recovery
 
