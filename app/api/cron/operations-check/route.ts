@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
+import { getCronCredential } from "@/lib/cron-authorization";
 
 export const runtime = "nodejs";
 export const maxDuration = 20;
@@ -43,9 +44,20 @@ async function getResendEmailUsage(apiKey: string | undefined) {
   }
 }
 
+async function probeAppHealth(requestUrl: string) {
+  const started = Date.now();
+  try {
+    const response = await fetch(new URL("/api/health", requestUrl), {
+      cache: "no-store", signal: AbortSignal.timeout(7_000),
+    });
+    return { status_code: response.status, duration_ms: Date.now() - started };
+  } catch {
+    return { status_code: 0, duration_ms: Date.now() - started };
+  }
+}
+
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!getCronCredential(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
@@ -81,16 +93,19 @@ export async function GET(request: Request) {
     admin.from("email_delivery_inbox").select("provider_event_id", { count: "exact", head: true }).eq("event", "delivery_delayed").lte("received_at", hourAgo).gte("received_at", dayAgo),
   ];
 
-  const [metrics, emailUsageResult, aiUsageResult, settingsResult, resendUsage] = await Promise.all([
+  const [metrics, emailUsageResult, aiUsageResult, settingsResult, resendUsage, pressureResult, exceptionResult, probe] = await Promise.all([
     Promise.all(metricQueries),
     admin.from("provider_email_daily_usage").select("source,emails_started").eq("usage_date", utcToday),
     admin.from("tradeflow_ai_global_daily_usage").select("attempts_started").eq("usage_date", utcToday).maybeSingle(),
     admin.from("tradeflow_app_settings").select("ai_global_daily_generation_limit").eq("singleton", true).single(),
     strictUsage ? getResendEmailUsage(process.env.RESEND_USAGE_API_KEY) : Promise.resolve(null),
+    admin.rpc("workcraft_db_pressure"),
+    admin.from("operational_exceptions").select("id", { count: "exact", head: true }).gte("occurred_at", new Date(now.getTime() - 15 * 60_000).toISOString()),
+    probeAppHealth(request.url),
   ]);
 
   if (metrics.some((metric: MetricResult) => metric.error)
-    || emailUsageResult.error || aiUsageResult.error || settingsResult.error) {
+    || emailUsageResult.error || aiUsageResult.error || settingsResult.error || pressureResult.error || exceptionResult.error) {
     console.error("Operations monitoring could not read aggregate health metrics.");
     return NextResponse.json({ error: "Operations metrics are temporarily unavailable." }, { status: 503 });
   }
@@ -98,6 +113,19 @@ export async function GET(request: Request) {
   const counts = metrics.map((metric: MetricResult) => metric.count ?? 0);
   const criticalAlerts: Array<{ code: string; count: number; action: string }> = [];
   const warnings: Array<{ code: string; source: string; used?: number; limit?: number; action: string }> = [];
+  const { error: probeWriteError } = await admin.from("operational_api_probes").insert(probe);
+  const { data: recentProbes, error: probeReadError } = await admin.from("operational_api_probes")
+    .select("status_code,duration_ms").order("checked_at", { ascending: false }).limit(3);
+  if (probeWriteError || probeReadError) {
+    return NextResponse.json({ error: "API latency monitoring is temporarily unavailable." }, { status: 503 });
+  }
+  if (recentProbes.length >= 3 && recentProbes.every((row) => row.status_code === 0 || row.status_code >= 500)) {
+    criticalAlerts.push({ code: "api_health_failure_sustained", count: 3,
+      action: "The last three synthetic app health requests failed; inspect Vercel function logs and Supabase availability." });
+  } else if (recentProbes.length >= 3 && recentProbes.every((row) => row.duration_ms >= 4_000)) {
+    warnings.push({ code: "api_health_latency_sustained", source: "application", used: probe.duration_ms, limit: 4_000,
+      action: "The last three synthetic app health requests took at least four seconds; inspect Vercel and Supabase latency." });
+  }
   const addCritical = (code: string, count: number, action: string) => {
     if (count > 0) criticalAlerts.push({ code, count, action });
   };
@@ -110,6 +138,26 @@ export async function GET(request: Request) {
   addCritical("auth_email_stuck", counts[5], "Check the Supabase Send Email Hook and Resend delivery; Auth messages older than ten minutes may contain expired links.");
   addCritical("email_delivery_issue", counts[6], "Review Resend usage, suppression, bounce, complaint, failed, and delivered-event records for the last 24 hours.");
   addCritical("email_delivery_delayed", counts[7], "Inspect Resend delivery details; messages have remained delayed for over one hour.");
+  const pressure = pressureResult.data as { connections?: number; max_connections?: number } | null;
+  const connections = pressure?.connections ?? 0;
+  const maxConnections = pressure?.max_connections ?? 0;
+  const dbUtilization = maxConnections > 0 ? Math.round(connections * 100 / maxConnections) : 0;
+  if (maxConnections <= 0) {
+    criticalAlerts.push({ code: "db_pressure_unavailable", count: 1, action: "Check the database pressure RPC and Supabase dashboard." });
+  } else if (dbUtilization >= 85) {
+    criticalAlerts.push({ code: "db_connections_critical", count: connections, action: "Inspect Supabase database connections and slow queries; utilization is at least 85%." });
+  } else if (dbUtilization >= 70) {
+    warnings.push({ code: "db_connections_warning", source: "supabase_database", used: connections, limit: maxConnections,
+      action: "Inspect Supabase connection sources and query latency; utilization is at least 70%." });
+  }
+  const recentExceptions = exceptionResult.count ?? 0;
+  if (recentExceptions >= 10) {
+    criticalAlerts.push({ code: "api_exceptions_spike", count: recentExceptions,
+      action: "Inspect Vercel runtime logs and operational_exceptions for routes with repeated server errors." });
+  } else if (recentExceptions >= 3) {
+    warnings.push({ code: "api_exceptions_warning", source: "application", used: recentExceptions,
+      action: "Inspect Vercel runtime logs and operational_exceptions; at least three uncaught errors occurred in fifteen minutes." });
+  }
 
   const emailUsage = new Map((emailUsageResult.data ?? []).map((row) => [row.source, row.emails_started]));
   for (const [pool, limit] of Object.entries(EMAIL_POOL_LIMITS)) {
@@ -147,7 +195,10 @@ export async function GET(request: Request) {
     });
   }
 
-  const failed = criticalAlerts.length > 0 || (strictUsage && warnings.length > 0);
+  const urgentWarnings = warnings.some((warning) => [
+    "db_connections_warning", "api_health_latency_sustained", "api_exceptions_warning",
+  ].includes(warning.code));
+  const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && warnings.length > 0);
   const response = {
     ok: !failed,
     checked_at: nowIso,
@@ -166,6 +217,12 @@ export async function GET(request: Request) {
       resend_email_daily_limit: resendUsage?.daily.limit ?? null,
       resend_email_monthly_used: resendUsage?.monthly.used ?? null,
       resend_email_monthly_limit: resendUsage?.monthly.limit ?? null,
+      database_connections: connections,
+      database_max_connections: maxConnections,
+      database_utilization_percent: dbUtilization,
+      uncaught_api_exceptions_15m: recentExceptions,
+      app_health_status_code: probe.status_code,
+      app_health_duration_ms: probe.duration_ms,
     },
     warnings,
     alerts: criticalAlerts,

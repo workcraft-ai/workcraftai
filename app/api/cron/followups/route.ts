@@ -36,6 +36,9 @@ export async function POST(request: Request) {
   // Bounded retention: no indefinite storage of notification contents/tokens.
   await admin.from("email_delivery_inbox").delete().lt("received_at",new Date(Date.now()-7*86400000).toISOString());
   await admin.from("notification_outbox").delete().in("status",["sent","failed"]).lt("created_at",new Date(Date.now()-90*86400000).toISOString());
+  await admin.from("operational_exceptions").delete().lt("occurred_at",new Date(Date.now()-30*86400000).toISOString());
+  await admin.from("operational_api_probes").delete().lt("checked_at",new Date(Date.now()-30*86400000).toISOString());
+  await admin.from("stripe_webhook_events").delete().eq("status","processed").lt("created_at",new Date(Date.now()-90*86400000).toISOString());
   return NextResponse.json({sent:pending.sent+scheduled.sent,pending:pending.pending+scheduled.pending,checked:(due??[]).length});
  }catch{console.error("Scheduled notifications could not complete.");return NextResponse.json({error:"Scheduled notifications are temporarily unavailable."},{status:503});}
 }

@@ -12,7 +12,7 @@ jobs:
   check-public-endpoints:
     name: Check public site and app health
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Check marketing website
         run: |
@@ -37,6 +37,19 @@ jobs:
           fi
           status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 55 --header "Authorization: Bearer $CRON_SECRET" https://app.workcraftai.com/api/cron/notifications)
           echo "Notification retry HTTP status: ${status}"
+          [[ "$status" == "200" ]]
+
+      - name: Retry queued Stripe webhooks
+        if: ${{ always() }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "::error::Set the repository CRON_SECRET to match Vercel Production. Stripe retries are not scheduled without it."
+            exit 1
+          fi
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 55 --header "Authorization: Bearer $CRON_SECRET" https://app.workcraftai.com/api/cron/stripe-webhooks)
+          echo "Stripe worker HTTP status: ${status}"
           [[ "$status" == "200" ]]
 
       - name: Check webhook, notification, and provider signals

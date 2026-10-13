@@ -10,6 +10,7 @@ export async function GET() {
 
   let supabaseAuth: "ok" | "error" = "error";
   let supabaseDatabase: "ok" | "error" = "error";
+  let scheduler: "ok" | "error" | "disabled" = process.env.SCHEDULER_SECRET ? "error" : "disabled";
 
   if (supabaseUrl && supabaseKey) {
     const baseUrl = supabaseUrl.replace(/\/$/, "");
@@ -35,11 +36,29 @@ export async function GET() {
     }
   }
 
-  const healthy = supabaseAuth === "ok" && supabaseDatabase === "ok";
+  if (process.env.SCHEDULER_SECRET && supabaseUrl && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    try {
+      const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/operational_heartbeats?name=eq.supabase_scheduler_notifications&select=last_success_at`, {
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+      });
+      if (response.ok) {
+        const rows: unknown = await response.json();
+        const lastSuccess = Array.isArray(rows) ? rows[0]?.last_success_at : undefined;
+        if (typeof lastSuccess === "string" && Date.now() - Date.parse(lastSuccess) < 20 * 60_000) scheduler = "ok";
+      }
+    } catch {
+      // An independent availability monitor will alert on this degraded check.
+    }
+  }
+
+  const healthy = supabaseAuth === "ok" && supabaseDatabase === "ok" && scheduler !== "error";
   return NextResponse.json(
     {
       status: healthy ? "ok" : "degraded",
-      checks: { app: "ok", supabaseAuth, supabaseDatabase },
+      checks: { app: "ok", supabaseAuth, supabaseDatabase, scheduler },
       checkedAt: new Date().toISOString(),
     },
     {
