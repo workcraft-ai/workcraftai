@@ -1,9 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { processNotifications } from "@/lib/notification-outbox";
+import { upgradeLegacyShareSecrets } from "@/lib/proposal-sharing";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export const maxDuration = 60;
 export async function GET(request: Request) {
+  const deadlineAt=Date.now()+50_000;
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({error: "Unauthorized."}, {status: 401});
@@ -13,11 +16,12 @@ export async function GET(request: Request) {
   }
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: {persistSession: false},
-    global: {fetch: (input, init) => fetch(input, {...init, signal: AbortSignal.timeout(5000)})},
+    global: {fetch: createBoundedFetch(5_000,deadlineAt)},
   });
   try {
-    const result = await processNotifications(admin, undefined, 4, 6000);
-    return NextResponse.json({sent: result.sent, pending: result.pending}, {headers: {"Cache-Control": "no-store"}});
+    const result = await processNotifications(admin, undefined, 4, 6000,deadlineAt);
+    const shareSecretsUpgraded = await upgradeLegacyShareSecrets(admin);
+    return NextResponse.json({sent: result.sent, pending: result.pending,shareSecretsUpgraded}, {headers: {"Cache-Control": "no-store"}});
   } catch {
     console.error("Notification retry could not complete.");
     return NextResponse.json({error: "Notification retry is temporarily unavailable."}, {status: 503});

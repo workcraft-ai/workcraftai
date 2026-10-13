@@ -668,7 +668,7 @@ export default function CreateEstimatePage() {
                 <a href="#customer-details" className="inline-flex min-h-11 items-center text-orange-800 underline underline-offset-2">{translate(language, "Customer details")}</a>
                 <a href="#estimate-line-items" className="inline-flex min-h-11 items-center text-orange-800 underline underline-offset-2">{translate(language, "Work and prices")}</a>
               </nav>
-              {estimateAllowance && <p role="status" className={`mt-2 text-xs ${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) === 0 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) === 0 ? "font-semibold text-red-800" : Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) <= 2 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) <= 10 ? "font-semibold text-amber-800" : "text-slate-600"}`}>{Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0)} of {estimateAllowance.daily_limit} estimates left today · {Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0)} of {estimateAllowance.monthly_limit} left this month (UTC)</p>}
+              {estimateAllowance && <p role="status" className={`mt-2 text-xs ${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) === 0 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) === 0 ? "font-semibold text-red-800" : Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0) <= 2 || Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0) <= 10 ? "font-semibold text-amber-800" : "text-slate-600"}`}>{language === "es" ? `Quedan ${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0)} de ${estimateAllowance.daily_limit} cotizaciones hoy y ${Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0)} de ${estimateAllowance.monthly_limit} este mes (UTC)` : `${Math.max(estimateAllowance.daily_limit - estimateAllowance.daily_used, 0)} of ${estimateAllowance.daily_limit} estimates left today · ${Math.max(estimateAllowance.monthly_limit - estimateAllowance.monthly_used, 0)} of ${estimateAllowance.monthly_limit} left this month (UTC)`}</p>}
             </div>
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
           </div>
@@ -919,7 +919,7 @@ export default function CreateEstimatePage() {
                   <p className="text-[11px] font-semibold text-blue-950">Possible Price Book matches · choose one to apply; none was applied automatically.</p>
                   <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-10 items-center rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">Use {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}</button>)}</div>
                 </div>}
-                <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={`Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={language === "es" ? `Descripción en español para ${item.description || `partida ${index + 1}`}` : `Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>
               ))}
             </div>
@@ -1027,7 +1027,7 @@ export default function CreateEstimatePage() {
             {!isProSubscriber && <p className="text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span>{" "}<Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
-              <span className="text-slate-600">Subtotal de partidas:</span>
+              <span className="text-slate-600">{language === "es" ? "Subtotal de partidas:" : "Line-item subtotal:"}</span>
               <span className="font-bold text-slate-900">${subtotal.toFixed(2)}</span>
             </div>
             {markupPercentage > 0 && <div className="flex justify-between text-sm text-slate-600"><span>Markup ({markupPercentage}%):</span><span>${markupAmount.toFixed(2)}</span></div>}

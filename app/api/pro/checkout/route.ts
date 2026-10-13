@@ -3,23 +3,25 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getAppOrigin, getServiceSupabase, getStripeClient } from "@/lib/stripe-server";
 import { getServerProAccess } from "@/lib/pro-access";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
+  const deadlineAt = Date.now() + 25_000;
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
+    { cookies: { getAll: () => cookieStore.getAll() },global:{fetch:createBoundedFetch(5_000,deadlineAt)} }
   );
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return response({ error: "Sign in to upgrade." }, 401);
 
   try {
-    if ((await getServerProAccess(user.id)).hasPro) {
+    if ((await getServerProAccess(user.id,deadlineAt)).hasPro) {
       return response({ error: "Your account already has Pro access." }, 409);
     }
   } catch {
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
   if (!stripeKey || !proPriceId) return response({ error: "Set STRIPE_SECRET_KEY and STRIPE_PRO_PRICE_ID to enable Pro billing." }, 503);
 
   let admin: ReturnType<typeof getServiceSupabase>;
-  try { admin = getServiceSupabase(); }
+  try { admin = getServiceSupabase(5_000, deadlineAt); }
   catch { return response({ error: "Pro billing is temporarily unavailable." }, 503); }
   const { data: currentPlan, error: planError } = await admin.from("subscriptions")
     .select("status, stripe_customer_id").eq("user_id", user.id).maybeSingle();
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   try {
-  const stripe = getStripeClient();
+  const stripe = getStripeClient(deadlineAt);
   const origin = getAppOrigin(request);
   const { data: reservations, error: reserveError } = await admin.rpc("workcraft_reserve_pro_checkout", { p_user_id: user.id });
   if (reserveError) {

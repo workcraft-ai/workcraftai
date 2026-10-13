@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import Link from "next/link";
+import { readAllPages } from "@/lib/read-all-pages";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree } from "@/app/components/LanguageProvider";
@@ -37,8 +38,8 @@ export default function PriceBookPage() {
 
   const loadData = useCallback(async () => {
     const [itemResult, templateResult] = await Promise.all([
-      supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name"),
-      supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name"),
+      readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to)),
+      readAllPages((from, to) => supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name").order("id").range(from, to)),
     ]);
     if (itemResult.error || templateResult.error) {
       setError("WorkCraft AI setup is needed for the price book and templates. Apply the operations migration in supabase/migrations.");

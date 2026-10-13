@@ -4,6 +4,7 @@ import { deleteTradeFlowAccount } from "@/lib/account-deletion";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export const maxDuration = 60;
 
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: createBoundedFetch(5_000) } });
   const { data: warnings, error: warningError } = await admin.rpc("workcraft_claim_inactivity_notices", { p_limit: 25 });
   if (warningError) {
     console.error("Could not claim inactivity notices:", warningError.message);
@@ -47,7 +48,11 @@ export async function GET(request: Request) {
   let warned = 0;
   let warningFailures = 0;
   for (const entry of warnings ?? []) {
-    if (!entry.email) {
+    const { data: account, error: lookupError } = await admin.auth.admin.getUserById(entry.user_id);
+    const recipient = account.user?.email;
+    const language = account.user?.user_metadata?.app_language === "es" ? "es" : "en";
+    if (lookupError || !recipient) {
+      warningFailures += 1;
       await admin.rpc("workcraft_finish_inactivity_notice", { p_user_id: entry.user_id, p_claimed_at: entry.claimed_at, p_sent: false });
       continue;
     }
@@ -66,12 +71,12 @@ export async function GET(request: Request) {
 
     let sent: Response;
     try {
-      const message = warningEmail(entry.language, appOrigin, supportEmail);
+      const message = warningEmail(language, appOrigin, supportEmail);
       sent = await fetch("https://api.resend.com/emails", {
         method: "POST",
         signal: AbortSignal.timeout(10_000),
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json", "Idempotency-Key": `account-inactivity-notice-${entry.user_id}` },
-        body: JSON.stringify({ from: sender, to: [entry.email], reply_to: supportEmail, ...message }),
+        body: JSON.stringify({ from: sender, to: [recipient], reply_to: supportEmail, ...message }),
       });
     } catch (cause) {
       warningFailures += 1;

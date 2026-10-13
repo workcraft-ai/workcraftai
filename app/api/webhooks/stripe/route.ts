@@ -9,6 +9,7 @@ import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDu
 import { enqueueNotification, escapeEmailHtml, notificationFrame, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
+import { getServiceSupabase } from "@/lib/stripe-server";
 
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  const deadlineAt = Date.now() + 25_000;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecrets = [...new Set([process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((secret): secret is string => Boolean(secret)))];
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,7 +27,8 @@ export async function POST(request: Request) {
 
   // Stripe retries non-2xx responses. Keep a single bounded provider attempt
   // and let its durable delivery retry policy handle transient failures.
-  const stripe = new Stripe(stripeKey, { timeout: 8_000, maxNetworkRetries: 0 });
+  const stripe = new Stripe(stripeKey, { timeout: 8_000, maxNetworkRetries: 0,
+    httpClient: Stripe.createFetchHttpClient(createBoundedFetch(8_000, deadlineAt)) });
   const signature = request.headers.get("stripe-signature");
   if (!signature) return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
 
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
     auth: { persistSession: false },
-    global: { fetch: createBoundedFetch(5_000) },
+    global: { fetch: createBoundedFetch(5_000, deadlineAt) },
   });
   const { data: claimState, error: claimError } = await admin.rpc("workcraft_claim_stripe_webhook_state", {
     p_event_id: event.id,
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
     });
     // Entitlement sync must complete even if a provider is down or the reserved
     // billing pool is full. The durable worker retries the notice separately.
-    try { await processNotifications(admin, [queued.id], 1, 3_000); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000, deadlineAt); }
     catch { console.error("Billing notification remains queued."); }
 
   }
@@ -151,7 +154,7 @@ export async function POST(request: Request) {
         html: notificationFrame(language, title, `<p>${escapeEmailHtml(detail)}</p><p><a href="${dashboardUrl}">${spanish ? "Abrir el panel de Stripe" : "Open Stripe Dashboard"}</a></p>`),
       },
     });
-    try { await processNotifications(admin, [queued.id], 1, 3_000); }
+    try { await processNotifications(admin, [queued.id], 1, 3_000, deadlineAt); }
     catch { console.error("Connected payment dispute notice remains queued."); }
   }
 
@@ -268,7 +271,9 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
   } catch (processingError) {
     const message = processingError instanceof Error ? processingError.message : "unknown error";
-    await admin.rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
+    // Reserve a separate short cleanup budget after the processing deadline.
+    // If this fails, the existing claim lease still expires for provider replay.
+    await getServiceSupabase(1_500).rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
     console.error("Stripe webhook business processing failed:", event.type, message);
     return NextResponse.json({ error: "Webhook processing failed. Stripe may retry this event." }, { status: 500 });
   }

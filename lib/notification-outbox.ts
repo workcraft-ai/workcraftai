@@ -3,6 +3,7 @@ import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { reserveAppEmail, releaseAppEmail } from "@/lib/email-quota";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
 import { brandedEmailFrame } from "@/lib/branded-email.mjs";
+import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export type NotificationMail = { from?: string; to: string[]; reply_to?: string; subject: string; text: string; html: string };
 type Notification = { id: string; user_id: string | null; estimate_id: string | null; job_id: string | null; source: "estimate"|"proposal_question"|"invoice"|"follow_up"|"billing"|"auth"|"welcome"; send_key: string; payload: Partial<NotificationMail>; attempts: number; reservation_id: string | null; first_attempt_at: string | null; created_at: string };
@@ -36,7 +37,7 @@ async function questionMail(admin:SupabaseClient,row:Notification):Promise<Notif
  const text=es?`${q.customer_name} (${q.customer_email}) hizo una pregunta sobre ${reference} para ${e.client_name}.\n\n${q.message}\n\n${link}\n\nResponde a este correo para contestarle al cliente.`:`${q.customer_name} (${q.customer_email}) asked about ${reference} for ${e.client_name}.\n\n${q.message}\n\n${link}\n\nReply to this email to respond to the customer.`;
  return {to:[owner.user.email],reply_to:q.customer_email,subject:subject.replace(/[\r\n]/g," ").slice(0,200),text,html:notificationFrame(language,es?"Nueva pregunta del cliente":"New customer question",`<p><strong>${escapeEmailHtml(reference)}</strong> · ${escapeEmailHtml(e.client_name||"")}</p><p>${escapeEmailHtml(q.customer_name)} · ${escapeEmailHtml(q.customer_email)}</p><blockquote>${escapeEmailHtml(q.message).replace(/\n/g,"<br>")}</blockquote><p><a href="${escapeEmailHtml(link)}">${es?"Abrir cotización":"Open estimate"}</a></p><p>${es?"Responde a este correo para contestarle al cliente.":"Reply to this email to respond to the customer."}</p>`)};
 }
-export async function processNotifications(admin:SupabaseClient, ids?:string[], limit=10, timeoutMs=8000){
+export async function processNotifications(admin:SupabaseClient, ids?:string[], limit=10, timeoutMs=8000, deadlineAt?:number){
  const apiKey=process.env.RESEND_API_KEY;
  if(!apiKey)return {sent:0,pending:ids?.length??0,results:[] as Array<{id:string;sent:boolean;quota?:unknown}>};
  const {data,error}=await admin.rpc("workcraft_claim_notifications",{p_limit:limit,p_ids:ids??null});
@@ -70,7 +71,7 @@ export async function processNotifications(admin:SupabaseClient, ids?:string[], 
      if(saveError){await releaseAppEmail(admin,reservation.reservation_id);throw new Error("quota_save");}
      row.reservation_id=reservation.reservation_id;
     }
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",signal:AbortSignal.timeout(timeoutMs),headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":row.send_key},body:JSON.stringify({...mail,from:mail.from||getWorkCraftNoReplySender()})});
+    const response=await createBoundedFetch(timeoutMs,deadlineAt)("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":row.send_key},body:JSON.stringify({...mail,from:mail.from||getWorkCraftNoReplySender()})});
     if(!response.ok){
      const permanent=response.status>=400&&response.status<500&&![408,409,425,429].includes(response.status);
      if(permanent&&row.reservation_id)await releaseAppEmail(admin,row.reservation_id);

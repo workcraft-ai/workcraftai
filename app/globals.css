@@ -69,6 +69,8 @@ body {
 }
 
 @media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select, textarea { font-size: 16px !important; }
   button,
   input:not([type="checkbox"]):not([type="radio"]),
   select,

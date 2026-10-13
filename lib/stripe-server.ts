@@ -2,10 +2,11 @@ import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 
-export function getStripeClient() {
+export function getStripeClient(deadlineAt = Date.now() + 20_000) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("Stripe is not configured.");
-  return new Stripe(key);
+  return new Stripe(key, { timeout: 8_000, maxNetworkRetries: 0,
+    httpClient: Stripe.createFetchHttpClient(createBoundedFetch(8_000, deadlineAt)) });
 }
 
 export function stripeLivemode() {
@@ -15,13 +16,13 @@ export function stripeLivemode() {
   return null;
 }
 
-export function getServiceSupabase(fetchTimeoutMs?: number) {
+export function getServiceSupabase(fetchTimeoutMs = 5_000, deadlineAt?: number) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Payment storage is not configured.");
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    ...(fetchTimeoutMs ? { global: { fetch: createBoundedFetch(fetchTimeoutMs) } } : {}),
+    global: { fetch: createBoundedFetch(fetchTimeoutMs, deadlineAt) },
   });
 }
 
