@@ -126,6 +126,8 @@ Review aggregate Vercel function counts/errors, Supabase Auth/API and Storage us
 
 ## Notification worker and signed Auth email hook
 
+Current scheduler and recovery configuration: [Production configuration and recovery inventory](OPERATIONS-RECOVERY-CONFIGURATION.md). Supabase Cron is the five-minute primary scheduler for notification retries, durable Stripe webhook processing, and operations checks. GitHub Actions remains a fallback; its nominal fifteen-minute schedule is best-effort. `/api/health` checks the independent scheduler heartbeat when `SCHEDULER_SECRET` is configured. Operations checks alert at 70% and 85% database connection utilization, on three consecutive failed or slow health probes, and on repeated uncaught server exceptions. Probe and exception records are private to the service role and are pruned after thirty days.
+
 The availability workflow calls `GET /api/cron/notifications` with the encrypted repository `CRON_SECRET` every 15 minutes. It retries bounded outbox batches; leases, backoff and provider idempotency prevent parallel duplicate sends. Follow-ups also accept authenticated GET or POST. Quota-denied mail remains queued, so a queued response is not a sent/delivered response. Auth links expire from the queue after ten minutes. Other ambiguous sends stop within Resend's 24-hour idempotency window. Sent/failed payloads are scrubbed and terminal rows are pruned after 90 days.
 
 The 100/day provider allocation is app 75, Auth 20, billing 5 (UTC). Per-account 5/day and 100/month customer-email limits remain unchanged. Auth only participates when the **Send Email Hook** is enabled; custom SMTP alone bypasses the shared counter. Do not describe aggregate Auth usage as bounded before activation.
