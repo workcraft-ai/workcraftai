@@ -106,7 +106,7 @@ export default function SignupForm() {
         </h1>
 
         <p className="mt-2 text-sm text-[#c8d1ca]">
-          Sign up to get started with your account
+          Create your free account. After confirming your email, start a 14-day Pro trial from Profile—no card required.
         </p>
       </div>
 

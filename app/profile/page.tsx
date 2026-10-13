@@ -38,6 +38,8 @@ export default function ProfilePage() {
   const [hasProAccess, setHasProAccess] = useState(false);
   const [proAccessSource, setProAccessSource] = useState<"stripe" | "admin_grant" | "free">("free");
   const [proAccessExpiresAt, setProAccessExpiresAt] = useState<string | null>(null);
+  const [trialAvailable, setTrialAvailable] = useState(false);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
   const [connectLoading, setConnectLoading] = useState(true);
@@ -100,6 +102,8 @@ export default function ProfilePage() {
           setHasProAccess(entitlement.has_pro);
           setProAccessSource(entitlement.source);
           setProAccessExpiresAt(entitlement.expires_at);
+          setTrialAvailable(entitlement.trial_available);
+          setTrialEndsAt(entitlement.trial_ends_at);
         } else {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
         }
@@ -229,6 +233,9 @@ export default function ProfilePage() {
 
   const hasBillingHistory = planStatus !== "free";
   const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
+  const formattedTrialEnd = trialEndsAt
+    ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(trialEndsAt))
+    : null;
 
   if (loading) {
     return (
@@ -250,13 +257,19 @@ export default function ProfilePage() {
       </div>
 
       <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Your Pro plan includes up to 50 estimates per day and 500 per month, 5 cloud AI drafts per day and 50 per month, 5 customer-facing emails per day and 100 per month, and up to 100 MB of media uploads per month. Check the usage panel below for what remains." : "Create up to 10 estimates per day and 50 per month, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p></div>
-        <div className="flex flex-wrap items-center gap-2">
-          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus}</span>}
-          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : "Manage billing"}</button>}
-          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : "Upgrade to Pro"}</button>}
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Your Pro plan includes up to 50 estimates per day and 500 per month, 5 cloud AI drafts per day and 50 per month, 5 customer-facing emails per day and 100 per month, and up to 100 MB of media uploads per month. Check the usage panel below for what remains." : "Create up to 10 estimates per day and 50 per month, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p>
+          {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{language === "es"
+            ? formattedTrialEnd ? `Tu prueba gratuita de Pro por 14 días termina el ${formattedTrialEnd}. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen.` : "Tu prueba gratuita de Pro por 14 días está activa. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen."
+            : formattedTrialEnd ? `Your 14-day Pro trial ends ${formattedTrialEnd}. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains.` : "Your 14-day Pro trial is active. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains."}</p>}
         </div>
-        {!hasProAccess && <p className="w-full text-xs text-slate-600">WorkCraft AI Pro is $9.99 per month. Free features remain available with no trial required.</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus === "trialing" ? "Free trial" : planStatus}</span>}
+          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : planStatus === "trialing" ? "Continue after trial" : "Manage billing"}</button>}
+          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Subscribe to Pro · $9.99/month"}</button>}
+        </div>
+        {!hasProAccess && <p className="w-full text-xs text-slate-600">{language === "es"
+          ? trialAvailable ? "Prueba todas las funciones Pro gratis durante 14 días. No se requiere tarjeta. La prueba termina automáticamente; agrega los datos de facturación antes de que termine para continuar a $9.99 al mes. Si no te suscribes, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen." : "WorkCraft AI Pro cuesta $9.99 al mes. Las funciones gratuitas siguen disponibles. Esta cuenta ya usó una prueba Pro o no es apta para una prueba."
+          : trialAvailable ? "Try every Pro feature free for 14 days. No card required. The trial ends automatically; add billing details before it ends to continue at $9.99/month. Your account returns to Free if you do not subscribe, and your saved data remains." : "WorkCraft AI Pro is $9.99 per month. Free features remain available. This account has already used or is not eligible for a Pro trial."}</p>}
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="account-usage-heading">

@@ -5,6 +5,8 @@ import { getAppOrigin, getServiceSupabase, getStripeClient } from "@/lib/stripe-
 import { getServerProAccess } from "@/lib/pro-access";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 
+const TRIAL_PERIOD_DAYS = 14;
+
 function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -36,12 +38,16 @@ export async function POST(request: Request) {
   try { admin = getServiceSupabase(5_000, deadlineAt); }
   catch { return response({ error: "Pro billing is temporarily unavailable." }, 503); }
   const { data: currentPlan, error: planError } = await admin.from("subscriptions")
-    .select("status, stripe_customer_id").eq("user_id", user.id).maybeSingle();
+    .select("status, stripe_customer_id, stripe_subscription_id").eq("user_id", user.id).maybeSingle();
   if (planError) return response({ error: "Could not verify your plan." }, 503);
   if (["active", "trialing"].includes(currentPlan?.status ?? "")) return response({ error: "Your account already has Pro." }, 409);
   if (currentPlan?.stripe_customer_id && ["past_due", "unpaid", "incomplete"].includes(currentPlan.status)) {
     return response({ error: "Use Manage billing to resolve your existing subscription before starting another." }, 409);
   }
+  // A Stripe customer record is retained after a subscription ends. Use that
+  // durable history to prevent a second no-card trial on the same app account.
+  const trialEligible = !currentPlan?.stripe_customer_id && !currentPlan?.stripe_subscription_id;
+  const checkoutKind = trialEligible ? "trial" : "monthly";
 
   try {
   const stripe = getStripeClient(deadlineAt);
@@ -61,7 +67,7 @@ export async function POST(request: Request) {
 
   if (attempt.stripe_checkout_session_id) {
     const existingSession = await stripe.checkout.sessions.retrieve(attempt.stripe_checkout_session_id);
-    if (existingSession.status === "open" && existingSession.url) {
+    if (existingSession.status === "open" && existingSession.url && existingSession.metadata?.checkout_kind === checkoutKind) {
       return response({ url: existingSession.url });
     }
     if (existingSession.status === "complete") {
@@ -86,13 +92,23 @@ export async function POST(request: Request) {
   const customer = currentPlan?.stripe_customer_id
     ? { customer: currentPlan.stripe_customer_id }
     : { customer_email: user.email };
+  const attemptSuffix = attempt.attempt_id.replaceAll("-", "").slice(0, 8)
+    .split("").map((character) => "abcdefghijklmnopqrstuvwxyz"[Number.parseInt(character, 16) % 26]).join("");
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: proPriceId, quantity: 1 }],
+    payment_method_collection: trialEligible ? "if_required" : "always",
     ...customer,
     client_reference_id: user.id,
-    metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id },
-    subscription_data: { metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id } },
+    metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id, checkout_kind: checkoutKind },
+    integration_identifier: `workcraft_pro_${trialEligible ? "trial" : "monthly"}_${attemptSuffix}`,
+    subscription_data: {
+      ...(trialEligible ? {
+        trial_period_days: TRIAL_PERIOD_DAYS,
+        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+      } : {}),
+      metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id },
+    },
     success_url: `${origin}/profile?upgrade=success`,
     cancel_url: `${origin}/profile?upgrade=cancelled`,
   }, {
