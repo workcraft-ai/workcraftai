@@ -19,6 +19,8 @@ export async function GET() {
       grant_type: access.grantType,
       expires_at: access.expiresAt,
       stripe_status: access.stripeStatus,
+      trial_available: access.trialAvailable,
+      trial_ends_at: access.trialEndsAt,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Pro entitlement lookup failed:", error instanceof Error ? error.message : "unknown error");

@@ -4,6 +4,8 @@ export type ClientProEntitlement = {
   grant_type: "temporary" | "permanent" | null;
   expires_at: string | null;
   stripe_status: string;
+  trial_available: boolean;
+  trial_ends_at: string | null;
 };
 
 export async function getClientProEntitlement(): Promise<ClientProEntitlement | null> {
@@ -18,6 +20,8 @@ export async function getClientProEntitlement(): Promise<ClientProEntitlement | 
       grant_type: result.grant_type === "temporary" || result.grant_type === "permanent" ? result.grant_type : null,
       expires_at: typeof result.expires_at === "string" ? result.expires_at : null,
       stripe_status: typeof result.stripe_status === "string" ? result.stripe_status : "free",
+      trial_available: result.trial_available === true,
+      trial_ends_at: typeof result.trial_ends_at === "string" ? result.trial_ends_at : null,
     };
   } catch {
     return null;
