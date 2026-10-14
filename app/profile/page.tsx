@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
@@ -18,12 +18,61 @@ function remaining(used: number, limit: number) {
   return Math.max(limit - used, 0);
 }
 
+function trialNotice(language: Language, date: string | null, billingReady: boolean | null) {
+  const message = billingReady === true
+    ? date
+      ? "Your Pro upgrade is set. Your 14-day trial ends {date}. Your saved payment method will be charged $9.99/month starting then unless you cancel before the trial ends. No charge is due today."
+      : "Your Pro upgrade is set. Your saved payment method will be charged $9.99/month when the trial ends unless you cancel before then. No charge is due today."
+    : billingReady === false
+      ? date
+        ? "Your Pro trial ends {date}. Add billing details before then to continue at $9.99/month. Without them, your account returns to Free and your saved data remains."
+        : "Your Pro trial is active. Add billing details in Manage billing to continue at $9.99/month. Without them, your account returns to Free and your saved data remains."
+      : date
+        ? "Your Pro trial ends {date}. Check Manage billing to confirm whether a payment method is set and when billing begins."
+        : "Your Pro trial is active. Check Manage billing to confirm whether a payment method is set and when billing begins.";
+  return translate(language, message).replace("{date}", date ?? "");
+}
+
+function planBadge(language: Language, status: string, billingReady: boolean | null) {
+  if (status === "trialing") return translate(language, billingReady === true ? "Pro upgrade set" : "14-day Pro trial");
+  if (status === "active") return translate(language, "Pro active");
+  return translate(language, status);
+}
+
+function billingActionLabel(language: Language, status: string, billingReady: boolean | null) {
+  if (status === "trialing" && billingReady === false) return translate(language, "Add payment method");
+  if (status === "trialing" && billingReady === null) return translate(language, "Review billing");
+  return translate(language, "Manage billing");
+}
+
+function localizePlanActionError(language: Language, message: string) {
+  const spanishMessages: Record<string, string> = {
+    "Unable to start checkout.": "No se pudo abrir el pago. Inténtalo de nuevo.",
+    "Pro checkout is temporarily unavailable. Please try again.": "El pago de Pro no está disponible temporalmente. Inténtalo de nuevo.",
+    "Could not start Pro checkout. Please try again.": "No se pudo iniciar el pago de Pro. Inténtalo de nuevo.",
+    "Could not verify your plan.": "No se pudo verificar tu plan. Actualiza la página e inténtalo de nuevo.",
+    "Your account already has Pro access.": "Tu cuenta ya tiene acceso a Pro. Actualiza la página para ver tu plan.",
+    "Your account already has Pro.": "Tu cuenta ya tiene Pro. Actualiza la página para ver tu plan.",
+    "Use Manage billing to resolve your existing subscription before starting another.": "Usa Administrar facturación para resolver tu suscripción actual antes de iniciar otra.",
+    "Your payment is processing. Refresh your profile in a moment.": "Tu pago se está procesando. Actualiza tu perfil en un momento.",
+    "Could not refresh Pro checkout. Please try again.": "No se pudo actualizar el pago de Pro. Inténtalo de nuevo.",
+    "A new checkout is being prepared. Please try again in a moment.": "Se está preparando un nuevo pago. Inténtalo de nuevo en un momento.",
+    "Checkout is being finalized. Refresh your profile and try again shortly.": "Se está finalizando el pago. Actualiza tu perfil e inténtalo de nuevo en breve.",
+    "Unable to open billing settings.": "No se pudo abrir la configuración de facturación. Inténtalo de nuevo.",
+    "Could not open billing settings. Please try again.": "No se pudo abrir la configuración de facturación. Inténtalo de nuevo.",
+    "Billing settings are temporarily unavailable. Please try again.": "La configuración de facturación no está disponible temporalmente. Inténtalo de nuevo.",
+    "Sign in to upgrade.": "Inicia sesión para actualizar tu plan.",
+  };
+  return language === "es" ? spanishMessages[message] ?? "No se pudo completar la acción de facturación. Inténtalo de nuevo o comunícate con soporte." : message;
+}
+
 export default function ProfilePage() {
   const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [planActionError, setPlanActionError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -40,6 +89,8 @@ export default function ProfilePage() {
   const [proAccessExpiresAt, setProAccessExpiresAt] = useState<string | null>(null);
   const [trialAvailable, setTrialAvailable] = useState(false);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [trialBillingReady, setTrialBillingReady] = useState<boolean | null>(null);
+  const [planReturnStatus, setPlanReturnStatus] = useState<"pending" | "confirmed" | "delayed" | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
   const [connectLoading, setConnectLoading] = useState(true);
@@ -96,7 +147,41 @@ export default function ProfilePage() {
           })
           .catch(() => setUsageSnapshot(null))
           .finally(() => setUsageLoading(false));
-        const entitlement = await getClientProEntitlement();
+
+        const checkoutParams = new URLSearchParams(window.location.search);
+        const returnedFromCheckout = checkoutParams.get("upgrade") === "success";
+        const checkoutSessionId = checkoutParams.get("session_id");
+        if (returnedFromCheckout) {
+          setPlanReturnStatus("pending");
+          if (checkoutSessionId) {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+              try {
+                const response = await fetch("/api/pro/checkout/confirm", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ session_id: checkoutSessionId }),
+                  cache: "no-store",
+                });
+                const result = await response.json().catch(() => null) as { confirmed?: boolean } | null;
+                if (response.ok && result?.confirmed === true) break;
+                if (response.status !== 202 && response.status !== 503) break;
+              } catch {
+                // The durable Stripe webhook remains the fallback if this
+                // immediate, authenticated confirmation cannot reach the API.
+              }
+              if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, 1_000 + attempt * 500));
+            }
+          }
+        }
+
+        let entitlement = await getClientProEntitlement();
+        if (returnedFromCheckout && !entitlement?.has_pro) {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+            entitlement = await getClientProEntitlement();
+            if (entitlement?.has_pro) break;
+          }
+        }
         if (entitlement) {
           setPlanStatus(entitlement.stripe_status);
           setHasProAccess(entitlement.has_pro);
@@ -104,8 +189,17 @@ export default function ProfilePage() {
           setProAccessExpiresAt(entitlement.expires_at);
           setTrialAvailable(entitlement.trial_available);
           setTrialEndsAt(entitlement.trial_ends_at);
+          setTrialBillingReady(entitlement.trial_billing_ready);
         } else {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
+        }
+        if (returnedFromCheckout) {
+          setPlanReturnStatus(entitlement?.has_pro ? "confirmed" : "delayed");
+          window.dispatchEvent(new Event("workcraft:pro-entitlement-refresh"));
+          checkoutParams.delete("upgrade");
+          checkoutParams.delete("session_id");
+          const cleanQuery = checkoutParams.toString();
+          window.history.replaceState(null, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`);
         }
         try {
           await refreshStripeStatus();
@@ -182,27 +276,29 @@ export default function ProfilePage() {
   };
 
   const handleUpgrade = async () => {
-    setUpgrading(true); setError(null);
+    setUpgrading(true);
+    setPlanActionError(null);
     try {
       const response = await fetch("/api/pro/checkout", { method: "POST" });
       const result = await response.json();
       if (!response.ok || !result.url) throw new Error(result.error || "Unable to start checkout.");
       window.location.href = result.url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to start checkout.");
+      setPlanActionError(err instanceof Error ? err.message : "Unable to start checkout.");
       setUpgrading(false);
     }
   };
 
   const handleManageBilling = async () => {
-    setManagingBilling(true); setError(null);
+    setManagingBilling(true);
+    setPlanActionError(null);
     try {
       const response = await fetch("/api/pro/portal", { method: "POST" });
       const result = await response.json();
       if (!response.ok || !result.url) throw new Error(result.error || "Unable to open billing settings.");
       window.location.href = result.url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to open billing settings.");
+      setPlanActionError(err instanceof Error ? err.message : "Unable to open billing settings.");
       setManagingBilling(false);
     }
   };
@@ -236,6 +332,13 @@ export default function ProfilePage() {
   const formattedTrialEnd = trialEndsAt
     ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(trialEndsAt))
     : null;
+  const planReturnMessage = planReturnStatus === "pending"
+    ? translate(language, "Confirming your Pro access…")
+    : planReturnStatus === "confirmed"
+      ? translate(language, "Your Pro access is active. Scheduling and other Pro features are now unlocked.")
+      : planReturnStatus === "delayed"
+        ? translate(language, "Your checkout is complete. Pro access is still syncing; refresh this page in a moment.")
+        : null;
 
   if (loading) {
     return (
@@ -256,17 +359,17 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <section className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section id="plan" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Your Pro plan includes up to 50 estimates per day and 500 per month, 5 cloud AI drafts per day and 50 per month, 5 customer-facing emails per day and 100 per month, and up to 100 MB of media uploads per month. Check the usage panel below for what remains." : "Create up to 10 estimates per day and 50 per month, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p>
-          {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{language === "es"
-            ? formattedTrialEnd ? `Tu prueba gratuita de Pro por 14 días termina el ${formattedTrialEnd}. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen.` : "Tu prueba gratuita de Pro por 14 días está activa. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen."
-            : formattedTrialEnd ? `Your 14-day Pro trial ends ${formattedTrialEnd}. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains.` : "Your 14-day Pro trial is active. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains."}</p>}
+          {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{trialNotice(language, formattedTrialEnd, trialBillingReady)}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus === "trialing" ? "Free trial" : planStatus}</span>}
-          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : planStatus === "trialing" ? "Continue after trial" : "Manage billing"}</button>}
-          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Subscribe to Pro · $9.99/month"}</button>}
+          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planBadge(language, planStatus, trialBillingReady)}</span>}
+          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : billingActionLabel(language, planStatus, trialBillingReady)}</button>}
+          {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Upgrade to Pro"}</button>}
         </div>
+        {planReturnMessage && <p role="status" aria-live="polite" className={`w-full rounded-lg border px-3 py-2 text-sm leading-5 ${planReturnStatus === "delayed" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-900"}`}>{planReturnMessage}</p>}
+        {planActionError && <p role="alert" aria-live="assertive" className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-800">{localizePlanActionError(language, planActionError)}</p>}
         {!hasProAccess && <p className="w-full text-xs text-slate-600">{language === "es"
           ? trialAvailable ? "Prueba todas las funciones Pro gratis durante 14 días. No se requiere tarjeta. La prueba termina automáticamente; agrega los datos de facturación antes de que termine para continuar a $9.99 al mes. Si no te suscribes, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen." : "WorkCraft AI Pro cuesta $9.99 al mes. Las funciones gratuitas siguen disponibles. Esta cuenta ya usó una prueba Pro o no es apta para una prueba."
           : trialAvailable ? "Try every Pro feature free for 14 days. No card required. The trial ends automatically; add billing details before it ends to continue at $9.99/month. Your account returns to Free if you do not subscribe, and your saved data remains." : "WorkCraft AI Pro is $9.99 per month. Free features remain available. This account has already used or is not eligible for a Pro trial."}</p>}
@@ -307,7 +410,7 @@ export default function ProfilePage() {
             <h2 className="mt-1 text-lg font-bold text-slate-900">Stripe payment setup</h2>
             <p className="mt-1 max-w-xl text-xs leading-5 text-slate-600">{stripeDashboard === "express" ? "This existing Stripe connection uses the Express Dashboard. New connections use the Full Stripe Dashboard. Use the Open Stripe Express button to review payments and payout settings." : "Stripe-hosted onboarding collects verification and payout information directly. New connected accounts use the Full Stripe Dashboard; after Stripe activates your account, use your own Stripe login to manage payments, payouts, reports, and account details. Stripe processing fees are separate from your WorkCraft AI Pro subscription."}</p>
             {stripePaymentMode === "test" && <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-950">{language === "es" ? "Stripe está en modo de prueba. La incorporación y los pagos usan datos de prueba; no se cobran fondos reales." : "Stripe is in test mode. Setup and payments use test data; no real money is collected."}</p>}
-            {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature.</p>}
+            {!hasProAccess && <p className="mt-2 text-xs font-semibold text-slate-700">Customer payment collection is a Pro feature. See your plan above for trial or upgrade options.</p>}
             {hasProAccess && !connectLoading && stripeConnected && stripeChargesEnabled && <p className="mt-2 text-xs font-semibold text-green-700">Stripe is connected and can accept payments.{stripeRequirementsDue ? " Stripe may request updated business information later." : ""}</p>}
             {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "needs_action" && <p role="status" className="mt-2 text-xs font-semibold text-amber-700">Stripe still needs information before it can activate payments. Continue setup to complete the remaining verification steps.</p>}
             {hasProAccess && !connectLoading && stripeConnected && !stripeChargesEnabled && stripeSetupState === "under_review" && <p role="status" className="mt-2 text-xs font-semibold text-amber-700">Stripe is reviewing your identity or business information. You do not need to submit it again while Stripe reviews it; we will check your status automatically for a short time.</p>}

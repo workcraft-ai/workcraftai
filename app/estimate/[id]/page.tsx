@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney, percentageOfCents } from "@/lib/estimate-money.mjs";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItem {
   id: string;
@@ -21,7 +21,7 @@ interface Estimate {
   id: string;
   reference_number: string;
   client_name: string;
-  client_email: string;
+  client_email?: string;
   client_phone?: string;
   job_address?: string;
   status: string;
@@ -265,7 +265,10 @@ export default function ClientEstimatePage() {
       if (!response.ok || !result.url) throw new Error(result.error || "Checkout could not be started.");
       window.location.assign(result.url);
     } catch (error) {
-      setPaymentError(error instanceof Error ? error.message : "Checkout could not be started.");
+      console.error("Customer payment checkout could not be opened:", error instanceof Error ? error.message : "unknown error");
+      setPaymentError(viewLanguage === "es"
+        ? "No pudimos abrir el pago seguro. No se realizó ningún cargo. Actualiza la cotización e inténtalo de nuevo, o comunícate con el contratista."
+        : "We couldn’t open secure checkout. You haven’t been charged. Refresh the estimate and try again, or contact the contractor.");
       setStartingPayment(false);
     }
   };
@@ -291,7 +294,10 @@ export default function ClientEstimatePage() {
 
       setPaying(false);
     } catch (err: unknown) {
-      alert("Error processing approval: " + (err instanceof Error ? err.message : String(err)));
+      console.error("Estimate approval could not be recorded:", err instanceof Error ? err.message : "unknown error");
+      setErrorMsg(viewLanguage === "es"
+        ? "No pudimos registrar tu aprobación. No se realizó ningún cargo. Revisa tu conexión e inténtalo de nuevo."
+        : "We couldn’t record your approval. You haven’t been charged. Check your connection and try again.");
       setPaying(false);
     }
   };
@@ -400,7 +406,7 @@ export default function ClientEstimatePage() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && (ownerHasPro
               ? <button type="button" disabled={creatingInvoice} onClick={() => void createOrOpenInvoice()} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60">{creatingInvoice ? "Creating invoice…" : invoiceJobId ? "View invoice" : "Create invoice"}</button>
-              : <Link href="/profile" className="rounded-lg border border-orange-300 px-3 py-1.5 font-semibold text-orange-100 hover:bg-slate-800">Create invoice (Pro)</Link>)}
+              : <div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-orange-100">Invoice creation is included with Pro:</span><ProPlanAction className="inline-flex min-h-10 items-center rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-100 hover:bg-slate-800" /> </div>)}
             <button
               type="button"
               onClick={() => router.push(`/estimate/${id}/edit`)}
@@ -456,7 +462,7 @@ export default function ClientEstimatePage() {
               </p>
             </div>
             <div className="text-left sm:text-right">
-              <span className="text-xs font-semibold text-slate-400 block uppercase tracking-wider">
+              <span className="text-xs font-semibold text-slate-600 block uppercase tracking-wider">
                 Total Estimate
               </span>
                 <span className="text-2xl font-black text-slate-900">
@@ -465,7 +471,7 @@ export default function ClientEstimatePage() {
             </div>
           </div>
 
-          {photos.length > 0 && <section className="space-y-3"><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Job photos</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><Image unoptimized width={480} height={240} src={photo.url} alt="Job site" className="h-36 w-full rounded-lg border border-slate-200 object-cover" /></a>)}</div></section>}
+          {photos.length > 0 && <section className="space-y-3"><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600">Job photos</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer"><Image unoptimized width={480} height={240} src={photo.url} alt="Job site" className="h-36 w-full rounded-lg border border-slate-200 object-cover" /></a>)}</div></section>}
           {ownerAttachments.some((item) => item.media_type === "voice") && <section className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4"><h2 className="text-xs font-bold uppercase tracking-wider text-amber-900">Private contractor voice notes</h2>{ownerAttachments.filter((item) => item.media_type === "voice").map((item) => <audio key={item.id} controls src={item.url} className="w-full" />)}<p className="text-[11px] text-amber-900">Only signed-in account owners can load these recordings.</p></section>}
 
           <div className="flex justify-end print:hidden">
@@ -474,7 +480,7 @@ export default function ClientEstimatePage() {
 
           {estimate.package_options?.length ? (
             <section className="space-y-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Choose the option that fits your home</h2><p className="mt-1 text-xs text-slate-500">Select one package to approve. Package totals are treated as final pre-tax prices; default markup is not added a second time. Applicable tax is added below.</p></div>
+              <div><h2 className="text-sm font-semibold text-slate-900">Choose the option that fits your home</h2><p className="mt-1 text-xs text-slate-600">Select one package to approve. Package totals are treated as final pre-tax prices; default markup is not added a second time. Applicable tax is added below.</p></div>
               <div className="grid gap-3 md:grid-cols-3">
                 {estimate.package_options.map((option, index) => (
                   <button key={`${option.name}-${index}`} type="button" onClick={() => setSelectedPackage(index)} className={`rounded-xl border p-4 text-left transition ${selectedPackage === index ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 bg-white hover:border-slate-400"}`}>
@@ -494,10 +500,7 @@ export default function ClientEstimatePage() {
                 Prepared For
               </span>
               <p className="font-bold text-slate-900 text-sm">{estimate.client_name}</p>
-              <p className="text-slate-600">{estimate.client_email}</p>
-              {estimate.client_phone && (
-                <p className="text-slate-600">{estimate.client_phone}</p>
-              )}
+              <p className="text-slate-600">{viewLanguage === "es" ? "Tus datos de contacto no se muestran en este enlace." : "Your contact details are not shown on this link."}</p>
             </div>
 
             <div>
@@ -512,13 +515,23 @@ export default function ClientEstimatePage() {
 
           {/* Scope of Work Table */}
           {estimate.proposal_display_mode === "summary" ? <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Work summary</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600">Work summary</h2>
             <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{estimate.proposal_summary}</p>
           </section> : <div className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
               Scope of Work
             </h2>
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <div className="space-y-2 sm:hidden">
+              {lineItems.map((item, index) => <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="break-words text-sm font-semibold text-slate-900">{viewLanguage === "es" ? item.description_es || item.description : item.description}</h3>
+                <p className="mt-2 text-xs text-slate-600">{viewLanguage === "es" ? "Cantidad" : "Quantity"}: {item.quantity} {item.unit ? translate(viewLanguage, item.unit) : ""}</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs">
+                  <p className="text-slate-600">{viewLanguage === "es" ? "Precio unitario" : "Unit rate"}<strong className="mt-1 block text-sm text-slate-900">${Number(item.unit_price).toFixed(2)}</strong></p>
+                  <p className="text-right text-slate-600">{viewLanguage === "es" ? "Importe" : "Amount"}<strong className="mt-1 block text-sm text-slate-900">${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}</strong></p>
+                </div>
+              </article>)}
+            </div>
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 sm:block">
               <table className="w-full min-w-[520px] text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
                   <tr>
@@ -625,7 +638,7 @@ export default function ClientEstimatePage() {
               <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 {Boolean(estimate.package_options?.length) && selectedPackage === null && <p className="text-xs font-semibold text-amber-800">Select a package above to continue.</p>}
                 <label className="block text-xs font-semibold text-slate-700">Type your full name to approve<input value={signatureName} onChange={(event) => { setSignatureName(event.target.value); setErrorMsg(""); }} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" autoComplete="name" placeholder="Full name" /></label>
-                <p className="text-[11px] leading-5 text-slate-500">Typing your name records your approval of this estimate.</p>
+                <p className="text-[11px] leading-5 text-slate-600">{viewLanguage === "es" ? "Al escribir tu nombre, registras la aprobación de esta cotización. No se te cobrará al aprobarla; después podrás elegir pagar el anticipo o el total con Stripe, si está disponible." : "Typing your name records your approval of this estimate. Approval does not charge you; you can then choose the down payment or full balance through Stripe, if available."}</p>
                 {estimate.signature_name && <p className="text-xs font-medium text-green-700">Approved by {estimate.signature_name}{estimate.accepted_at ? ` on ${new Date(estimate.accepted_at).toLocaleDateString()}` : ""}</p>}
                 {errorMsg && <p role="alert" className="text-xs text-red-700">{errorMsg}</p>}
               </div>
@@ -638,8 +651,8 @@ export default function ClientEstimatePage() {
               {paying
                 ? "Recording Approval..."
                 : estimate.require_deposit
-                ? `Approve Estimate · Deposit Due Later ($${depositAmount.toFixed(2)})`
-                : `Approve Proposal ($${total.toFixed(2)})`}
+                ? viewLanguage === "es" ? `Aprobar cotización · el anticipo se paga después ($${depositAmount.toFixed(2)})` : `Approve estimate · down payment due next ($${depositAmount.toFixed(2)})`
+                : viewLanguage === "es" ? `Aprobar cotización ($${total.toFixed(2)})` : `Approve estimate ($${total.toFixed(2)})`}
             </button>
             {confirmingDecline ? (
               <form onSubmit={(event) => void handleDecline(event)} className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">

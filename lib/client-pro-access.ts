@@ -6,6 +6,7 @@ export type ClientProEntitlement = {
   stripe_status: string;
   trial_available: boolean;
   trial_ends_at: string | null;
+  trial_billing_ready: boolean | null;
 };
 
 export async function getClientProEntitlement(): Promise<ClientProEntitlement | null> {
@@ -22,6 +23,7 @@ export async function getClientProEntitlement(): Promise<ClientProEntitlement | 
       stripe_status: typeof result.stripe_status === "string" ? result.stripe_status : "free",
       trial_available: result.trial_available === true,
       trial_ends_at: typeof result.trial_ends_at === "string" ? result.trial_ends_at : null,
+      trial_billing_ready: typeof result.trial_billing_ready === "boolean" ? result.trial_billing_ready : null,
     };
   } catch {
     return null;

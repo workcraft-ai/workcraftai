@@ -9,6 +9,16 @@ export type HelpGuide = {
 
 export const helpGuides: HelpGuide[] = [
   {
+    slug: "start-pro-trial", title: { en: "Start your 14-day Pro trial", es: "Inicia tu prueba de Pro de 14 días" },
+    summary: { en: "Find your trial offer, understand eligibility, and know what happens when it ends.", es: "Encuentra la oferta de prueba, consulta los requisitos y conoce qué pasa cuando termina." },
+    steps: {
+      en: ["Sign in to your confirmed WorkCraft AI account. Eligible accounts can start one trial.", "Open Profile → Your plan, or choose the trial offer shown on Dashboard, Customers, Price Book, or when opening a Pro feature.", "Start the 14-day Pro trial. No payment method is needed to begin.", "During the trial, the offer changes to Upgrade to Pro. To continue after the trial, add billing details in Manage billing before it ends; Pro is $9.99/month.", "If you do not add billing, the trial ends automatically and your account returns to Free. Your saved estimates, customers, jobs, and other account data remain available."],
+      es: ["Inicia sesión en tu cuenta confirmada de WorkCraft AI. Las cuentas aptas pueden iniciar una sola prueba.", "Abre Perfil → Tu plan o elige la oferta de prueba que aparece en el Panel, Clientes, Lista de precios o al abrir una función Pro.", "Inicia la prueba de Pro de 14 días. No necesitas un método de pago para comenzar.", "Durante la prueba, la oferta cambia a Mejorar a Pro. Para continuar después, agrega los datos de facturación en Administrar facturación antes de que termine; Pro cuesta $9.99 al mes.", "Si no agregas datos de facturación, la prueba termina automáticamente y tu cuenta vuelve al plan Gratis. Tus cotizaciones, clientes, trabajos y otros datos guardados permanecen disponibles."],
+    },
+    note: { en: "The trial is available only to eligible accounts. Accounts that have used a trial or have prior Stripe subscription history may see the paid upgrade price instead.", es: "La prueba solo está disponible para cuentas aptas. Las cuentas que ya usaron una prueba o tienen un historial previo de suscripción en Stripe podrían ver directamente el precio de pago." },
+    action: { href: "/profile#plan", en: "View my plan", es: "Ver mi plan" },
+  },
+  {
     slug: "first-estimate", title: { en: "Create your first estimate", es: "Crea tu primera cotización" },
     summary: { en: "Start with one customer, one job, and prices you control.", es: "Comienza con un cliente, un trabajo y los precios que tú eliges." },
     steps: { en: ["Open New estimate from the Dashboard.", "Enter the customer and job location.", "Add a line item with its quantity, unit, and price.", "Review the total and save. Open the customer view before sharing."], es: ["Abre Nueva cotización desde el Panel.", "Ingresa el cliente y la ubicación del trabajo.", "Agrega un concepto con cantidad, unidad y precio.", "Revisa el total y guarda. Abre la vista del cliente antes de compartir."] },

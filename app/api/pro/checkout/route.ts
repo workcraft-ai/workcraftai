@@ -48,10 +48,14 @@ export async function POST(request: Request) {
   // durable history to prevent a second no-card trial on the same app account.
   const trialEligible = !currentPlan?.stripe_customer_id && !currentPlan?.stripe_subscription_id;
   const checkoutKind = trialEligible ? "trial" : "monthly";
+  let checkoutStage = "initialize_checkout";
 
   try {
+  checkoutStage = "initialize_stripe_client";
   const stripe = getStripeClient(deadlineAt);
+  checkoutStage = "resolve_checkout_origin";
   const origin = getAppOrigin(request);
+  checkoutStage = "reserve_checkout_attempt";
   const { data: reservations, error: reserveError } = await admin.rpc("workcraft_reserve_pro_checkout", { p_user_id: user.id });
   if (reserveError) {
     const status = reserveError.message.includes("WORKCRAFT_PRO_ALREADY_ACTIVE") ? 409 : 503;
@@ -66,6 +70,7 @@ export async function POST(request: Request) {
   if (!attempt?.attempt_id) return response({ error: "Could not start Pro checkout. Please try again." }, 503);
 
   if (attempt.stripe_checkout_session_id) {
+    checkoutStage = "retrieve_existing_checkout_session";
     const existingSession = await stripe.checkout.sessions.retrieve(attempt.stripe_checkout_session_id);
     if (existingSession.status === "open" && existingSession.url && existingSession.metadata?.checkout_kind === checkoutKind) {
       return response({ url: existingSession.url });
@@ -78,6 +83,7 @@ export async function POST(request: Request) {
       .update({ status: "expired", updated_at: new Date().toISOString() })
       .eq("id", attempt.attempt_id).in("status", ["creating", "open"]);
     if (expireError) return response({ error: "Could not refresh Pro checkout. Please try again." }, 503);
+    checkoutStage = "reserve_retry_checkout_attempt";
     const { data: retryReservations, error: retryError } = await admin.rpc("workcraft_reserve_pro_checkout", { p_user_id: user.id });
     if (retryError) return response({ error: "Could not refresh Pro checkout. Please try again." }, 503);
     attempt = Array.isArray(retryReservations) ? retryReservations[0] as typeof attempt : undefined;
@@ -94,6 +100,7 @@ export async function POST(request: Request) {
     : { customer_email: user.email };
   const attemptSuffix = attempt.attempt_id.replaceAll("-", "").slice(0, 8)
     .split("").map((character) => "abcdefghijklmnopqrstuvwxyz"[Number.parseInt(character, 16) % 26]).join("");
+  checkoutStage = "create_stripe_checkout_session";
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: proPriceId, quantity: 1 }],
@@ -109,13 +116,14 @@ export async function POST(request: Request) {
       } : {}),
       metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id },
     },
-    success_url: `${origin}/profile?upgrade=success`,
+    success_url: `${origin}/profile?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/profile?upgrade=cancelled`,
   }, {
     idempotencyKey: `workcraft-pro-checkout-${attempt.attempt_id}`,
   });
   if (!session.url) return response({ error: "Stripe did not return a checkout URL." }, 502);
 
+  checkoutStage = "save_checkout_session";
   const { data: savedAttempt, error: saveError } = await admin.from("pro_checkout_attempts").update({
     status: "open",
     stripe_checkout_session_id: session.id,
@@ -126,7 +134,23 @@ export async function POST(request: Request) {
   if (saveError || !savedAttempt) return response({ error: "Checkout is being finalized. Refresh your profile and try again shortly." }, 503);
   return response({ url: session.url });
   } catch (error) {
-    console.error("Pro checkout could not be completed:", error instanceof Error ? error.name : "unknown error");
+    const details = error && typeof error === "object" ? error as {
+      name?: unknown;
+      type?: unknown;
+      code?: unknown;
+      statusCode?: unknown;
+      param?: unknown;
+      requestId?: unknown;
+    } : {};
+    console.error("Pro checkout could not be completed", {
+      stage: checkoutStage,
+      errorName: typeof details.name === "string" ? details.name : "unknown",
+      stripeErrorType: typeof details.type === "string" ? details.type : undefined,
+      stripeErrorCode: typeof details.code === "string" ? details.code : undefined,
+      stripeStatusCode: typeof details.statusCode === "number" ? details.statusCode : undefined,
+      stripeParam: typeof details.param === "string" ? details.param : undefined,
+      stripeRequestId: typeof details.requestId === "string" ? details.requestId : undefined,
+    });
     return response({ error: "Pro checkout is temporarily unavailable. Please try again." }, 502);
   }
 }

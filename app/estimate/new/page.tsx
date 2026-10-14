@@ -15,6 +15,7 @@ import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItemInput {
   description: string;
@@ -102,7 +103,8 @@ export default function CreateEstimatePage() {
   const { language } = useLanguage();
 
   // Paid cloud drafting is available to Pro subscribers only.
-  const [isProSubscriber, setIsProSubscriber] = useState(false);
+  const [proStatus, setProStatus] = useState<"checking" | "free" | "pro">("checking");
+  const isProSubscriber = proStatus === "pro";
   const [aiDailyAllowance, setAiDailyAllowance] = useState<AiAllowance | null>(null);
   const [estimateAllowance, setEstimateAllowance] = useState<EstimateAllowance | null>(null);
   const [mediaAllowance, setMediaAllowance] = useState<MediaAllowance | null>(null);
@@ -140,6 +142,13 @@ export default function CreateEstimatePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
   const [draftStorageMessage, setDraftStorageMessage] = useState("");
+  const [formError, setFormError] = useState("");
+  const [partialSavedEstimateId, setPartialSavedEstimateId] = useState<string | null>(null);
+  const [draftOwnerId, setDraftOwnerId] = useState<string | null>(null);
+  const [draftStorageReady, setDraftStorageReady] = useState(false);
+  const [savedDraftNeedsChoice, setSavedDraftNeedsChoice] = useState(false);
+  const draftSubmissionComplete = useRef(false);
+  const clientNameInputRef = useRef<HTMLInputElement>(null);
 
   // Line Items
   const [lineItems, setLineItems] = useState<LineItemInput[]>([
@@ -162,7 +171,7 @@ export default function CreateEstimatePage() {
   const saveDraftOnDevice = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user.id) {
-      setDraftStorageMessage("Sign in before saving a private device draft.");
+      setDraftStorageMessage(language === "es" ? "Inicia sesión antes de guardar un borrador privado en este dispositivo." : "Sign in before saving a private device draft.");
       return;
     }
     const draft: LocalEstimateDraft = {
@@ -170,16 +179,17 @@ export default function CreateEstimatePage() {
       depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
       proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, savedAt: new Date().toISOString(),
     };
+    setSavedDraftNeedsChoice(false);
     void saveOfflineEstimateDraft(session.user.id, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
-      .then(() => setDraftStorageMessage("Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
-      .catch(() => setDraftStorageMessage("This browser could not save the draft. Check available device storage."));
+      .then(() => setDraftStorageMessage(language === "es" ? "El borrador y sus archivos se guardaron de forma privada en este dispositivo. Incluye datos de contacto del cliente." : "Draft and attachments saved privately in this browser on this device. It includes customer contact details."))
+      .catch(() => setDraftStorageMessage(language === "es" ? "Este navegador no pudo guardar el borrador. Revisa el espacio disponible." : "This browser could not save the draft. Check available device storage."));
   };
 
   const restoreDraftFromDevice = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user.id) {
-        setDraftStorageMessage("Sign in to restore a device draft saved for your account.");
+        setDraftStorageMessage(language === "es" ? "Inicia sesión para restaurar el borrador de tu cuenta guardado en este dispositivo." : "Sign in to restore a device draft saved for your account.");
         return;
       }
       const stored = await loadOfflineEstimateDraft<LocalEstimateDraft>(session.user.id);
@@ -188,16 +198,17 @@ export default function CreateEstimatePage() {
         restoreFields(draft);
         setAttachments(stored.attachments.map((item) => ({ mediaType: item.mediaType, file: new File([item.blob], item.name, { type: item.type }) })));
         setDraftStorageMessage(`Draft and ${stored.attachments.length} attachment(s) restored${stored.savedAt ? ` (saved ${new Date(stored.savedAt).toLocaleString()})` : ""}.`);
+        setSavedDraftNeedsChoice(false);
         return;
       }
       const saved = localStorage.getItem("tradeflow-unsent-estimate-v1");
       if (!saved) {
-        setDraftStorageMessage("No saved draft found in this browser.");
+        setDraftStorageMessage(language === "es" ? "No se encontró ningún borrador guardado en este navegador." : "No saved draft found in this browser.");
         return;
       }
-      setDraftStorageMessage("An older device draft has no account owner recorded, so it was not restored. Remove it before using this shared device.");
+      setDraftStorageMessage(language === "es" ? "No se restauró un borrador antiguo porque no tiene una cuenta asociada. Bórralo antes de compartir este dispositivo." : "An older device draft has no account owner recorded, so it was not restored. Remove it before using this shared device.");
     } catch {
-      setDraftStorageMessage("Could not restore this saved draft. Save a new draft to replace it.");
+      setDraftStorageMessage(language === "es" ? "No se pudo restaurar este borrador. Guarda uno nuevo para reemplazarlo." : "Could not restore this saved draft. Save a new draft to replace it.");
     }
   };
 
@@ -223,14 +234,15 @@ export default function CreateEstimatePage() {
   const deleteDraftFromDevice = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user.id) {
-      setDraftStorageMessage("Sign in to remove the device draft saved for your account.");
+      setDraftStorageMessage(language === "es" ? "Inicia sesión para borrar el borrador de tu cuenta guardado en este dispositivo." : "Sign in to remove the device draft saved for your account.");
       return;
     }
     void clearOfflineEstimateDraft(session.user.id).then(() => {
       // This legacy localStorage entry has no owner marker; remove it only after the
       // user explicitly chooses the device-draft removal action.
       localStorage.removeItem("tradeflow-unsent-estimate-v1");
-      setDraftStorageMessage("Saved device draft and attachments removed.");
+      setSavedDraftNeedsChoice(false);
+      setDraftStorageMessage(language === "es" ? "Se borraron el borrador y sus archivos guardados en este dispositivo." : "Saved device draft and attachments removed.");
     });
   };
 
@@ -261,6 +273,10 @@ export default function CreateEstimatePage() {
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const storedDraft = await loadOfflineEstimateDraft<LocalEstimateDraft>(user.id).catch(() => null);
+        setDraftOwnerId(user.id);
+        setSavedDraftNeedsChoice(Boolean(storedDraft));
+        setDraftStorageReady(true);
         void fetch("/api/estimate/trades", { cache: "no-store" }).then(async (response) => {
           if (!response.ok) return;
           const result = await response.json();
@@ -282,7 +298,7 @@ export default function CreateEstimatePage() {
         setMarkupPercentage(Number(user.user_metadata?.markup_percentage) || 0);
         const entitlement = await getClientProEntitlement();
         const activePro = entitlement?.has_pro === true;
-        setIsProSubscriber(activePro);
+        setProStatus(activePro ? "pro" : "free");
         if (activePro) {
           void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {
             if (!response.ok) return;
@@ -301,6 +317,8 @@ export default function CreateEstimatePage() {
         else setSavedCustomers((customerData ?? []) as SavedCustomer[]);
       } else {
         setRequireDeposit(false); setPackageOptions([]);
+        setDraftStorageReady(true);
+        setProStatus("free");
       }
       const { data, error: priceBookError } = await readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to));
       setPriceBookLoadFailed(Boolean(priceBookError));
@@ -308,6 +326,30 @@ export default function CreateEstimatePage() {
       setPriceBookItems((data ?? []) as PriceBookItem[]);
     })();
   }, []);
+
+  const hasEstimateDraftContent = Boolean(clientName.trim() || clientEmail.trim() || clientPhone.trim() || jobAddress.trim() || promptText.trim() || lineItems.some((item) => item.description.trim()));
+  useEffect(() => {
+    if (!draftOwnerId || !draftStorageReady || savedDraftNeedsChoice || saving || draftSubmissionComplete.current || !hasEstimateDraftContent) return;
+    const timeout = window.setTimeout(() => {
+      const draft: LocalEstimateDraft = {
+        clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
+        depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
+        proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, savedAt: new Date().toISOString(),
+      };
+      setDraftStorageMessage(language === "es" ? "Guardando borrador solo en este dispositivo…" : "Saving draft on this device…");
+      void saveOfflineEstimateDraft(draftOwnerId, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
+        .then(() => setDraftStorageMessage(language === "es" ? "Borrador guardado en este dispositivo. Incluye datos de contacto del cliente; bórralo en dispositivos compartidos." : "Draft saved on this device. It includes customer contact details; clear it on shared devices."))
+        .catch(() => setDraftStorageMessage(language === "es" ? "No se pudo guardar el borrador en este dispositivo. Revisa el espacio disponible." : "This device could not save the draft. Check available storage."));
+    }, 900);
+    return () => window.clearTimeout(timeout);
+  }, [draftOwnerId, draftStorageReady, savedDraftNeedsChoice, saving, hasEstimateDraftContent, clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit, depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, attachments, language]);
+
+  const startNewEstimateOnDevice = async () => {
+    if (!draftOwnerId) return;
+    await clearOfflineEstimateDraft(draftOwnerId).catch(() => undefined);
+    setSavedDraftNeedsChoice(false);
+    setDraftStorageMessage(language === "es" ? "Borrador anterior reemplazado. Los cambios nuevos se guardarán automáticamente en este dispositivo." : "Previous draft cleared. New changes will auto-save on this device.");
+  };
 
   // Handle Pro cloud AI line-item drafting.
   const handleGenerateItems = async () => {
@@ -379,7 +421,7 @@ export default function CreateEstimatePage() {
               : errorText.includes("temporarily paused") ? "La redacción de cotizaciones con IA en la nube está pausada temporalmente. Inténtalo más tarde."
                 : errorText.includes("no usable line items") ? "La IA no devolvió partidas utilizables. Agrega detalles del trabajo e inténtalo de nuevo."
                   : errorText;
-      alert(`${language === "es" ? "Error al generar la cotización: " : "Error generating estimate: "}${translatedError}`);
+      setDraftMessage(`${language === "es" ? "No se pudo generar el borrador: " : "Could not generate the draft: "}${translatedError}`);
     } finally {
       setIsGenerating(false);
     }
@@ -504,31 +546,40 @@ export default function CreateEstimatePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName || !clientEmail) {
-      alert("Please fill in client name and email.");
+    setFormError("");
+    const showValidationError = (message: string, target?: HTMLElement | null) => {
+      setFormError(message);
+      window.setTimeout(() => target?.focus(), 0);
+    };
+    if (!clientName.trim()) {
+      showValidationError(language === "es" ? "Agrega el nombre del cliente para guardar la cotización." : "Add the customer’s name before saving the estimate.", clientNameInputRef.current);
+      return;
+    }
+    if (clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim())) {
+      showValidationError(language === "es" ? "Revisa el correo electrónico o déjalo vacío. Puedes compartir el enlace de la cotización." : "Check the email address or leave it blank. You can still share the estimate link.", document.getElementById("estimate-client-email"));
       return;
     }
     const nonEmptyLineItems = lineItems.filter((item) => item.description.trim());
     if (!nonEmptyLineItems.length) {
-      alert("Add at least one line item with a description.");
+      showValidationError(language === "es" ? "Agrega al menos una partida con una descripción." : "Add at least one line item with a description.", document.querySelector<HTMLInputElement>('[aria-label="Line item 1 description"]'));
       return;
     }
     if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0)) {
-      alert("Line item quantities must be greater than zero and prices cannot be negative.");
+      showValidationError(language === "es" ? "Las cantidades deben ser mayores que cero y los precios no pueden ser negativos." : "Quantities must be greater than zero and prices cannot be negative.");
       return;
     }
     if (nonEmptyLineItems.some((item) => /^(unknown|unspecified|n\/a)$/i.test(item.unit?.trim() ?? ""))) {
-      alert(language === "es"
+      showValidationError(language === "es"
         ? "Elige una unidad válida para cada partida marcada antes de guardar la cotización."
-        : "Choose a valid unit for each flagged line item before saving the estimate.");
+        : "Choose a valid unit for each flagged line item before saving the estimate.", document.querySelector<HTMLInputElement>('[aria-label^="Line item"]'));
       return;
     }
     if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {
-      alert(language === "es" ? "Agrega un resumen del trabajo para el cliente o elige partidas detalladas." : "Add a customer-facing work summary or choose detailed line items.");
+      showValidationError(language === "es" ? "Agrega un resumen del trabajo para el cliente o elige partidas detalladas." : "Add a customer-facing work summary or choose detailed line items.", document.getElementById("proposal-summary"));
       return;
     }
     if (proposalSummary.trim().length > 1200) {
-      alert(language === "es" ? "El resumen debe tener 1.200 caracteres o menos." : "The work summary must be 1,200 characters or less.");
+      showValidationError(language === "es" ? "El resumen debe tener 1.200 caracteres o menos." : "The work summary must be 1,200 characters or less.", document.getElementById("proposal-summary"));
       return;
     }
     if (!zeroRateConfirmed) return;
@@ -619,8 +670,9 @@ export default function CreateEstimatePage() {
       }
 
       // 3. Return to the dashboard so the contractor can review and share the proposal.
+      draftSubmissionComplete.current = true;
       await clearOfflineEstimateDraft(user.id).catch(() => undefined);
-      router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard#first-five-minutes" : "/dashboard");
+      router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard?estimateSaved=1#first-five-minutes" : "/dashboard?estimateSaved=1#estimates");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const quotaMessage = isEstimateQuotaLimitError(err)
@@ -632,11 +684,16 @@ export default function CreateEstimatePage() {
           : message.includes("ESTIMATE_MEDIA_STORAGE_LIMIT")
             ? language === "es" ? "Alcanzaste el límite de almacenamiento Pro. Elimina archivos privados antiguos o revisa Perfil." : "You’ve reached the Pro storage limit. Remove older private files or review Profile."
         : null;
-      alert(createdEstimateId
+      const safeError = createdEstimateId
         ? quotaMessage
-          ? language === "es" ? `Se creó la cotización ${createdEstimateId}. ${quotaMessage}` : `Estimate ${createdEstimateId} was saved. ${quotaMessage}`
-          : `Estimate ${createdEstimateId} was created, but a later save step failed. Open it from your dashboard; do not create it again. Details: ${message}`
-        : quotaMessage || "Error creating estimate: " + message);
+          ? language === "es" ? `La cotización se creó, pero no se completó un paso posterior. No la vuelvas a crear. ${quotaMessage}` : `The estimate was created, but a later step did not finish. Do not create it again. ${quotaMessage}`
+          : language === "es" ? "La cotización se creó, pero no se completó un paso posterior. Ábrela desde el panel; no la vuelvas a crear." : "The estimate was created, but a later step did not finish. Open it from your dashboard; do not create it again."
+        : quotaMessage || (language === "es" ? "No se pudo guardar la cotización. Revisa los datos e inténtalo de nuevo." : "We couldn’t save the estimate. Check the details and try again.");
+      setFormError(safeError);
+      if (createdEstimateId) {
+        setPartialSavedEstimateId(createdEstimateId);
+        setDraftStorageMessage(language === "es" ? "La cotización ya existe. Ábrela desde el enlace de abajo antes de volver a intentarlo." : "The estimate already exists. Open it using the link below before trying again.");
+      }
     } finally {
       setSaving(false);
     }
@@ -651,18 +708,18 @@ export default function CreateEstimatePage() {
         <div className="bg-slate-900 text-white p-3.5 rounded-xl flex items-center justify-between text-xs shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="font-semibold text-slate-200">Mode:</span>
-            <span className={isProSubscriber ? "text-purple-400 font-bold" : "text-blue-400 font-bold"}>
-              {isProSubscriber ? "✦ Pro Plan (Cloud AI drafting)" : "Free Plan (Price Book + manual estimates)"}
+            <span className={proStatus === "pro" ? "text-purple-400 font-bold" : "text-blue-400 font-bold"}>
+              {proStatus === "checking" ? (language === "es" ? "Verificando tu plan…" : "Checking your plan…") : isProSubscriber ? "✦ Pro Plan (Cloud AI drafting)" : "Free Plan (Price Book + manual estimates)"}
             </span>
           </div>
-          {isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <Link href="/profile" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:bg-slate-700">Upgrade to Pro</Link>}
+          {proStatus === "checking" ? <span role="status" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-200">{language === "es" ? "Cargando acceso" : "Loading access"}</span> : isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200">{language === "es" ? "Plan Gratis" : "Free Plan"}</span>}
         </div>
         <div role="status" className={`rounded-lg border px-4 py-2.5 text-xs ${connectionOnline ? "border-green-200 bg-green-50 text-green-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
           {connectionOnline ? "Online · You can create estimates and upload field notes." : "Offline · You can edit and save drafts with photos and voice notes on this device. Reconnect to create the estimate."}
         </div>
 
         {/* Main Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+        <form noValidate onSubmit={handleSubmit} className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
           <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">WorkCraft AI / Estimates</p>
@@ -677,6 +734,8 @@ export default function CreateEstimatePage() {
             </div>
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
           </div>
+
+          {formError && <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"><p>{formError}</p>{partialSavedEstimateId && <Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Abrir cotización guardada" : "Open saved estimate"}</Link>}</div>}
 
           <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
@@ -703,13 +762,15 @@ export default function CreateEstimatePage() {
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-800">Unfinished estimate</h2><p className="mt-1 text-xs text-slate-600">Save or restore a draft in this browser on this device.</p></div>
+              <div><h2 className="text-sm font-semibold text-slate-800">{language === "es" ? "Cotización sin terminar" : "Unfinished estimate"}</h2><p className="mt-1 text-xs text-slate-600">{language === "es" ? "Los borradores se guardan automáticamente solo en este navegador y dispositivo. Incluyen datos de contacto del cliente; bórralos en dispositivos compartidos." : "Drafts auto-save in this browser on this device only. They include customer contact details; clear them on shared devices."}</p></div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Save on this device</button>
-                <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">Restore saved draft</button>
-                <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-12 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">Clear saved draft</button>
+                <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Guardar en este dispositivo" : "Save on this device"}</button>
+                <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Restaurar borrador" : "Restore saved draft"}</button>
+                {savedDraftNeedsChoice && <button type="button" onClick={() => void startNewEstimateOnDevice()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Crear cotización nueva" : "Start new estimate"}</button>}
+                <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-12 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">{language === "es" ? "Borrar borrador guardado" : "Clear saved draft"}</button>
               </div>
             </div>
+            {savedDraftNeedsChoice && <p role="status" className="mt-3 text-xs font-semibold text-amber-900">{language === "es" ? "Ya hay un borrador guardado en este dispositivo. Restáuralo o crea una cotización nueva antes de continuar." : "A saved draft already exists on this device. Restore it or start a new estimate before continuing."}</p>}
             {draftStorageMessage && <p role="status" className="mt-3 text-xs text-slate-600">{draftStorageMessage}</p>}
           </section>
 
@@ -747,7 +808,7 @@ export default function CreateEstimatePage() {
                   id="estimate-trade"
                   value={trade}
                   onChange={(e) => setTrade(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {estimateTrades.map((option) => <option key={option.value} value={option.value}>{language === "es" ? option.label_es : option.value}</option>)}
                 </select>
@@ -761,25 +822,28 @@ export default function CreateEstimatePage() {
                   type="text"
                   required
                   value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
+                  ref={clientNameInputRef}
+                  aria-invalid={Boolean(formError && !clientName.trim())}
+                  onChange={(e) => { setClientName(e.target.value); setFormError(""); }}
                   placeholder="e.g. John Doe"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label htmlFor="estimate-client-email" className="block text-xs font-medium text-slate-700 mb-1">
-                  Client Email *
+                  {language === "es" ? "Correo electrónico del cliente (opcional)" : "Customer email (optional)"}
                 </label>
                 <input
                   id="estimate-client-email"
                   type="email"
-                  required
                   value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
+                  aria-invalid={Boolean(formError && clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim()))}
+                  onChange={(e) => { setClientEmail(e.target.value); setFormError(""); }}
                   placeholder="john@example.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="mt-1 text-xs text-slate-600">{language === "es" ? "No necesitas el correo para guardar. Copia el enlace del cliente desde el panel y compártelo por mensaje." : "Email is not needed to save. Copy the customer link from your dashboard and share it by text."}</p>
               </div>
 
               <div>
@@ -789,10 +853,11 @@ export default function CreateEstimatePage() {
                 <input
                   id="estimate-client-phone"
                   type="tel"
+                  inputMode="tel"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
                   placeholder="(555) 000-0000"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -806,7 +871,7 @@ export default function CreateEstimatePage() {
                   value={jobAddress}
                   onChange={(e) => setJobAddress(e.target.value)}
                   placeholder="123 Main St, City, State"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -829,7 +894,7 @@ export default function CreateEstimatePage() {
                 });
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
-              }} /></label> : <Link href="/profile" className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
+              }} /></label> : <ProPlanAction className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-slate-50" />}
               {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
@@ -869,16 +934,18 @@ export default function CreateEstimatePage() {
                     placeholder="Item or service description"
                     value={item.description}
                     onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                    className="col-span-2 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-1 sm:flex-1"
+                    className="col-span-2 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-1 sm:flex-1"
                   />
                   <input
                     aria-label={`Line item ${index + 1} quantity`}
                     type="number"
-                    min="1"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
                     placeholder="Qty"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 0)}
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
+                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
                   />
                   <input
                     aria-label={`Line item ${index + 1} unit`}
@@ -887,17 +954,18 @@ export default function CreateEstimatePage() {
                     placeholder="Unit"
                     value={item.unit || "each"}
                     onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
                   />
                   <input
                     aria-label={`Line item ${index + 1} rate`}
                     type="number"
                     min="0"
                     step="0.01"
+                    inputMode="decimal"
                     placeholder="Rate"
                     value={item.unit_price}
                     onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
                   />
                   <div className="flex min-w-0 items-center justify-between rounded-md px-2 text-sm font-semibold text-slate-700 sm:ml-auto sm:w-20 sm:justify-end sm:rounded-none sm:px-0 sm:text-right sm:text-xs">
                     <span className="text-xs font-medium text-slate-500 sm:hidden">Amount</span>
@@ -914,15 +982,15 @@ export default function CreateEstimatePage() {
                     </button>
                   )}
                 </div>
-                {item.pricing_source === "ai_suggested" && <p className="text-[11px] font-medium text-amber-800">AI suggested starting price · no confident Price Book match for this trade, unit, and pricing basis. Review before sharing.</p>}
-                {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">Price Book rate applied.</p>}
-                {item.quantity_source === "contractor_measurement" && <p className="text-[11px] font-medium text-blue-800">Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity.</p>}
-                {item.pricing_source === "ai_suggested" && (item.pricing_assumption || item.pricing_assumption_es) && <p className="text-[11px] text-slate-600"><strong>AI pricing assumption to verify:</strong> {language === "es" ? item.pricing_assumption_es || item.pricing_assumption : item.pricing_assumption}</p>}
-                {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">Choose a recognized unit before saving this estimate.</p>}
+                {item.pricing_source === "ai_suggested" && <p className="text-[11px] font-medium text-amber-800">{language === "es" ? "Precio inicial sugerido por IA · no hubo una coincidencia clara en la lista de precios para este oficio, unidad y base de precio. Revísalo antes de compartir." : "AI suggested starting price · no confident Price Book match for this trade, unit, and pricing basis. Review before sharing."}</p>}
+                {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">{language === "es" ? "Se aplicó la tarifa de la lista de precios." : "Price Book rate applied."}</p>}
+                {item.quantity_source === "contractor_measurement" && <p className="text-[11px] font-medium text-blue-800">{language === "es" ? "Cantidad base calculada a partir del área del techo. Ajusta según la pendiente, el desperdicio y la complejidad." : "Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity."}</p>}
+                {item.pricing_source === "ai_suggested" && (item.pricing_assumption || item.pricing_assumption_es) && <p className="text-[11px] text-slate-600"><strong>{language === "es" ? "Suposición de precio de IA para verificar:" : "AI pricing assumption to verify:"}</strong> {language === "es" ? item.pricing_assumption_es || item.pricing_assumption : item.pricing_assumption}</p>}
+                {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">{language === "es" ? "Elige una unidad reconocida antes de guardar." : "Choose a recognized unit before saving this estimate."}</p>}
                 {reviewNotesByIndex[index].map((note, noteIndex) => <p key={`${index}-review-${noteIndex}`} role="note" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">{note}</p>)}
                 {!!item.price_book_suggestions?.length && <div className="rounded-md border border-blue-200 bg-blue-50/70 p-2">
-                  <p className="text-[11px] font-semibold text-blue-950">Possible Price Book matches · choose one to apply; none was applied automatically.</p>
-                  <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-10 items-center rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">Use {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}</button>)}</div>
+                  <p className="text-[11px] font-semibold text-blue-950">{language === "es" ? "Posibles coincidencias de la lista de precios. No se aplicaron automáticamente porque la descripción, la unidad o la base de precio no coincidieron con suficiente certeza." : "Possible Price Book matches. They were not applied automatically because the description, unit, or pricing basis was not a confident match."}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-12 items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">{language === "es" ? "Usar" : "Use"} {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}{suggestion.pricing_basis ? ` · ${suggestion.pricing_basis}` : ""} · {suggestion.match_score}%</button>)}</div>
                 </div>}
                 <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={language === "es" ? `Descripción en español para ${item.description || `partida ${index + 1}`}` : `Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>
@@ -931,31 +999,31 @@ export default function CreateEstimatePage() {
           </div>
 
           {zeroRateLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-            <p role="alert" className="font-semibold">One or more line items have a $0 rate. Review the pricing before sharing this proposal.</p>
+            <p role="alert" className="font-semibold">{language === "es" ? "Una o más partidas tienen una tarifa de $0. Revisa el precio antes de compartir la cotización." : "One or more line items have a $0 rate. Review the pricing before sharing this proposal."}</p>
             <label className="mt-2 flex items-start gap-2">
               <input id="zero-rate-confirmation" type="checkbox" required checked={zeroRateConfirmed} onChange={(event) => setZeroRateConfirmationKey(event.target.checked ? zeroRateReviewKey : "")} className="mt-0.5" />
-              <span>I confirmed every $0 line item is intentional.</span>
+              <span>{language === "es" ? "Confirmo que cada partida de $0 es intencional." : "I confirmed every $0 line item is intentional."}</span>
             </label>
           </div>}
 
           {aiSuggestedLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-            <p role="alert" className="font-semibold">AI starting rates are broad estimates, not live local supplier quotes. Check the unit, quantity, labor, and material assumptions. Suggested rates are before your markup and sales tax.</p>
+            <p role="alert" className="font-semibold">{language === "es" ? "Los precios iniciales de IA son estimaciones generales, no cotizaciones locales actuales. Revisa la unidad, cantidad, mano de obra y materiales. Los precios sugeridos no incluyen tu recargo ni los impuestos." : "AI starting rates are broad estimates, not live local supplier quotes. Check the unit, quantity, labor, and material assumptions. Suggested rates are before your markup and sales tax."}</p>
             <label className="mt-2 flex items-start gap-2">
               <input id="ai-rate-confirmation" type="checkbox" required checked={aiRatesConfirmed} onChange={(event) => setAiRateConfirmationKey(event.target.checked ? aiRateReviewKey : "")} className="mt-0.5" />
-              <span>I reviewed the AI suggested rates and adjusted them for this job.</span>
+              <span>{language === "es" ? "Revisé los precios sugeridos por IA y los ajusté para este trabajo." : "I reviewed the AI suggested rates and adjusted them for this job."}</span>
             </label>
           </div>}
 
           {unresolvedUnitLineItems.length > 0 && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950">
-            <p role="alert" className="font-semibold">Choose a recognized unit for every flagged line item before saving.</p>
-            <p className="mt-1">Choose a unit in each highlighted line item. Units affect both quantities and rates.</p>
+            <p role="alert" className="font-semibold">{language === "es" ? "Elige una unidad reconocida para cada partida marcada antes de guardar." : "Choose a recognized unit for every flagged line item before saving."}</p>
+            <p className="mt-1">{language === "es" ? "Selecciona una unidad en cada partida resaltada. Las unidades afectan las cantidades y las tarifas." : "Choose a unit in each highlighted line item. Units affect both quantities and rates."}</p>
           </div>}
 
           {reviewNoteLineItems.length > 0 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-            <p role="alert" className="font-semibold">Review the flagged quantities and possible scope overlap before saving.</p>
+            <p role="alert" className="font-semibold">{language === "es" ? "Revisa las cantidades marcadas y cualquier posible duplicación del trabajo antes de guardar." : "Review the flagged quantities and possible scope overlap before saving."}</p>
             <label className="mt-2 flex items-start gap-2">
               <input id="draft-review-confirmation" type="checkbox" required checked={draftReviewConfirmed} onChange={(event) => setDraftReviewConfirmationKey(event.target.checked ? draftReviewKey : "")} className="mt-0.5" />
-              <span>I checked the flagged quantities, units, and included work against this job.</span>
+              <span>{language === "es" ? "Verifiqué las cantidades, unidades y el trabajo incluido para este proyecto." : "I checked the flagged quantities, units, and included work against this job."}</span>
             </label>
           </div>}
 
@@ -967,8 +1035,8 @@ export default function CreateEstimatePage() {
             <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
             {!isProSubscriber && <div className="rounded-lg border border-purple-200 bg-white p-3">
               <p className="text-sm font-semibold text-slate-900">{language === "es" ? "La redacción de partidas con IA está incluida con Pro." : "AI line-item drafting is included with Pro."}</p>
-              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Puedes seguir creando partidas y usando tu lista de precios gratis. Mejora a Pro cuando quieras que la IA prepare un borrador." : "You can still create line items and use your Price Book for free. Upgrade when you want AI to prepare a draft."}</p>
-              <Link href="/profile" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800">{language === "es" ? "Ver Pro" : "View Pro"}</Link>
+              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "La redacción con IA forma parte de Pro. Puedes seguir creando partidas y usando tu lista de precios gratis." : "AI drafting is part of Pro. Your manual estimates and Price Book remain available on Free."}</p>
+              <ProPlanAction className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800 hover:bg-purple-50" />
             </div>}
             {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             {isProSubscriber ? <div className="space-y-2">
@@ -1030,7 +1098,7 @@ export default function CreateEstimatePage() {
                 </div>
               )}
             </div>
-            {!isProSubscriber && <p className="text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span>{" "}<Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
+            {!isProSubscriber && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span><ProPlanAction variant="text" /></div>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
               <span className="text-slate-600">{language === "es" ? "Subtotal de partidas:" : "Line-item subtotal:"}</span>
@@ -1053,18 +1121,18 @@ export default function CreateEstimatePage() {
               <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
               {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
             </div>
-            {!isProSubscriber && <p className="mt-3 text-xs text-slate-500">Upgrade to Pro to add customer-selectable package options.</p>}
+            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
             {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
           </section>
 
           {/* Submit Button */}
-          <p className="text-center text-xs text-slate-600">Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature.</p>
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; enviar cotizaciones por email es una función Pro." : "Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
           <button
             type="submit"
-            disabled={saving || !connectionOnline}
+            disabled={saving || !connectionOnline || Boolean(partialSavedEstimateId)}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-colors shadow-sm disabled:opacity-50 text-sm"
           >
-            {saving ? "Saving Estimate..." : "Save Estimate"}
+            {saving ? (language === "es" ? "Guardando cotización…" : "Saving estimate…") : partialSavedEstimateId ? (language === "es" ? "Abre la cotización guardada" : "Open the saved estimate above") : (language === "es" ? "Guardar cotización" : "Save estimate")}
           </button>
         </form>
       </div>

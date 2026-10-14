@@ -18,7 +18,7 @@ const appLinks = [
 ];
 
 export default function HeaderNav() {
-  const { language, setLanguage } = useLanguage();
+  const { language } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +96,6 @@ export default function HeaderNav() {
   if (!user) {
     return (
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"}>
-          {language === "en" ? "ES" : "EN"}
-        </button>
         <Link href="/login" className="inline-flex min-h-12 items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 hover:text-white">
           {translate(language, "Sign in")}
         </Link>
@@ -144,9 +141,6 @@ export default function HeaderNav() {
   return (
     <>
     <div className="relative flex w-full items-center justify-end gap-1 sm:gap-2 lg:w-auto">
-      <button type="button" onClick={() => setLanguage(language === "en" ? "es" : "en")} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-xs font-bold text-slate-100 transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400" aria-label={language === "en" ? "Cambiar a español" : "Switch to English"} title={language === "en" ? "Cambiar a español" : "Switch to English"}>
-        {language === "en" ? "ES" : "EN"}
-      </button>
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
         {renderLinks()}
       </nav>

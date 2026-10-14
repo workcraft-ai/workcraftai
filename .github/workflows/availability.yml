@@ -35,9 +35,21 @@ jobs:
             echo "::error::Set the repository CRON_SECRET to match Vercel Production. Notification retries are not scheduled without it."
             exit 1
           fi
-          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 55 --header "Authorization: Bearer $CRON_SECRET" https://app.workcraftai.com/api/cron/notifications)
-          echo "Notification retry HTTP status: ${status}"
-          [[ "$status" == "200" ]]
+          for attempt in 1 2; do
+            if status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 55 --header "Authorization: Bearer $CRON_SECRET" https://app.workcraftai.com/api/cron/notifications); then
+              :
+            else
+              status="000"
+            fi
+            echo "Notification retry HTTP status: ${status} (attempt ${attempt}/2)"
+            [[ "$status" == "200" ]] && exit 0
+            if [[ "$attempt" -eq 1 ]] && { [[ "$status" =~ ^5[0-9]{2}$ ]] || [[ "$status" == "000" || "$status" == "408" || "$status" == "429" ]]; }; then
+              echo "::warning::Notification retry returned a transient failure; retrying once after 8 seconds."
+              sleep 8
+              continue
+            fi
+            exit 1
+          done
 
       - name: Retry queued Stripe webhooks
         if: ${{ always() }}

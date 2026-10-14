@@ -7,6 +7,7 @@ import { LocalizedTree, translate, useLanguage } from "@/app/components/Language
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItemInput {
   description: string;
@@ -31,6 +32,7 @@ export default function EditEstimatePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const [isPro, setIsPro] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
 
@@ -114,7 +116,7 @@ export default function EditEstimatePage() {
 
   const handleRemoveItem = (index: number) => {
     if (lineItems.length === 1) {
-      alert("An estimate must contain at least one line item.");
+      setFormError(language === "es" ? "La cotización debe incluir al menos una partida." : "Keep at least one line item on the estimate.");
       return;
     }
     setLineItems(lineItems.filter((_, i) => i !== index));
@@ -125,6 +127,7 @@ export default function EditEstimatePage() {
     field: keyof LineItemInput,
     value: string | number
   ) => {
+    setFormError("");
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
     setLineItems(updated);
@@ -139,21 +142,22 @@ export default function EditEstimatePage() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError("");
     const nonEmptyLineItems = lineItems.filter((item) => item.description.trim());
     if (!nonEmptyLineItems.length) {
-      alert("Add at least one line item with a description.");
+      setFormError(language === "es" ? "Agrega al menos una partida con una descripción." : "Add at least one line item with a description.");
       return;
     }
     if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0)) {
-      alert("Line item quantities must be greater than zero and prices cannot be negative.");
+      setFormError(language === "es" ? "Las cantidades deben ser mayores que cero y los precios no pueden ser negativos." : "Quantities must be greater than zero and prices cannot be negative.");
       return;
     }
     if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {
-      alert(translate(language, "Add a customer-facing work summary or choose detailed line items."));
+      setFormError(translate(language, "Add a customer-facing work summary or choose detailed line items."));
       return;
     }
     if (proposalSummary.trim().length > 1200) {
-      alert(translate(language, "The work summary must be 1,200 characters or less."));
+      setFormError(translate(language, "The work summary must be 1,200 characters or less."));
       return;
     }
     if (!zeroRateConfirmed) return;
@@ -188,8 +192,8 @@ export default function EditEstimatePage() {
       // Return to the dashboard so the contractor can review and share the updated proposal.
       router.push("/dashboard");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      alert(`${language === "es" ? "Error al actualizar la cotización: " : "Error updating estimate: "}${translate(language, message)}`);
+      console.error("Estimate update failed:", err instanceof Error ? err.message : "unknown error");
+      setFormError(language === "es" ? "No se pudo actualizar la cotización. Revisa los datos e inténtalo de nuevo." : "We couldn’t update this estimate. Check the details and try again.");
     } finally {
       setSaving(false);
     }
@@ -208,9 +212,11 @@ export default function EditEstimatePage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-6">
         <form
+          noValidate
           onSubmit={handleUpdate}
           className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6"
         >
+          {formError && <p role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900">{formError}</p>}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h1 className="text-xl font-bold text-slate-900">Edit Estimate</h1>
@@ -241,21 +247,20 @@ export default function EditEstimatePage() {
                   required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label htmlFor="edit-client-email" className="block text-xs font-medium text-slate-700 mb-1">
-                  Client Email *
+                  {language === "es" ? "Correo electrónico del cliente (opcional)" : "Customer email (optional)"}
                 </label>
                 <input
                   id="edit-client-email"
                   type="email"
-                  required
                   value={clientEmail}
                   onChange={(e) => setClientEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -266,9 +271,10 @@ export default function EditEstimatePage() {
                 <input
                   id="edit-client-phone"
                   type="tel"
+                  inputMode="tel"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -281,7 +287,7 @@ export default function EditEstimatePage() {
                   type="text"
                   value={jobAddress}
                   onChange={(e) => setJobAddress(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div><label htmlFor="edit-proposal-language" className="block text-xs font-medium text-slate-700 mb-1">Customer proposal language</label><select id="edit-proposal-language" value={proposalLanguage} onChange={(event) => setProposalLanguage(event.target.value === "es" ? "es" : "en")} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="en">English proposal</option><option value="es">Spanish proposal</option></select></div>
@@ -419,7 +425,7 @@ export default function EditEstimatePage() {
           {isPro ? <section className="space-y-3 rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best</h2><p className="mt-1 text-xs text-slate-500">Add or adjust service options customers can choose from.</p></div><button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add options"}</button></div>
             {packageOptions.length > 0 && <div className="grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-600">{option.name}</p><input aria-label={`${option.name} description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="What's included?" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm" /></div>)}</div>}
-          </section> : <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><span>Good / Better / Best options are included with Pro.</span>{" "}<a href="/profile" className="font-semibold text-blue-700 underline">Upgrade to Pro</a></section>}
+          </section> : <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><span>Good / Better / Best options are included with Pro.</span>{" "}<ProPlanAction variant="text" /></section>}
 
           {/* Financial Totals */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -434,6 +440,8 @@ export default function EditEstimatePage() {
                 />
                 <span>{isPro ? "Require Down-Payment / Deposit" : "Require Down-Payment / Deposit (Pro)"}</span>
               </label>
+
+              {!isPro && <ProPlanAction variant="text" />}
 
               {requireDeposit && (
                 <div className="flex items-center space-x-2">

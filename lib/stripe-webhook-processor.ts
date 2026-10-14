@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { syncStripeSubscription } from "@/lib/stripe-subscription-sync";
+import { SubscriptionRefreshBusyError, syncStripeSubscription } from "@/lib/stripe-subscription-sync";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
@@ -244,7 +244,15 @@ export async function processVerifiedStripeEvent(event: Stripe.Event, requestUrl
     const message = processingError instanceof Error ? processingError.message : "unknown error";
     // Reserve a separate short cleanup budget after the processing deadline.
     // If this fails, the claim lease expires and the durable worker can retry.
-    await getServiceSupabase(1_500).rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
+    const { error: retryError } = await getServiceSupabase(1_500).rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
+    if (retryError) {
+      console.error("Stripe webhook retry could not be scheduled:", event.type, retryError.message);
+      return NextResponse.json({ error: "Webhook retry could not be scheduled." }, { status: 500 });
+    }
+    if (processingError instanceof SubscriptionRefreshBusyError) {
+      console.info("Stripe subscription event deferred for a concurrent refresh:", event.type);
+      return NextResponse.json({ received: true, deferred: true }, { status: 202 });
+    }
     console.error("Stripe webhook business processing failed:", event.type, message);
     return NextResponse.json({ error: "Webhook processing failed. The durable worker will retry this event." }, { status: 500 });
   }

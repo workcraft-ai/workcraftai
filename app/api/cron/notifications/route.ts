@@ -20,18 +20,24 @@ export const GET = withApiFailureMetrics("/api/cron/notifications", async (reque
     auth: {persistSession: false},
     global: {fetch: createBoundedFetch(5_000,deadlineAt)},
   });
+  let phase = "notification_processing";
   try {
     const result = await processNotifications(admin, undefined, 4, 6000,deadlineAt);
+    phase = "share_secret_maintenance";
     const shareSecretsUpgraded = await upgradeLegacyShareSecrets(admin);
     if (credential === "database") {
+      phase = "scheduler_heartbeat";
       const { error: heartbeatError } = await admin.from("operational_heartbeats").upsert({
         name: "supabase_scheduler_notifications", last_success_at: new Date().toISOString(),
       });
       if (heartbeatError) throw heartbeatError;
     }
     return NextResponse.json({sent: result.sent, pending: result.pending,shareSecretsUpgraded}, {headers: {"Cache-Control": "no-store"}});
-  } catch {
-    console.error("Notification retry could not complete.");
+  } catch (error) {
+    console.error("Notification retry could not complete.", {
+      phase,
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
     return NextResponse.json({error: "Notification retry is temporarily unavailable."}, {status: 503});
   }
 });

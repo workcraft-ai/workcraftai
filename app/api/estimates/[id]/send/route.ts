@@ -36,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, reference_number, user_id, client_name, client_email, job_address, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, updated_at").eq("id", id).eq("user_id", user.id).single();
   if (estimateError || !estimate) return NextResponse.json({ error: "Estimate not found in your account." }, { status: 404 });
+  if (!estimate.client_email?.trim()) return NextResponse.json({ error: "Add a customer email address before sending this estimate by email. You can still copy and share its link." }, { status: 400 });
   const { data: items, error: itemsError } = await supabase.from("line_items").select("description, description_es, quantity, unit, unit_price").eq("estimate_id", id);
   if (itemsError) {
     console.error("Could not load estimate line items for email:", itemsError.message);

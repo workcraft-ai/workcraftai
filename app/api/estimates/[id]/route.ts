@@ -123,7 +123,7 @@ export async function PUT(
   const markupPercentage = Number(body.markup_percentage);
   const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
   const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
-  if (!clientName || clientName.length > 200 || !clientEmail || clientEmail.length > 320 ||
+  if (!clientName || clientName.length > 200 || (clientEmail.length > 0 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320)) ||
       clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(body.lineItems) ||
       !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100) {
     return jsonError("Check the customer details, deposit percentage, and line items.", 400);
