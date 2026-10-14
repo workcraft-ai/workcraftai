@@ -45,12 +45,34 @@ function billingActionLabel(language: Language, status: string, billingReady: bo
   return translate(language, "Manage billing");
 }
 
+function localizePlanActionError(language: Language, message: string) {
+  const spanishMessages: Record<string, string> = {
+    "Unable to start checkout.": "No se pudo abrir el pago. Inténtalo de nuevo.",
+    "Pro checkout is temporarily unavailable. Please try again.": "El pago de Pro no está disponible temporalmente. Inténtalo de nuevo.",
+    "Could not start Pro checkout. Please try again.": "No se pudo iniciar el pago de Pro. Inténtalo de nuevo.",
+    "Could not verify your plan.": "No se pudo verificar tu plan. Actualiza la página e inténtalo de nuevo.",
+    "Your account already has Pro access.": "Tu cuenta ya tiene acceso a Pro. Actualiza la página para ver tu plan.",
+    "Your account already has Pro.": "Tu cuenta ya tiene Pro. Actualiza la página para ver tu plan.",
+    "Use Manage billing to resolve your existing subscription before starting another.": "Usa Administrar facturación para resolver tu suscripción actual antes de iniciar otra.",
+    "Your payment is processing. Refresh your profile in a moment.": "Tu pago se está procesando. Actualiza tu perfil en un momento.",
+    "Could not refresh Pro checkout. Please try again.": "No se pudo actualizar el pago de Pro. Inténtalo de nuevo.",
+    "A new checkout is being prepared. Please try again in a moment.": "Se está preparando un nuevo pago. Inténtalo de nuevo en un momento.",
+    "Checkout is being finalized. Refresh your profile and try again shortly.": "Se está finalizando el pago. Actualiza tu perfil e inténtalo de nuevo en breve.",
+    "Unable to open billing settings.": "No se pudo abrir la configuración de facturación. Inténtalo de nuevo.",
+    "Could not open billing settings. Please try again.": "No se pudo abrir la configuración de facturación. Inténtalo de nuevo.",
+    "Billing settings are temporarily unavailable. Please try again.": "La configuración de facturación no está disponible temporalmente. Inténtalo de nuevo.",
+    "Sign in to upgrade.": "Inicia sesión para actualizar tu plan.",
+  };
+  return language === "es" ? spanishMessages[message] ?? "No se pudo completar la acción de facturación. Inténtalo de nuevo o comunícate con soporte." : message;
+}
+
 export default function ProfilePage() {
   const { language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [planActionError, setPlanActionError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -211,27 +233,29 @@ export default function ProfilePage() {
   };
 
   const handleUpgrade = async () => {
-    setUpgrading(true); setError(null);
+    setUpgrading(true);
+    setPlanActionError(null);
     try {
       const response = await fetch("/api/pro/checkout", { method: "POST" });
       const result = await response.json();
       if (!response.ok || !result.url) throw new Error(result.error || "Unable to start checkout.");
       window.location.href = result.url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to start checkout.");
+      setPlanActionError(err instanceof Error ? err.message : "Unable to start checkout.");
       setUpgrading(false);
     }
   };
 
   const handleManageBilling = async () => {
-    setManagingBilling(true); setError(null);
+    setManagingBilling(true);
+    setPlanActionError(null);
     try {
       const response = await fetch("/api/pro/portal", { method: "POST" });
       const result = await response.json();
       if (!response.ok || !result.url) throw new Error(result.error || "Unable to open billing settings.");
       window.location.href = result.url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to open billing settings.");
+      setPlanActionError(err instanceof Error ? err.message : "Unable to open billing settings.");
       setManagingBilling(false);
     }
   };
@@ -294,6 +318,7 @@ export default function ProfilePage() {
           {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : billingActionLabel(language, planStatus, trialBillingReady)}</button>}
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Upgrade to Pro"}</button>}
         </div>
+        {planActionError && <p role="alert" aria-live="assertive" className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-800">{localizePlanActionError(language, planActionError)}</p>}
         {!hasProAccess && <p className="w-full text-xs text-slate-600">{language === "es"
           ? trialAvailable ? "Prueba todas las funciones Pro gratis durante 14 días. No se requiere tarjeta. La prueba termina automáticamente; agrega los datos de facturación antes de que termine para continuar a $9.99 al mes. Si no te suscribes, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen." : "WorkCraft AI Pro cuesta $9.99 al mes. Las funciones gratuitas siguen disponibles. Esta cuenta ya usó una prueba Pro o no es apta para una prueba."
           : trialAvailable ? "Try every Pro feature free for 14 days. No card required. The trial ends automatically; add billing details before it ends to continue at $9.99/month. Your account returns to Free if you do not subscribe, and your saved data remains." : "WorkCraft AI Pro is $9.99 per month. Free features remain available. This account has already used or is not eligible for a Pro trial."}</p>}
