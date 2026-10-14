@@ -187,7 +187,11 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
     warnings.push({ code: "db_idle_transactions", source: "supabase_database", used: idleInTransaction,
       action: "Several database sessions are idle in a transaction; inspect open transactions and function logs." });
   }
-  const apiFailureRows = (apiFailuresResult.data ?? []) as Array<{ route: string; failure_count: number }>;
+  // This endpoint deliberately returns 503 when it detects an alert condition.
+  // Exclude its own alert responses so the monitor cannot inflate the API 5xx
+  // count that it uses to decide whether to fail the next check.
+  const apiFailureRows = ((apiFailuresResult.data ?? []) as Array<{ route: string; failure_count: number }>)
+    .filter((row) => row.route !== "/api/cron/operations-check");
   const apiFailureCount = apiFailureRows.reduce((sum, row) => sum + (Number.isFinite(Number(row.failure_count)) ? Number(row.failure_count) : 0), 0);
   const failingRoutes = apiFailureRows.filter((row) => row.failure_count > 0).map((row) => row.route).slice(0, 5);
   if (apiFailureCount >= 10) {
