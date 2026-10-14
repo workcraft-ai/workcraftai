@@ -103,8 +103,6 @@ export async function POST(request: Request) {
   checkoutStage = "create_stripe_checkout_session";
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
-    // Keep WorkCraft account billing on the standard payment flow without Link prompts.
-    excluded_payment_method_types: ["link"],
     line_items: [{ price: proPriceId, quantity: 1 }],
     payment_method_collection: trialEligible ? "if_required" : "always",
     ...customer,
