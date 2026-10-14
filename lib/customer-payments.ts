@@ -56,6 +56,8 @@ export async function createConnectedCheckout(input: {
   const title = input.kind === "deposit" ? "Estimate down payment" : "Estimate payment";
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    // Prevent Stripe Link from prompting customers to verify or create a Link account.
+    excluded_payment_method_types: ["link"],
     customer_email: input.estimate.client_email || undefined,
     client_reference_id: input.estimate.id,
     line_items: [{

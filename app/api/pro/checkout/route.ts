@@ -96,6 +96,8 @@ export async function POST(request: Request) {
     .split("").map((character) => "abcdefghijklmnopqrstuvwxyz"[Number.parseInt(character, 16) % 26]).join("");
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
+    // Keep WorkCraft account billing on the standard payment flow without Link prompts.
+    excluded_payment_method_types: ["link"],
     line_items: [{ price: proPriceId, quantity: 1 }],
     payment_method_collection: trialEligible ? "if_required" : "always",
     ...customer,
