@@ -108,7 +108,7 @@ export function ProPlanAction({ className, variant = "button" }: ProPlanActionPr
 }
 
 function isWorkspaceNavigation(pathname: string) {
-  return ["/dashboard", "/customers", "/pricebook"].includes(pathname);
+  return ["/dashboard", "/customers", "/schedule", "/pricebook", "/reports"].includes(pathname);
 }
 
 export function ProPlanBanner() {
