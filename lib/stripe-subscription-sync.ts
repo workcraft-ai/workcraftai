@@ -4,6 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type CheckoutIdentity = { userId: string; attemptId: string; sessionId: string };
 
+export class SubscriptionRefreshBusyError extends Error {
+  constructor() {
+    super("Subscription refresh is busy; retry the event.");
+    this.name = "SubscriptionRefreshBusyError";
+  }
+}
+
 /** The database lease is acquired before the authoritative provider refresh.
  * Its UUID fences an expired worker from committing after another worker takes
  * over. Only a verified, reserved Checkout can adopt a different subscription.
@@ -23,7 +30,7 @@ export async function syncStripeSubscription(
     p_user_id: userId, p_token: token,
   });
   if (claimError) throw claimError;
-  if (acquired !== true) throw new Error("Subscription refresh is busy; retry the event.");
+  if (acquired !== true) throw new SubscriptionRefreshBusyError();
   try {
     const { data: current, error: readError } = await admin.from("subscriptions")
       .select("stripe_subscription_id,stripe_subscription_created_at")

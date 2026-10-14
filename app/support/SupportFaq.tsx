@@ -30,7 +30,7 @@ const questions = [
   },
   {
     question: "How does the free Pro trial work?",
-    answer: "Eligible WorkCraft AI accounts can start one 14-day Pro trial from Profile. No payment method is required to start. The trial ends automatically and the account returns to Free if you do not add billing details. To keep Pro, add a payment method in Manage billing before the trial ends; the subscription then costs $9.99/month. Saved estimates and other account data remain if the trial ends.",
+    answer: "Eligible WorkCraft AI accounts can start one 14-day Pro trial from Profile → Your plan or from a trial offer shown on the Dashboard, Customers, Price Book, or a Pro feature. No payment method is required to start. Once the trial is active, these offers change to Upgrade to Pro; paid Pro accounts no longer see them. The trial ends automatically and the account returns to Free if you do not add billing details. To keep Pro, add a payment method in Manage billing before the trial ends; the subscription then costs $9.99/month. Saved estimates and other account data remain if the trial ends.",
   },
   {
     question: "Can my customer review a proposal without an account?",

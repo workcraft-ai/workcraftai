@@ -106,7 +106,7 @@ export default function SignupForm() {
         </h1>
 
         <p className="mt-2 text-sm text-[#c8d1ca]">
-          Create your free account. After confirming your email, start a 14-day Pro trial from Profile—no card required.
+          Create a free account. After confirming your email, eligible accounts can start one 14-day Pro trial from Profile or an offer in the app—no card required to start.
         </p>
       </div>
 

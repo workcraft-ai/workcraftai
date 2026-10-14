@@ -77,7 +77,7 @@ Link each post to a relevant page with a simple campaign tag, for example `https
 4. Start with the built-in Meta Business Suite scheduler for Facebook and Instagram. It costs nothing and avoids managing API tokens while validating the content rhythm.
 5. Keep generated posts in a **review queue** for the first few weeks. Check that product claims are accurate, links work, spelling is clean, and the graphic is legible on a phone. Then mark posts approved and schedule them.
 
-### Move routine posts to full automation after the trial
+### Move routine posts to full automation after the review period
 
 Once the review queue is consistently producing accurate posts, the same workflow can publish automatically:
 
@@ -112,6 +112,26 @@ The first objective is an **activated contractor**: someone who saves a real est
 | Days 61–90 | Publish trade-specific estimate examples based on the trades active in the cohort. Reuse the most helpful post formats. Consider a tightly capped paid experiment only after the first-estimate funnel can be measured. | Keep channels with repeat use and a practical acquisition cost; stop those producing only curiosity visits. |
 
 Use these stages when reviewing a source each week: public-page visit → signup click → completed signup → first estimate saved → first customer link shared → second-week return → Pro purchase. The public website records page views and the `signup_click` event in Google Analytics only after a visitor allows optional analytics. This does not measure completed signup or join a website visitor to an app account. Use existing app records for later stages and report public-site conversion only for consenting visitors; do not claim a full cross-domain conversion rate. Never put personal data or estimate content in event properties or UTM tags. Confirm the GA4 property for `G-SNVSN55B8S` receives a consented visit and `signup_click` in Realtime after deployment.
+
+### 14-day Pro trial campaign copy
+
+Use these drafts when promoting the trial. Keep the eligibility and billing terms visible in the post or linked pricing page; do not imply every account will qualify or that a card is required to begin. Do not say the trial converts automatically without clarifying that the user must add billing to continue. The in-app offer appears after sign-in; it is also available under Profile → Your plan. Do not publish these drafts automatically—review each caption and link before scheduling.
+
+**Facebook / Instagram — English**
+
+> Put estimates, customer approvals, and job details in one place. Eligible WorkCraft AI accounts can try Pro for 14 days without adding a card to start. Find the offer in the app or under Profile → Your plan. Add billing during the trial to continue at $9.99/month; if you don't, the account returns to Free and your saved work stays available. Start with a free account: https://app.workcraftai.com/signup
+
+**LinkedIn — English**
+
+> WorkCraft AI brings estimates, proposals, and job follow-through into one workspace for independent contractors. Eligible accounts can try Pro for 14 days with no payment method required at trial start. The in-app offer and Profile → Your plan show the next step. To continue at $9.99/month after the trial, add billing before it ends; otherwise access returns to Free and saved work remains. Learn more: https://workcraftai.com/#plans
+
+**Facebook / Instagram — Español**
+
+> Organiza cotizaciones, aprobaciones de clientes y detalles del trabajo en un solo lugar. Las cuentas aptas de WorkCraft AI pueden probar Pro durante 14 días sin agregar una tarjeta para comenzar. Busca la oferta en la aplicación o en Perfil → Tu plan. Agrega los datos de facturación durante la prueba para continuar a $9.99 al mes; si no, la cuenta vuelve al plan Gratis y tu trabajo guardado permanece disponible. Crea una cuenta gratis: https://app.workcraftai.com/signup
+
+**LinkedIn — Español**
+
+> WorkCraft AI reúne cotizaciones, propuestas y seguimiento de trabajos para contratistas independientes. Las cuentas aptas pueden probar Pro durante 14 días sin agregar un método de pago al comenzar. La oferta en la aplicación y Perfil → Tu plan indican el siguiente paso. Para continuar a $9.99 al mes después de la prueba, agrega los datos de facturación antes de que termine; de lo contrario, el acceso vuelve al plan Gratis y tu trabajo guardado permanece. Más información: https://workcraftai.com/es/#plans
 
 ### Copy starters
 
