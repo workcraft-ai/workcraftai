@@ -5,6 +5,7 @@ import Footer from "@/app/components/Footer";
 import Logo from "@/app/components/Logo";
 import AccountActivityTracker from "@/app/components/AccountActivityTracker";
 import { LanguageProvider } from "@/app/components/LanguageProvider";
+import { ProPlanBanner, ProPlanProvider } from "@/app/components/ProPlanExperience";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -43,6 +44,9 @@ export default function RootLayout({
       React.createElement(
       LanguageProvider,
       null,
+      React.createElement(
+      ProPlanProvider,
+      null,
       React.createElement(AccountActivityTracker, null),
       React.createElement(
           "header",
@@ -50,8 +54,10 @@ export default function RootLayout({
           React.createElement(Logo, null),
           React.createElement(HeaderNav, null)
         ),
+        React.createElement(ProPlanBanner, null),
         React.createElement("main", { className: "flex-1" }, children),
         React.createElement(Footer, null)
+      )
       )
     )
   );

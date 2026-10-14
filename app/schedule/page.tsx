@@ -7,6 +7,7 @@ import { readAllPages } from "@/lib/read-all-pages";
 import { supabase } from "@/lib/supabase";
 import { isLocalDateTimeAmbiguous, localDateTimeToIso, toLocalDateTimeInput } from "@/lib/localDateTime.mjs";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
@@ -194,7 +195,7 @@ export default function SchedulePage() {
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-700">WorkCraft AI Pro</p>
           <h1 className="mt-2 text-2xl font-bold">Scheduling and job tracking are Pro features</h1>
           <p className="mt-3 text-sm text-slate-600">Upgrade to schedule jobs, track job costs, and manage invoice status. Your existing data is preserved and available again if Pro is reactivated.</p>
-          <Link href="/profile" className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">View plans and upgrade</Link>
+          <ProPlanAction className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-800" />
         </section> : <>
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div>

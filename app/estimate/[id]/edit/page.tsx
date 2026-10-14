@@ -7,6 +7,7 @@ import { LocalizedTree, translate, useLanguage } from "@/app/components/Language
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItemInput {
   description: string;
@@ -424,7 +425,7 @@ export default function EditEstimatePage() {
           {isPro ? <section className="space-y-3 rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best</h2><p className="mt-1 text-xs text-slate-500">Add or adjust service options customers can choose from.</p></div><button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add options"}</button></div>
             {packageOptions.length > 0 && <div className="grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-600">{option.name}</p><input aria-label={`${option.name} description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="What's included?" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm" /></div>)}</div>}
-          </section> : <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><span>Good / Better / Best options are included with Pro.</span>{" "}<a href="/profile" className="font-semibold text-blue-700 underline">Upgrade to Pro</a></section>}
+          </section> : <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><span>Good / Better / Best options are included with Pro.</span>{" "}<ProPlanAction variant="text" /></section>}
 
           {/* Financial Totals */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -439,6 +440,8 @@ export default function EditEstimatePage() {
                 />
                 <span>{isPro ? "Require Down-Payment / Deposit" : "Require Down-Payment / Deposit (Pro)"}</span>
               </label>
+
+              {!isPro && <ProPlanAction variant="text" />}
 
               {requireDeposit && (
                 <div className="flex items-center space-x-2">

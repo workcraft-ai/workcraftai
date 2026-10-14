@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { amountToCents, calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface JobInvoice {
   id: string;
@@ -133,7 +134,7 @@ export default function InvoicePage() {
               <select aria-label="Invoice status" value={job.invoice_status} onChange={(event) => void setStatus(event.target.value as JobInvoice["invoice_status"])} className="min-h-12 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
                 <option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option>
               </select>
-            ) : <Link href="/profile" className="self-center text-xs font-semibold text-blue-700 underline">Manage invoice status with Pro</Link>}
+            ) : <ProPlanAction className="self-center text-xs font-semibold text-blue-700 underline" variant="text" />}
             {isPro && (
               <button type="button" aria-busy={emailSending} disabled={emailSending || !canSendInvoice} onClick={() => void sendInvoiceEmail()} className="min-h-12 rounded-lg bg-[#c85b2d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a94724] disabled:cursor-not-allowed disabled:opacity-60">
                 {emailSending ? "Sending invoice email…" : job.invoice_status === "sent" ? "Resend invoice email" : "Send invoice email"}

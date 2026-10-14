@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { calculateEstimateMoney, percentageOfCents } from "@/lib/estimate-money.mjs";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItem {
   id: string;
@@ -406,7 +406,7 @@ export default function ClientEstimatePage() {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && (ownerHasPro
               ? <button type="button" disabled={creatingInvoice} onClick={() => void createOrOpenInvoice()} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60">{creatingInvoice ? "Creating invoice…" : invoiceJobId ? "View invoice" : "Create invoice"}</button>
-              : <Link href="/profile" className="rounded-lg border border-orange-300 px-3 py-1.5 font-semibold text-orange-100 hover:bg-slate-800">Create invoice (Pro)</Link>)}
+              : <div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-orange-100">Invoice creation is included with Pro:</span><ProPlanAction className="inline-flex min-h-10 items-center rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-100 hover:bg-slate-800" /> </div>)}
             <button
               type="button"
               onClick={() => router.push(`/estimate/${id}/edit`)}

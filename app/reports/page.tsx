@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 type Estimate = { id: string; reference_number: string; status: string; created_at: string; total_cents: number };
 type FinancialSummary = { completed_count: number; completed_total_cents: number; revenue_cents: number; cost_cents: number; unknown_tax_count: number };
@@ -67,7 +68,7 @@ export default function ReportsPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-800">Business overview</p><h1 className="mt-1 text-2xl font-bold">Reports</h1><p className="mt-1 text-sm text-slate-600">Estimate pipeline reports are included with Free. Pro adds job-value and gross-profit reports.</p></div>
-          <div className="flex flex-wrap gap-2">{!isPro && <Link href="/profile" className="inline-flex min-h-12 items-center rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400">Unlock job reports</Link>}<button type="button" onClick={() => void loadReport()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Refresh</button></div>
+          <div className="flex flex-wrap gap-2">{!isPro && <ProPlanAction />}<button type="button" onClick={() => void loadReport()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">Refresh</button></div>
         </header>
 
         {error && <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}

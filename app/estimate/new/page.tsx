@@ -15,6 +15,7 @@ import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
+import { ProPlanAction } from "@/app/components/ProPlanExperience";
 
 interface LineItemInput {
   description: string;
@@ -711,7 +712,7 @@ export default function CreateEstimatePage() {
               {proStatus === "checking" ? (language === "es" ? "Verificando tu plan…" : "Checking your plan…") : isProSubscriber ? "✦ Pro Plan (Cloud AI drafting)" : "Free Plan (Price Book + manual estimates)"}
             </span>
           </div>
-          {proStatus === "checking" ? <span role="status" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-200">{language === "es" ? "Cargando acceso" : "Loading access"}</span> : isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <Link href="/profile" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200 transition-colors hover:bg-slate-700">Upgrade to Pro</Link>}
+          {proStatus === "checking" ? <span role="status" className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-slate-200">{language === "es" ? "Cargando acceso" : "Loading access"}</span> : isProSubscriber ? <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-semibold text-green-300">Pro active</span> : <span className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 font-medium text-slate-200">{language === "es" ? "Plan Gratis" : "Free Plan"}</span>}
         </div>
         <div role="status" className={`rounded-lg border px-4 py-2.5 text-xs ${connectionOnline ? "border-green-200 bg-green-50 text-green-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
           {connectionOnline ? "Online · You can create estimates and upload field notes." : "Offline · You can edit and save drafts with photos and voice notes on this device. Reconnect to create the estimate."}
@@ -893,7 +894,7 @@ export default function CreateEstimatePage() {
                 });
                 setDraftMessage(photos.length !== selected.length ? "Only supported photos up to 8 MB each were added." : selected.length > photos.length || attachments.filter((item) => item.mediaType === "photo").length + photos.length > 6 ? "Up to 6 photos can be attached." : "");
                 event.currentTarget.value = "";
-              }} /></label> : <Link href="/profile" className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700">View Pro</Link>}
+              }} /></label> : <ProPlanAction className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-slate-50" />}
               {isProSubscriber && (recording ? <button type="button" onClick={stopVoiceNote} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Stop recording</button> : <button type="button" disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} onClick={() => void startVoiceNote()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Record voice note</button>)}
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
@@ -1034,8 +1035,8 @@ export default function CreateEstimatePage() {
             <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
             {!isProSubscriber && <div className="rounded-lg border border-purple-200 bg-white p-3">
               <p className="text-sm font-semibold text-slate-900">{language === "es" ? "La redacción de partidas con IA está incluida con Pro." : "AI line-item drafting is included with Pro."}</p>
-              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Puedes seguir creando partidas y usando tu lista de precios gratis. Mejora a Pro cuando quieras que la IA prepare un borrador." : "You can still create line items and use your Price Book for free. Upgrade when you want AI to prepare a draft."}</p>
-              <Link href="/profile" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800">{language === "es" ? "Ver Pro" : "View Pro"}</Link>
+              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "La redacción con IA forma parte de Pro. Puedes seguir creando partidas y usando tu lista de precios gratis." : "AI drafting is part of Pro. Your manual estimates and Price Book remain available on Free."}</p>
+              <ProPlanAction className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800 hover:bg-purple-50" />
             </div>}
             {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             {isProSubscriber ? <div className="space-y-2">
@@ -1097,7 +1098,7 @@ export default function CreateEstimatePage() {
                 </div>
               )}
             </div>
-            {!isProSubscriber && <p className="text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span>{" "}<Link href="/profile" className="font-semibold text-blue-700 underline">View Pro</Link></p>}
+            {!isProSubscriber && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500"><span>Online deposits and customer payments require Pro and a connected Stripe account.</span><ProPlanAction variant="text" /></div>}
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm">
               <span className="text-slate-600">{language === "es" ? "Subtotal de partidas:" : "Line-item subtotal:"}</span>
@@ -1120,12 +1121,12 @@ export default function CreateEstimatePage() {
               <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
               {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
             </div>
-            {!isProSubscriber && <p className="mt-3 text-xs text-slate-500">Upgrade to Pro to add customer-selectable package options.</p>}
+            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
             {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
           </section>
 
           {/* Submit Button */}
-          <p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; enviar cotizaciones por email es una función Pro." : "Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature."}</p>
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; enviar cotizaciones por email es una función Pro." : "Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
           <button
             type="submit"
             disabled={saving || !connectionOnline || Boolean(partialSavedEstimateId)}
