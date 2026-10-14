@@ -508,6 +508,16 @@ export default function AdminPage() {
     }
   };
 
+  const moveEstimateTradeOption = (index: number, direction: -1 | 1) => {
+    setEstimateTradeOptions((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const reordered = [...current];
+      [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+      return reordered;
+    });
+  };
+
   if (accessState === "loading") return <LocalizedTree><main className="mx-auto max-w-6xl px-4 py-14"><p className="text-slate-600">Checking administrator access…</p></main></LocalizedTree>;
   if (accessState !== "ready") return <LocalizedTree><main className="mx-auto max-w-3xl px-4 py-14"><section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-bold text-slate-900">Admin support</h1><p className="mt-3 text-slate-600">{accessState === "denied" ? "This account does not have support-console access." : error}</p></section></main></LocalizedTree>;
 
@@ -564,13 +574,17 @@ export default function AdminPage() {
       </section>}
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="text-lg font-bold text-slate-900">Estimate trade options</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Manage the choices shown in the Trade dropdown when creating an estimate. Add an English name and its Spanish label for each trade. Changes apply to new estimate forms; existing estimates keep their saved trade.</p></div>
+        <div><h2 className="text-lg font-bold text-slate-900">Estimate trade options</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Manage the choices shown in the Trade dropdown when creating an estimate. Add an English name and its Spanish label for each trade. Use the up and down buttons to change their order, then save. Changes apply to new estimate forms; existing estimates keep their saved trade.</p></div>
         <form onSubmit={saveEstimateTradeOptions} className="mt-4 space-y-3">
           <div className="space-y-3">
             {estimateTradeOptions.map((option, index) => <div key={index} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
               <label className="block text-xs font-semibold text-slate-700">Trade name (English)<input required maxLength={60} value={option.value} onChange={(event) => setEstimateTradeOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
               <label className="block text-xs font-semibold text-slate-700">Trade name (Spanish)<input required maxLength={60} value={option.label_es} onChange={(event) => setEstimateTradeOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, label_es: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
-              <button type="button" aria-label={translate(language, "Remove this trade")} title={translate(language, "Remove this trade")} onClick={() => setEstimateTradeOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={estimateTradeOptions.length <= 1 || busy !== ""} className="min-h-12 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-40">{translate(language, "Remove")}</button>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <button type="button" aria-label={`${translate(language, "Move up")}: ${option.value || translate(language, "Unnamed trade")}`} title={`${translate(language, "Move up")}: ${option.value || translate(language, "Unnamed trade")}`} onClick={() => moveEstimateTradeOption(index, -1)} disabled={index === 0 || busy !== "" || estimateTradeOptionsLoading} className="min-h-12 min-w-12 rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg font-bold text-slate-800 disabled:opacity-40">↑</button>
+                <button type="button" aria-label={`${translate(language, "Move down")}: ${option.value || translate(language, "Unnamed trade")}`} title={`${translate(language, "Move down")}: ${option.value || translate(language, "Unnamed trade")}`} onClick={() => moveEstimateTradeOption(index, 1)} disabled={index === estimateTradeOptions.length - 1 || busy !== "" || estimateTradeOptionsLoading} className="min-h-12 min-w-12 rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg font-bold text-slate-800 disabled:opacity-40">↓</button>
+                <button type="button" aria-label={translate(language, "Remove this trade")} title={translate(language, "Remove this trade")} onClick={() => setEstimateTradeOptions((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={estimateTradeOptions.length <= 1 || busy !== ""} className="min-h-12 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-40">{translate(language, "Remove")}</button>
+              </div>
             </div>)}
           </div>
           <button type="button" onClick={() => setEstimateTradeOptions((current) => [...current, { value: "", label_es: "" }])} disabled={estimateTradeOptionsLoading || estimateTradeOptions.length >= 40 || busy !== ""} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50">+ {translate(language, "Add trade")}</button>
