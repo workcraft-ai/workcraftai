@@ -82,6 +82,22 @@ export default function SchedulePage() {
   }, [loadData]);
 
   useEffect(() => {
+    let refreshTimer: number | undefined;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => { void loadData(); }, 250);
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+    };
+  }, [loadData]);
+
+  useEffect(() => {
     const targetEstimate = new URLSearchParams(window.location.search).get("estimate");
     if (!targetEstimate || !estimates.length) return;
     const acceptedEstimate = estimates.find((estimate) => estimate.id === targetEstimate);

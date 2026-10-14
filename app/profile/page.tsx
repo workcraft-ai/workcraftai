@@ -90,6 +90,7 @@ export default function ProfilePage() {
   const [trialAvailable, setTrialAvailable] = useState(false);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [trialBillingReady, setTrialBillingReady] = useState<boolean | null>(null);
+  const [planReturnStatus, setPlanReturnStatus] = useState<"pending" | "confirmed" | "delayed" | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
   const [connectLoading, setConnectLoading] = useState(true);
@@ -146,7 +147,41 @@ export default function ProfilePage() {
           })
           .catch(() => setUsageSnapshot(null))
           .finally(() => setUsageLoading(false));
-        const entitlement = await getClientProEntitlement();
+
+        const checkoutParams = new URLSearchParams(window.location.search);
+        const returnedFromCheckout = checkoutParams.get("upgrade") === "success";
+        const checkoutSessionId = checkoutParams.get("session_id");
+        if (returnedFromCheckout) {
+          setPlanReturnStatus("pending");
+          if (checkoutSessionId) {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+              try {
+                const response = await fetch("/api/pro/checkout/confirm", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ session_id: checkoutSessionId }),
+                  cache: "no-store",
+                });
+                const result = await response.json().catch(() => null) as { confirmed?: boolean } | null;
+                if (response.ok && result?.confirmed === true) break;
+                if (response.status !== 202 && response.status !== 503) break;
+              } catch {
+                // The durable Stripe webhook remains the fallback if this
+                // immediate, authenticated confirmation cannot reach the API.
+              }
+              if (attempt < 4) await new Promise((resolve) => window.setTimeout(resolve, 1_000 + attempt * 500));
+            }
+          }
+        }
+
+        let entitlement = await getClientProEntitlement();
+        if (returnedFromCheckout && !entitlement?.has_pro) {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+            entitlement = await getClientProEntitlement();
+            if (entitlement?.has_pro) break;
+          }
+        }
         if (entitlement) {
           setPlanStatus(entitlement.stripe_status);
           setHasProAccess(entitlement.has_pro);
@@ -157,6 +192,14 @@ export default function ProfilePage() {
           setTrialBillingReady(entitlement.trial_billing_ready);
         } else {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
+        }
+        if (returnedFromCheckout) {
+          setPlanReturnStatus(entitlement?.has_pro ? "confirmed" : "delayed");
+          window.dispatchEvent(new Event("workcraft:pro-entitlement-refresh"));
+          checkoutParams.delete("upgrade");
+          checkoutParams.delete("session_id");
+          const cleanQuery = checkoutParams.toString();
+          window.history.replaceState(null, "", `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`);
         }
         try {
           await refreshStripeStatus();
@@ -289,6 +332,13 @@ export default function ProfilePage() {
   const formattedTrialEnd = trialEndsAt
     ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(trialEndsAt))
     : null;
+  const planReturnMessage = planReturnStatus === "pending"
+    ? translate(language, "Confirming your Pro access…")
+    : planReturnStatus === "confirmed"
+      ? translate(language, "Your Pro access is active. Scheduling and other Pro features are now unlocked.")
+      : planReturnStatus === "delayed"
+        ? translate(language, "Your checkout is complete. Pro access is still syncing; refresh this page in a moment.")
+        : null;
 
   if (loading) {
     return (
@@ -318,6 +368,7 @@ export default function ProfilePage() {
           {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : billingActionLabel(language, planStatus, trialBillingReady)}</button>}
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Upgrade to Pro"}</button>}
         </div>
+        {planReturnMessage && <p role="status" aria-live="polite" className={`w-full rounded-lg border px-3 py-2 text-sm leading-5 ${planReturnStatus === "delayed" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-900"}`}>{planReturnMessage}</p>}
         {planActionError && <p role="alert" aria-live="assertive" className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-5 text-red-800">{localizePlanActionError(language, planActionError)}</p>}
         {!hasProAccess && <p className="w-full text-xs text-slate-600">{language === "es"
           ? trialAvailable ? "Prueba todas las funciones Pro gratis durante 14 días. No se requiere tarjeta. La prueba termina automáticamente; agrega los datos de facturación antes de que termine para continuar a $9.99 al mes. Si no te suscribes, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen." : "WorkCraft AI Pro cuesta $9.99 al mes. Las funciones gratuitas siguen disponibles. Esta cuenta ya usó una prueba Pro o no es apta para una prueba."

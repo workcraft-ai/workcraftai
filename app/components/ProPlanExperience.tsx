@@ -16,6 +16,7 @@ type ProPlanContextValue = {
 const ProPlanContext = createContext<ProPlanContextValue | null>(null);
 
 export function ProPlanProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [userId, setUserId] = useState<string | null>(null);
   const [identityLoading, setIdentityLoading] = useState(true);
   const [entitlement, setEntitlement] = useState<ClientProEntitlement | null>(null);
@@ -57,6 +58,7 @@ export function ProPlanProvider({ children }: { children: ReactNode }) {
 
     let active = true;
     let requestNumber = 0;
+    let checkoutRefreshTimer: ReturnType<typeof setTimeout> | undefined;
     const refresh = async () => {
       const currentRequest = ++requestNumber;
       const result = await getClientProEntitlement();
@@ -64,19 +66,39 @@ export function ProPlanProvider({ children }: { children: ReactNode }) {
         setEntitlement(result);
         setEntitlementUserId(userId);
       }
+      return result;
     };
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refresh();
     };
-    void refresh();
+    const refreshOnCheckoutConfirmation = () => { void refresh(); };
+
+    const checkoutParams = new URLSearchParams(window.location.search);
+    const checkoutReturn = pathname === "/profile" && checkoutParams.get("upgrade") === "success";
+    if (checkoutReturn) {
+      let checks = 0;
+      const refreshUntilProIsReady = async () => {
+        const result = await refresh();
+        checks += 1;
+        if (active && !result?.has_pro && checks < 8) {
+          checkoutRefreshTimer = setTimeout(() => { void refreshUntilProIsReady(); }, 2_000);
+        }
+      };
+      void refreshUntilProIsReady();
+    } else {
+      void refresh();
+    }
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("workcraft:pro-entitlement-refresh", refreshOnCheckoutConfirmation);
     return () => {
       active = false;
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("workcraft:pro-entitlement-refresh", refreshOnCheckoutConfirmation);
+      if (checkoutRefreshTimer) clearTimeout(checkoutRefreshTimer);
     };
-  }, [identityLoading, userId]);
+  }, [identityLoading, pathname, userId]);
 
   const currentEntitlement = entitlementUserId === userId ? entitlement : null;
   const value = useMemo(() => ({ entitlement: currentEntitlement, loading: identityLoading || (!!userId && entitlementUserId !== userId) }), [currentEntitlement, entitlementUserId, identityLoading, userId]);

@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       } : {}),
       metadata: { user_id: user.id, checkout_attempt_id: attempt.attempt_id },
     },
-    success_url: `${origin}/profile?upgrade=success`,
+    success_url: `${origin}/profile?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/profile?upgrade=cancelled`,
   }, {
     idempotencyKey: `workcraft-pro-checkout-${attempt.attempt_id}`,
