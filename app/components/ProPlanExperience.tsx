@@ -123,16 +123,28 @@ export function ProPlanBanner() {
     : null;
   let message: string;
   if (entitlement.has_pro && entitlement.stripe_status === "trialing") {
-    message = date
-      ? `${translate(language, "Your Pro trial is active until")} ${date}${translate(language, ". Add a payment method to keep Pro at $9.99/month.")}`
-      : translate(language, "Your Pro trial is active. Add a payment method to keep Pro at $9.99/month.");
+    if (entitlement.trial_billing_ready === true) {
+      message = date
+        ? translate(language, "Your Pro upgrade is set. Your 14-day trial ends {date}. Your saved payment method will be charged $9.99/month starting then unless you cancel before the trial ends. No charge is due today.").replace("{date}", date)
+        : translate(language, "Your Pro upgrade is set. Your saved payment method will be charged $9.99/month when the trial ends unless you cancel before then. No charge is due today.");
+    } else if (entitlement.trial_billing_ready === false) {
+      message = date
+        ? translate(language, "Your Pro trial ends {date}. Add billing details before then to continue at $9.99/month. Without them, your account returns to Free and your saved data remains.").replace("{date}", date)
+        : translate(language, "Your Pro trial is active. Add billing details in Manage billing to continue at $9.99/month. Without them, your account returns to Free and your saved data remains.");
+    } else {
+      message = date
+        ? translate(language, "Your Pro trial ends {date}. Check Manage billing to confirm whether a payment method is set and when billing begins.").replace("{date}", date)
+        : translate(language, "Your Pro trial is active. Check Manage billing to confirm whether a payment method is set and when billing begins.");
+    }
   } else if (entitlement.trial_available) {
     message = translate(language, "Try Pro free for 14 days—no card required.");
   } else {
     message = translate(language, "Upgrade to Pro for $9.99/month.");
   }
 
-  const label = translate(language, entitlement.trial_available && !entitlement.has_pro ? "Start 14-day Pro trial" : "Upgrade to Pro");
+  const label = entitlement.has_pro && entitlement.stripe_status === "trialing"
+    ? translate(language, entitlement.trial_billing_ready === true ? "Manage billing" : entitlement.trial_billing_ready === false ? "Add payment method" : "Review billing")
+    : translate(language, entitlement.trial_available ? "Start 14-day Pro trial" : "Upgrade to Pro");
   return (
     <aside className="print:hidden border-b border-orange-100 bg-orange-50/80 px-4 py-2.5 text-slate-800" aria-label={translate(language, "Pro plan options")}>
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2">

@@ -224,3 +224,5 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 @media(max-width:650px){.footer-bottom{height:auto;min-height:52px}.footer-links{min-width:0;flex-wrap:wrap;gap:8px 16px}.footer-links a,.analytics-choice{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:48px}.analytics-actions button{min-height:48px}}
 /* Third-party SaaS directory listing badge in the public-site footer. */
 .footer-badge-row{display:flex;justify-content:flex-end;align-items:center;padding-block:6px}.footer-badge-row img{display:block;width:150px;height:auto;max-width:100%}@media(max-width:650px){.footer-badge-row{justify-content:center}}
+/* Keep the language control before every primary navigation link at all widths. */
+.site-header>.language-toggle{order:1;flex:0 0 auto}.site-header>.main-nav{order:2}.site-header>.menu-toggle{order:3}.site-header>.header-actions{order:4}

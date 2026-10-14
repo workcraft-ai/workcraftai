@@ -9,6 +9,8 @@ export type ProAccess = {
   expiresAt: string | null;
   trialAvailable: boolean;
   trialEndsAt: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 };
 
 export function createProAccessAdminClient(deadlineAt?:number) {
@@ -48,6 +50,8 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
       expiresAt: null,
       trialAvailable: false,
       trialEndsAt: stripeStatus === "trialing" ? subscription?.current_period_end ?? null : null,
+      stripeCustomerId: subscription?.stripe_customer_id ?? null,
+      stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
     };
   }
   if (grant) {
@@ -59,9 +63,21 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
       expiresAt: grant.expires_at,
       trialAvailable,
       trialEndsAt: null,
+      stripeCustomerId: subscription?.stripe_customer_id ?? null,
+      stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
     };
   }
-  return { hasPro: false, source: "free", stripeStatus, grantType: null, expiresAt: null, trialAvailable, trialEndsAt: null };
+  return {
+    hasPro: false,
+    source: "free",
+    stripeStatus,
+    grantType: null,
+    expiresAt: null,
+    trialAvailable,
+    trialEndsAt: null,
+    stripeCustomerId: subscription?.stripe_customer_id ?? null,
+    stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
+  };
 }
 
 export async function getServerProAccess(userId: string, deadlineAt?:number) {

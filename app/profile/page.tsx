@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
-import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
+import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 
@@ -16,6 +16,33 @@ type UsageSnapshot = {
 
 function remaining(used: number, limit: number) {
   return Math.max(limit - used, 0);
+}
+
+function trialNotice(language: Language, date: string | null, billingReady: boolean | null) {
+  const message = billingReady === true
+    ? date
+      ? "Your Pro upgrade is set. Your 14-day trial ends {date}. Your saved payment method will be charged $9.99/month starting then unless you cancel before the trial ends. No charge is due today."
+      : "Your Pro upgrade is set. Your saved payment method will be charged $9.99/month when the trial ends unless you cancel before then. No charge is due today."
+    : billingReady === false
+      ? date
+        ? "Your Pro trial ends {date}. Add billing details before then to continue at $9.99/month. Without them, your account returns to Free and your saved data remains."
+        : "Your Pro trial is active. Add billing details in Manage billing to continue at $9.99/month. Without them, your account returns to Free and your saved data remains."
+      : date
+        ? "Your Pro trial ends {date}. Check Manage billing to confirm whether a payment method is set and when billing begins."
+        : "Your Pro trial is active. Check Manage billing to confirm whether a payment method is set and when billing begins.";
+  return translate(language, message).replace("{date}", date ?? "");
+}
+
+function planBadge(language: Language, status: string, billingReady: boolean | null) {
+  if (status === "trialing") return translate(language, billingReady === true ? "Pro upgrade set" : "14-day Pro trial");
+  if (status === "active") return translate(language, "Pro active");
+  return translate(language, status);
+}
+
+function billingActionLabel(language: Language, status: string, billingReady: boolean | null) {
+  if (status === "trialing" && billingReady === false) return translate(language, "Add payment method");
+  if (status === "trialing" && billingReady === null) return translate(language, "Review billing");
+  return translate(language, "Manage billing");
 }
 
 export default function ProfilePage() {
@@ -40,6 +67,7 @@ export default function ProfilePage() {
   const [proAccessExpiresAt, setProAccessExpiresAt] = useState<string | null>(null);
   const [trialAvailable, setTrialAvailable] = useState(false);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [trialBillingReady, setTrialBillingReady] = useState<boolean | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [managingBilling, setManagingBilling] = useState(false);
   const [connectLoading, setConnectLoading] = useState(true);
@@ -104,6 +132,7 @@ export default function ProfilePage() {
           setProAccessExpiresAt(entitlement.expires_at);
           setTrialAvailable(entitlement.trial_available);
           setTrialEndsAt(entitlement.trial_ends_at);
+          setTrialBillingReady(entitlement.trial_billing_ready);
         } else {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
         }
@@ -258,13 +287,11 @@ export default function ProfilePage() {
 
       <section id="plan" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? "Your Pro plan includes up to 50 estimates per day and 500 per month, 5 cloud AI drafts per day and 50 per month, 5 customer-facing emails per day and 100 per month, and up to 100 MB of media uploads per month. Check the usage panel below for what remains." : "Create up to 10 estimates per day and 50 per month, manage your price book, share proposals, and view estimate reports. Upgrade to Pro for cloud AI, job scheduling, and other advanced tools."}</p>
-          {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{language === "es"
-            ? formattedTrialEnd ? `Tu prueba gratuita de Pro por 14 días termina el ${formattedTrialEnd}. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen.` : "Tu prueba gratuita de Pro por 14 días está activa. Agrega un método de pago en Administrar facturación para continuar a $9.99 al mes. Si no lo haces, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen."
-            : formattedTrialEnd ? `Your 14-day Pro trial ends ${formattedTrialEnd}. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains.` : "Your 14-day Pro trial is active. Add a payment method in Manage billing to continue at $9.99/month. If you do not, your account returns to Free and your saved data remains."}</p>}
+          {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{trialNotice(language, formattedTrialEnd, trialBillingReady)}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planStatus === "trialing" ? "Free trial" : planStatus}</span>}
-          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : planStatus === "trialing" ? "Upgrade to Pro" : "Manage billing"}</button>}
+          {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planBadge(language, planStatus, trialBillingReady)}</span>}
+          {hasBillingHistory && <button type="button" disabled={managingBilling} onClick={() => void handleManageBilling()} className="min-h-12 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">{managingBilling ? "Opening billing…" : billingActionLabel(language, planStatus, trialBillingReady)}</button>}
           {!hasProAccess && !needsBillingAttention && <button type="button" disabled={upgrading} onClick={() => void handleUpgrade()} className="min-h-12 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{upgrading ? "Opening checkout…" : trialAvailable ? "Start 14-day Pro trial" : "Upgrade to Pro"}</button>}
         </div>
         {!hasProAccess && <p className="w-full text-xs text-slate-600">{language === "es"
