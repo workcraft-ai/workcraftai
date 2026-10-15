@@ -13,6 +13,7 @@ import { LocalizedTree, translate, useLanguage } from "@/app/components/Language
 import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
+import { attachmentMimeType, invalidEstimateAttachment, supportedAttachmentMimeTypes, uploadEstimateAttachments, type EstimateAttachment } from "@/lib/estimate-attachments";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
 import { ProPlanAction } from "@/app/components/ProPlanExperience";
@@ -88,9 +89,9 @@ interface LocalEstimateDraft {
   proposalSummary?: string;
   paymentTerms?: string;
   paymentTermsEs?: string;
+  createdEstimateId?: string;
 }
 
-interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
 type EstimateAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
 type AiAllowance = { enabled: boolean; daily_limit: number; used: number; remaining: number; monthly_limit: number; monthly_used: number; monthly_remaining: number };
 type MediaAllowance = { monthly_used_bytes: number; monthly_limit_bytes: number; retained_bytes: number; retained_limit_bytes: number; file_count: number; file_limit: number };
@@ -142,6 +143,7 @@ export default function CreateEstimatePage() {
   const [draftStorageMessage, setDraftStorageMessage] = useState("");
   const [formError, setFormError] = useState("");
   const [partialSavedEstimateId, setPartialSavedEstimateId] = useState<string | null>(null);
+  const uploadedAttachmentFilesRef = useRef<Set<File>>(new Set());
   const [draftOwnerId, setDraftOwnerId] = useState<string | null>(null);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [savedDraftNeedsChoice, setSavedDraftNeedsChoice] = useState(false);
@@ -175,7 +177,7 @@ export default function CreateEstimatePage() {
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
       depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
-      proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, savedAt: new Date().toISOString(),
+      proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, createdEstimateId: partialSavedEstimateId ?? undefined, savedAt: new Date().toISOString(),
     };
     setSavedDraftNeedsChoice(false);
     void saveOfflineEstimateDraft(session.user.id, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
@@ -235,6 +237,10 @@ export default function CreateEstimatePage() {
     setProposalSummary(draft.proposalSummary ?? "");
     setPaymentTerms(draft.paymentTerms ?? "");
     setPaymentTermsEs(draft.paymentTermsEs ?? "");
+    if (draft.createdEstimateId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.createdEstimateId)) {
+      setPartialSavedEstimateId(draft.createdEstimateId);
+      setFormError(language === "es" ? "Esta cotización ya se guardó. Reintenta solo sus archivos adjuntos; no crees otra cotización." : "This estimate was already saved. Retry only its attachments; do not create another estimate.");
+    }
   };
 
   const deleteDraftFromDevice = async () => {
@@ -258,6 +264,18 @@ export default function CreateEstimatePage() {
     window.addEventListener("online", syncOnline); window.addEventListener("offline", syncOnline);
     return () => { window.removeEventListener("online", syncOnline); window.removeEventListener("offline", syncOnline); mediaStreamRef.current?.getTracks().forEach((track) => track.stop()); };
   }, []);
+
+  useEffect(() => {
+    const resumeEstimateId = new URLSearchParams(window.location.search).get("resumeEstimate");
+    if (resumeEstimateId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resumeEstimateId)) {
+      queueMicrotask(() => {
+        setPartialSavedEstimateId(resumeEstimateId);
+        setFormError(language === "es"
+          ? "Esta cotización ya existe. Restaura el borrador guardado o selecciona los archivos de nuevo y reintenta los adjuntos; no la vuelvas a crear."
+          : "This estimate already exists. Restore your saved draft or select the files again, then retry the attachments; do not create it again.");
+      });
+    }
+  }, [language]);
 
   useEffect(() => {
     const savedTemplate = sessionStorage.getItem("tradeflow-estimate-template");
@@ -361,7 +379,7 @@ export default function CreateEstimatePage() {
       const draft: LocalEstimateDraft = {
         clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
         depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
-        proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, savedAt: new Date().toISOString(),
+        proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, createdEstimateId: partialSavedEstimateId ?? undefined, savedAt: new Date().toISOString(),
       };
       setDraftStorageMessage(language === "es" ? "Guardando borrador solo en este dispositivo…" : "Saving draft on this device…");
       void saveOfflineEstimateDraft(draftOwnerId, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
@@ -369,7 +387,7 @@ export default function CreateEstimatePage() {
         .catch(() => setDraftStorageMessage(language === "es" ? "No se pudo guardar el borrador en este dispositivo. Revisa el espacio disponible." : "This device could not save the draft. Check available storage."));
     }, 900);
     return () => window.clearTimeout(timeout);
-  }, [draftOwnerId, draftStorageReady, savedDraftNeedsChoice, saving, hasEstimateDraftContent, clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit, depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, attachments, language]);
+  }, [draftOwnerId, draftStorageReady, savedDraftNeedsChoice, saving, hasEstimateDraftContent, clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit, depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, partialSavedEstimateId, attachments, language]);
 
   const startNewEstimateOnDevice = async () => {
     if (!draftOwnerId) return;
@@ -554,7 +572,7 @@ export default function CreateEstimatePage() {
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        const blob = new Blob(chunks, { type: (recorder.mimeType || "audio/webm").split(";", 1)[0].toLowerCase() });
         const extension = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
         setAttachments((current) => [...current.filter((item) => item.mediaType !== "voice"), { mediaType: "voice", file: new File([blob], `field-note-${Date.now()}.${extension}`, { type: blob.type }) }]);
         stream.getTracks().forEach((track) => track.stop()); mediaStreamRef.current = null; setRecording(false);
@@ -564,6 +582,30 @@ export default function CreateEstimatePage() {
   };
 
   const stopVoiceNote = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); };
+
+  const finishSavedEstimate = async (estimateId: string, userId: string) => {
+    await uploadEstimateAttachments(estimateId, userId, attachments, uploadedAttachmentFilesRef.current);
+    draftSubmissionComplete.current = true;
+    await clearOfflineEstimateDraft(userId).catch(() => undefined);
+    router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard?estimateSaved=1#first-five-minutes" : "/dashboard?estimateSaved=1#estimates");
+  };
+
+  const retrySavedEstimateAttachments = async () => {
+    if (!partialSavedEstimateId || saving) return;
+    setFormError("");
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sign in to finish uploading your attachments.");
+      await finishSavedEstimate(partialSavedEstimateId, user.id);
+    } catch {
+      setFormError(language === "es"
+        ? "La cotización sigue guardada, pero no se pudieron subir todos los archivos. Comprueba la conexión e inténtalo de nuevo aquí."
+        : "Your estimate is still saved, but some attachments could not be uploaded. Check your connection and retry here.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -606,14 +648,25 @@ export default function CreateEstimatePage() {
     if (!zeroRateConfirmed) return;
     if (!aiRatesConfirmed) return;
     if (!draftReviewConfirmed) return;
+    if (attachments.length > 0 && !isProSubscriber) {
+      showValidationError(language === "es" ? "Las fotos y notas de voz requieren Pro. Quita los archivos o mejora tu plan antes de guardar." : "Photos and voice notes require Pro. Remove the files or upgrade before saving.");
+      return;
+    }
+    const invalidAttachment = attachments.find(({ file, mediaType }) => file.size > (mediaType === "photo" ? 8 * 1024 * 1024 : 15 * 1024 * 1024));
+    if (invalidAttachment) {
+      showValidationError(language === "es" ? "Un archivo supera el límite de tamaño. Las fotos admiten hasta 8 MB y las notas de voz hasta 15 MB." : `${invalidAttachment.file.name} exceeds the ${invalidAttachment.mediaType === "photo" ? "8 MB photo" : "15 MB voice note"} limit.`);
+      return;
+    }
+    const unsupportedAttachment = invalidEstimateAttachment(attachments);
+    if (unsupportedAttachment) {
+      showValidationError(language === "es" ? "Uno de los archivos adjuntos tiene un formato no compatible o está vacío. Elimínalo antes de guardar." : "An attachment has an unsupported format or is empty. Remove it before saving.");
+      return;
+    }
 
     setSaving(true);
     let createdEstimateId: string | null = null;
     try {
       if (!navigator.onLine) throw new Error("You are offline. Save the draft on this device, then reconnect to create and upload it.");
-      if (attachments.length > 0 && !isProSubscriber) throw new Error("Photo and voice-note uploads require Pro. Your saved draft remains on this device; remove its attachments or upgrade to continue.");
-      const invalidAttachment = attachments.find(({ file, mediaType }) => file.size > (mediaType === "photo" ? 8 * 1024 * 1024 : 15 * 1024 * 1024));
-      if (invalidAttachment) throw new Error(`${invalidAttachment.file.name} exceeds the ${invalidAttachment.mediaType === "photo" ? "8 MB photo" : "15 MB voice note"} limit.`);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login");
@@ -663,37 +716,9 @@ export default function CreateEstimatePage() {
       if (!createResponse.ok || typeof createResult.id !== "string") {
         throw new Error(typeof createResult.error === "string" ? createResult.error : "Unable to save this estimate.");
       }
-      createdEstimateId = createResult.id;
-
-      for (const attachment of attachments) {
-        const path = `${user.id}/${createdEstimateId}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180)}`;
-        const { data: reservationRows, error: reservationError } = await supabase.rpc("workcraft_reserve_estimate_media_upload", {
-          p_estimate_id: createdEstimateId,
-          p_storage_path: path,
-          p_size: attachment.file.size,
-          p_mime_type: attachment.file.type.toLowerCase(),
-        });
-        const reservation = Array.isArray(reservationRows) ? reservationRows[0] : reservationRows;
-        if (reservationError) throw new Error(`Media upload reservation failed: ${reservationError.message}`);
-        if (!reservation?.allowed || typeof reservation.reservation_id !== "string") {
-          const reason = reservation?.reason === "monthly_limit" ? "ESTIMATE_MEDIA_MONTHLY_LIMIT" : reservation?.reason === "storage_limit" ? "ESTIMATE_MEDIA_STORAGE_LIMIT" : reservation?.reason === "pro_required" ? "WORKCRAFT_PRO_REQUIRED" : "MEDIA_UPLOAD_UNAVAILABLE";
-          throw new Error(reason);
-        }
-        const { error: uploadError } = await supabase.storage.from("estimate-media").upload(path, attachment.file, { contentType: attachment.file.type, upsert: false });
-        if (uploadError) {
-          await supabase.rpc("workcraft_finish_estimate_media_upload", { p_reservation_id: reservation.reservation_id, p_uploaded: false });
-          throw new Error(`Estimate saved but attachment upload failed: ${uploadError.message}`);
-        }
-        const { data: uploadRecorded, error: finalizeError } = await supabase.rpc("workcraft_finish_estimate_media_upload", { p_reservation_id: reservation.reservation_id, p_uploaded: true });
-        if (finalizeError || uploadRecorded !== true) throw new Error("Estimate saved but uploaded media usage could not be recorded. Please contact support before retrying the upload.");
-        const { error: metadataError } = await supabase.from("estimate_attachments").insert({ estimate_id: createdEstimateId, user_id: user.id, storage_path: path, media_type: attachment.mediaType, content_type: attachment.file.type });
-        if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
-      }
-
-      // 3. Return to the dashboard so the contractor can review and share the proposal.
-      draftSubmissionComplete.current = true;
-      await clearOfflineEstimateDraft(user.id).catch(() => undefined);
-      router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard?estimateSaved=1#first-five-minutes" : "/dashboard?estimateSaved=1#estimates");
+      const savedEstimateId: string = createResult.id;
+      createdEstimateId = savedEstimateId;
+      await finishSavedEstimate(savedEstimateId, user.id);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const quotaMessage = isEstimateQuotaLimitError(err)
@@ -708,12 +733,14 @@ export default function CreateEstimatePage() {
       const safeError = createdEstimateId
         ? quotaMessage
           ? language === "es" ? `La cotización se creó, pero no se completó un paso posterior. No la vuelvas a crear. ${quotaMessage}` : `The estimate was created, but a later step did not finish. Do not create it again. ${quotaMessage}`
-          : language === "es" ? "La cotización se creó, pero no se completó un paso posterior. Ábrela desde el panel; no la vuelvas a crear." : "The estimate was created, but a later step did not finish. Open it from your dashboard; do not create it again."
+          : attachments.length > 0
+            ? language === "es" ? "La cotización se guardó, pero no se subieron todos los archivos. Reintenta los archivos aquí; no crees otra cotización." : "The estimate was saved, but some attachments did not upload. Retry the attachments here; do not create another estimate."
+            : language === "es" ? "La cotización se creó, pero no se completó un paso posterior. Ábrela desde el panel; no la vuelvas a crear." : "The estimate was created, but a later step did not finish. Open it from your dashboard; do not create it again."
         : quotaMessage || (language === "es" ? "No se pudo guardar la cotización. Revisa los datos e inténtalo de nuevo." : "We couldn’t save the estimate. Check the details and try again.");
       setFormError(safeError);
       if (createdEstimateId) {
         setPartialSavedEstimateId(createdEstimateId);
-        setDraftStorageMessage(language === "es" ? "La cotización ya existe. Ábrela desde el enlace de abajo antes de volver a intentarlo." : "The estimate already exists. Open it using the link below before trying again.");
+        setDraftStorageMessage(language === "es" ? "La cotización ya existe. Usa el botón para reintentar los archivos o ábrela desde el enlace de abajo." : "The estimate already exists. Retry its attachments or open it using the link below.");
       }
     } finally {
       setSaving(false);
@@ -756,7 +783,7 @@ export default function CreateEstimatePage() {
             <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">Draft · Unsaved</span>
           </div>
 
-          {formError && <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"><p>{formError}</p>{partialSavedEstimateId && <Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Abrir cotización guardada" : "Open saved estimate"}</Link>}</div>}
+          {(formError || partialSavedEstimateId) && <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"><p>{formError || (language === "es" ? "Subiendo archivos a la cotización guardada…" : "Uploading files to the saved estimate…")}</p>{partialSavedEstimateId && <div className="mt-2 flex flex-wrap items-center gap-4">{attachments.length > 0 && <button type="button" onClick={() => void retrySavedEstimateAttachments()} disabled={saving} className="inline-flex min-h-11 items-center rounded-lg bg-slate-900 px-3 py-2 font-semibold text-white disabled:opacity-50">{saving ? language === "es" ? "Subiendo archivos…" : "Uploading attachments…" : language === "es" ? "Reintentar archivos adjuntos" : "Retry attachments"}</button>}<Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}`} className="inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Abrir cotización guardada" : "Open saved estimate"}</Link><Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}/edit`} className="inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Agregar archivos en Editar cotización" : "Add files in Edit estimate"}</Link></div>}</div>}
 
           <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
@@ -769,16 +796,6 @@ export default function CreateEstimatePage() {
               <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
               <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
             </label>}
-          </section>
-
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
-              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
-              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -911,7 +928,7 @@ export default function CreateEstimatePage() {
               </div>
               {isProSubscriber ? <label className={`rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 ${mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit) ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>Add photos<input type="file" accept="image/jpeg,image/png,image/webp,image/heic" capture="environment" multiple disabled={Boolean(mediaAllowance && (mediaAllowance.monthly_limit_bytes <= mediaAllowance.monthly_used_bytes || mediaAllowance.retained_limit_bytes <= mediaAllowance.retained_bytes || mediaAllowance.file_count >= mediaAllowance.file_limit))} className="sr-only" onChange={(event) => {
                 const selected = Array.from(event.target.files ?? []);
-                const photos = selected.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024);
+                const photos = selected.filter((file) => attachmentMimeType(file).startsWith("image/") && supportedAttachmentMimeTypes.has(attachmentMimeType(file)) && file.size > 0 && file.size <= 8 * 1024 * 1024);
                 setAttachments((current) => {
                   const voiceNotes = current.filter((item) => item.mediaType !== "photo");
                   const nextPhotos = [...current.filter((item) => item.mediaType === "photo").map((item) => item.file), ...photos].slice(0, 6);
@@ -924,6 +941,12 @@ export default function CreateEstimatePage() {
             </div>
             {recording && <p role="status" className="mt-3 text-xs font-medium text-red-700">Recording… Tap “Stop recording” to attach it.</p>}
             {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-semibold text-slate-900">{language === "es" ? "Precios de la cotización" : "Estimate pricing"}</h2>
+            <p className="mt-1 text-xs text-slate-600">{language === "es" ? "El recargo se aplica antes del impuesto sobre ventas. Confirma las reglas locales para mano de obra y materiales." : "Markup is applied before sales tax. Check local tax rules for taxable labor and materials."}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">{language === "es" ? "Recargo (%)" : "Markup (%)"}<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(event) => setMarkupPercentage(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">{language === "es" ? "Impuesto sobre ventas (%)" : "Sales tax (%)"}<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label></div>
           </section>
 
           {/* Scope of Work Table */}
@@ -1089,6 +1112,15 @@ export default function CreateEstimatePage() {
             </div>
           </details>
 
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
+              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
+            </div>
+            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
+            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
+          </section>
+
           {/* Deposit & Financial Options */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
             <div className="flex items-center justify-between">
@@ -1136,13 +1168,14 @@ export default function CreateEstimatePage() {
             )}
           </div>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
-              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
-            </div>
-            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
-            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
+              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
+              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
           </section>
 
           {/* Submit Button */}
