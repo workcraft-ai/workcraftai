@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#f5f3ec" />
     <meta
       name="description"
-      content="Envía una cotización clara antes de salir del trabajo. Créala en tu teléfono y comparte gratis un enlace de aprobación. Pro agrega IA, agenda, facturas y pagos."
+      content="Crea cotizaciones para contratistas desde tu teléfono. Empieza gratis y agrega IA, agenda, facturas y pagos con Pro."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="WorkCraft AI" />
     <meta property="og:title" content="Envía una cotización clara desde el trabajo | WorkCraft AI" />
     <meta
       property="og:description"
-      content="Crea una cotización en tu teléfono y comparte un enlace de aprobación. Empieza gratis y agrega herramientas Pro cuando las necesites."
+      content="Crea cotizaciones para contratistas desde tu teléfono. Empieza gratis y agrega IA, agenda, facturas y pagos con Pro."
     />
     <title>Cotizaciones para contratistas desde tu teléfono | WorkCraft AI</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -24,11 +24,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/trade-directory.css" />
     <link rel="canonical" href="https://workcraftai.com/es/" />
     <meta property="og:url" content="https://workcraftai.com/es/" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Envía una cotización clara desde el trabajo | WorkCraft AI" />
-    <meta name="twitter:description" content="Crea una cotización en tu teléfono y comparte un enlace de aprobación. Empieza gratis y agrega herramientas Pro cuando las necesites." />
+    <meta name="twitter:description" content="Crea cotizaciones para contratistas desde tu teléfono. Empieza gratis y agrega IA, agenda, facturas y pagos con Pro." />
     <meta property="og:image" content="https://workcraftai.com/assets/workcraftai-og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -36,7 +37,73 @@
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:image" content="https://workcraftai.com/assets/workcraftai-og.png" />
     <meta name="twitter:image:alt" content="Espacio de trabajo de WorkCraft AI para cotizaciones, trabajos y pagos" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://workcraftai.com/#organization","name":"WorkCraft AI","url":"https://workcraftai.com/","logo":"https://workcraftai.com/assets/workcraft-ai-logo.svg","email":"support@workcraftai.com","sameAs":["https://www.facebook.com/profile.php?id=61595227071773","https://www.linkedin.com/company/workcraft-ai","https://www.instagram.com/workcraftai/"]},{"@type":"SoftwareApplication","name":"WorkCraft AI","url":"https://app.workcraftai.com/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Crea y comparte cotizaciones para contratistas, organiza trabajos y prepara facturas en un solo espacio de trabajo.","featureList":["Cotizaciones y propuestas para contratistas","Lista de precios y plantillas de cotización","Agenda de trabajos y herramientas de facturación","Pagos de clientes mediante Stripe Connect"],"provider":{"@id":"https://workcraftai.com/#organization"},"inLanguage":"es-US"}]}</script>
+    <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://workcraftai.com/#organization",
+      "name": "WorkCraft AI",
+      "url": "https://workcraftai.com/",
+      "logo": "https://workcraftai.com/assets/workcraft-ai-mark.svg",
+      "email": "support@workcraftai.com",
+      "sameAs": [
+        "https://www.facebook.com/profile.php?id=61595227071773",
+        "https://www.linkedin.com/company/workcraft-ai",
+        "https://www.instagram.com/workcraftai/"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://workcraftai.com/#website",
+      "url": "https://workcraftai.com/",
+      "name": "WorkCraft AI",
+      "publisher": {
+        "@id": "https://workcraftai.com/#organization"
+      },
+      "inLanguage": "es-US"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "WorkCraft AI",
+      "url": "https://app.workcraftai.com/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Crea y comparte cotizaciones para contratistas, organiza trabajos y prepara facturas en un solo espacio de trabajo.",
+      "featureList": [
+        "Cotizaciones y propuestas para contratistas",
+        "Lista de precios y plantillas de cotización",
+        "Agenda de trabajos y herramientas de facturación",
+        "Pagos de clientes mediante Stripe Connect"
+      ],
+      "provider": {
+        "@id": "https://workcraftai.com/#organization"
+      },
+      "inLanguage": "es-US",
+      "@id": "https://workcraftai.com/#software",
+      "applicationSubCategory": "Software de cotizaciones y administración de trabajos para contratistas",
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "WorkCraft AI Gratis",
+          "price": "0.00",
+          "priceCurrency": "USD",
+          "category": "free",
+          "url": "https://app.workcraftai.com/signup"
+        },
+        {
+          "@type": "Offer",
+          "name": "WorkCraft AI Pro mensual",
+          "price": "9.99",
+          "priceCurrency": "USD",
+          "category": "subscription",
+          "description": "Suscripción mensual de $9.99 después de una prueba de 14 días para cuentas aptas; agrega los datos de facturación para continuar.",
+          "url": "https://workcraftai.com/#plans"
+        }
+      ]
+    }
+  ]
+}</script>
       <link rel="alternate" hreflang="en-US" href="https://workcraftai.com/" />
     <link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/" />
     <link rel="alternate" hreflang="x-default" href="https://workcraftai.com/" />
@@ -144,6 +211,8 @@
         <div class="payment-faq-list" aria-label="Preguntas sobre la prueba Pro"><details class="payment-faq-item"><summary>¿Cómo funciona la prueba gratuita de Pro?</summary><p>Las cuentas aptas pueden iniciar una sola prueba de 14 días desde Perfil → Tu plan o desde una oferta que aparece en el Panel, Clientes, Lista de precios o una función Pro. No se requiere un método de pago para comenzar. Durante la prueba, estas ofertas cambian a Mejorar a Pro; quienes ya tienen Pro de pago dejan de verlas. Agrega los datos de facturación en Administrar facturación antes de que termine para continuar a $9.99 al mes. Si no lo haces, la prueba termina automáticamente, tu cuenta vuelve al plan Gratis y tus datos guardados permanecen.</p></details><details class="payment-faq-item"><summary>¿Cuándo comienza el cobro mensual de $9.99?</summary><p>Si agregas un método de pago antes de que termine la prueba, Pro continúa a $9.99 al mes al finalizarla, a menos que canceles antes. Si no agregas un método de pago, no se realiza ningún cobro y la suscripción se cancela automáticamente.</p></details></div>
         <p class="plans-note">Siempre puedes usar una cuenta gratuita. Las cuentas aptas pueden iniciar una sola prueba Pro de 14 días desde Perfil → Tu plan o una oferta en la aplicación, sin tarjeta para comenzar. Agrega los datos de facturación antes de que termine la prueba para continuar a $9.99 al mes; de lo contrario, la suscripción se cancela automáticamente, la cuenta vuelve al plan Gratis y tus datos guardados permanecen. Los límites son por cuenta y se restablecen a las 00:00 UTC o al inicio de cada mes UTC. Los intentos fallidos del proveedor de IA cuentan. El cupo de correo Pro incluye cotizaciones, seguimientos y avisos de preguntas de clientes; la capacidad general del proveedor podría pausar temporalmente los envíos. Los pagos de clientes requieren Pro y completar la incorporación de Stripe. Los clientes pueden pagar anticipos o saldos mediante Stripe Checkout desde una propuesta aceptada. Los cargos llegan directamente a la cuenta de Stripe del contratista; Stripe deduce las tarifas de procesamiento aplicables y deposita los fondos según su calendario. Las nuevas conexiones usan el Panel completo de Stripe con las propias credenciales del contratista; una conexión existente podría conservar el acceso anterior al Panel. WorkCraft AI no recibe ni retiene fondos de clientes ni agrega una tarifa por pago.</p>
       </section>
+
+      <section class="trade-directory-section" id="trade-estimates" aria-labelledby="trade-estimates-title"><div class="section-wrap"><div class="section-heading"><div><p class="eyebrow"><span class="eyebrow-line"></span>Ejemplos de cotizaciones por oficio</p><h2 id="trade-estimates-title">Empieza con el trabajo que haces.</h2></div><p>Explora ideas prácticas para organizar el alcance de varios oficios. Agrega tus propias cantidades, supuestos y tarifas antes de compartir una propuesta.</p></div><div class="trade-directory-grid"><a class="trade-directory-card" href="/es/cotizaciones/paisajismo/"><span class="trade-directory-index">01</span><strong>Cotizaciones para paisajismo</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/es/cotizaciones/plomeria/"><span class="trade-directory-index">02</span><strong>Cotizaciones de plomería</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/es/cotizaciones/electricidad/"><span class="trade-directory-index">03</span><strong>Cotizaciones eléctricas</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/es/cotizaciones/climatizacion/"><span class="trade-directory-index">04</span><strong>Cotizaciones de HVAC</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/es/cotizaciones/reparaciones-del-hogar/"><span class="trade-directory-index">05</span><strong>Cotizaciones de reparaciones</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a></div></div></section>
 
       <section class="payment-faq-section section-wrap" id="payment-faq" aria-labelledby="payment-faq-title">
         <div class="section-heading"><div><p class="eyebrow"><span class="eyebrow-line"></span>Pagos de clientes con Stripe</p><h2 id="payment-faq-title">Pagos de clientes, explicados con claridad.</h2></div><p>Descubre cómo los contratistas conectan Stripe, cómo pagan los clientes y dónde se administran los pagos.</p></div>
