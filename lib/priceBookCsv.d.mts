@@ -7,4 +7,4 @@ export type ImportedPriceBookItem = {
   pricing_basis?: string;
 };
 
-export function parsePriceBookCsv(text: string): ImportedPriceBookItem[];
+export function parsePriceBookCsv(text: string, defaultTrade?: string): ImportedPriceBookItem[];

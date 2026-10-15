@@ -167,6 +167,7 @@ const spanish: Record<string, string> = {
   "Could not copy the customer link.": "No se pudo copiar el enlace del cliente.",
   "Customer sharing is disabled or expired. Replace the customer link before sending.": "El enlace del cliente está desactivado o vencido. Reemplázalo antes de enviar.",
   "Pricing basis": "Base del precio", "Not specified": "Sin especificar", "Labor only": "Solo mano de obra", "Materials only": "Solo materiales", "Labor and materials": "Mano de obra y materiales", "Other costs": "Otros costos",
+  "Retry": "Reintentar",
   "AI applies a saved rate automatically only when its unit and pricing basis match. Unspecified rates remain suggestions for your review.": "La IA aplica una tarifa guardada automáticamente solo cuando coinciden la unidad y la base del precio. Las tarifas sin especificar quedan como sugerencias para que las revises.",
   "That local time does not exist because of the daylight-saving clock change. Choose a different time.": "Esa hora local no existe por el cambio de horario. Elige otra hora.",
   "That local time occurs twice because of the daylight-saving clock change. Choose an unambiguous time.": "Esa hora local ocurre dos veces por el cambio de horario. Elige una hora sin ambigüedad.",
