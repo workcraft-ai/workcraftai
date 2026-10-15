@@ -125,7 +125,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
     if (!lastSuccess) return;
     const ageMs = now.getTime() - Date.parse(lastSuccess);
     if (!Number.isFinite(ageMs) || ageMs > maxAgeMs) {
-      criticalAlerts.push({ code, count: 1, action: `${label} last succeeded ${Number.isFinite(ageMs) ? `${Math.max(0, Math.round(ageMs / 60_000))} minutes ago` : "at an invalid timestamp"}; inspect its scheduled run and credentials.` });
+      criticalAlerts.push({ code, count: 1, action: `${label} last recorded a heartbeat ${Number.isFinite(ageMs) ? `${Math.max(0, Math.round(ageMs / 60_000))} minutes ago` : "at an invalid timestamp"}; inspect its scheduled run and credentials.` });
     }
   };
   checkHeartbeat("availability_monitor", "availability_monitor_missed", "The GitHub availability monitor", AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS);
@@ -247,9 +247,12 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
   }
 
   const urgentWarnings = warnings.some((warning) => [
-    "db_connections_warning", "db_sessions_waiting", "api_health_latency_sustained", "api_exceptions_warning", "api_5xx_warning",
+    "db_connections_warning", "api_health_latency_sustained", "api_exceptions_warning", "api_5xx_warning",
   ].includes(warning.code));
-  const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && warnings.length > 0);
+  // A single waiting backend or a few transient idle transactions are useful
+  // diagnostics, but neither alone means the app or daily provider audit failed.
+  const usageWarnings = warnings.some((warning) => warning.source === "resend_provider" || warning.source === "application_allocation");
+  const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && usageWarnings);
   const response = {
     ok: !failed,
     checked_at: nowIso,

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS } from "@/lib/operational-heartbeats";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +40,7 @@ export async function GET() {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     try {
       const heartbeatUrl = new URL(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/operational_heartbeats`);
-      heartbeatUrl.searchParams.set("name", "in.(supabase_scheduler_notifications,availability_monitor)");
+      heartbeatUrl.searchParams.set("name", "eq.supabase_scheduler_notifications");
       heartbeatUrl.searchParams.set("select", "name,last_success_at");
       const response = await fetch(heartbeatUrl, {
         headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
@@ -52,14 +51,10 @@ export async function GET() {
         const rows: unknown = await response.json();
         const entries = Array.isArray(rows) ? rows as Array<{ name?: unknown; last_success_at?: unknown }> : [];
         const notificationHeartbeat = entries.find((row) => row.name === "supabase_scheduler_notifications")?.last_success_at;
-        const availabilityHeartbeat = entries.find((row) => row.name === "availability_monitor")?.last_success_at;
         const notificationsFresh = typeof notificationHeartbeat === "string" && Date.now() - Date.parse(notificationHeartbeat) < 20 * 60_000;
-        // Do not fail health before the monitor has recorded its first heartbeat.
-        // GitHub's 15-minute schedule is best-effort; allow one delayed interval
-        // so a late check does not make this health endpoint fail itself.
-        const availabilityFresh = typeof availabilityHeartbeat !== "string"
-          || Date.now() - Date.parse(availabilityHeartbeat) < AVAILABILITY_MONITOR_HEARTBEAT_MAX_AGE_MS;
-        if (notificationsFresh && availabilityFresh) scheduler = "ok";
+        // The GitHub availability monitor checks this endpoint. Its own delayed
+        // heartbeat must not turn a healthy app into a failed health check.
+        if (notificationsFresh) scheduler = "ok";
       }
     } catch {
       // An independent availability monitor will alert on this degraded check.
