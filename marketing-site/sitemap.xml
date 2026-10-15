@@ -162,4 +162,74 @@
     <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/resources/roofing-estimate-scope-template/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/resources/roofing-estimate-scope-template/" />
   </url>
+  <url>
+    <loc>https://workcraftai.com/estimates/landscaping/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/landscaping/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/paisajismo/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/landscaping/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/cotizaciones/paisajismo/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/landscaping/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/paisajismo/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/landscaping/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/estimates/plumbing/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/plumbing/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/plomeria/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/plumbing/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/cotizaciones/plomeria/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/plumbing/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/plomeria/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/plumbing/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/estimates/electrical/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/electrical/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/electricidad/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/electrical/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/cotizaciones/electricidad/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/electrical/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/electricidad/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/electrical/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/estimates/hvac/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/hvac/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/climatizacion/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/hvac/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/cotizaciones/climatizacion/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/hvac/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/climatizacion/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/hvac/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/estimates/handyman/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/handyman/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/reparaciones-del-hogar/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/handyman/" />
+  </url>
+  <url>
+    <loc>https://workcraftai.com/es/cotizaciones/reparaciones-del-hogar/</loc>
+    <lastmod>2026-10-15</lastmod>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://workcraftai.com/estimates/handyman/" />
+    <xhtml:link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/cotizaciones/reparaciones-del-hogar/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://workcraftai.com/estimates/handyman/" />
+  </url>
 </urlset>

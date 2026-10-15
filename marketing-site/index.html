@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#f5f3ec" />
     <meta
       name="description"
-      content="Send a clear estimate before you leave the job site. Build it on your phone and share a customer approval link for free. Pro adds AI, scheduling, invoices, and payments."
+      content="Create contractor estimates from your phone. Start free; add AI drafting, scheduling, invoices, and payments with Pro."
     />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="WorkCraft AI" />
     <meta property="og:title" content="Send a clear estimate from the job site | WorkCraft AI" />
     <meta
       property="og:description"
-      content="Build an estimate on your phone and share a customer approval link. Start free; add Pro tools when you need them."
+      content="Create contractor estimates from your phone. Start free; add AI drafting, scheduling, invoices, and payments with Pro."
     />
     <title>Create Contractor Estimates From Your Phone | WorkCraft AI</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -24,11 +24,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/trade-directory.css" />
     <link rel="canonical" href="https://workcraftai.com/" />
     <meta property="og:url" content="https://workcraftai.com/" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Send a clear estimate from the job site | WorkCraft AI" />
-    <meta name="twitter:description" content="Build an estimate on your phone and share a customer approval link. Start free; add Pro tools when you need them." />
+    <meta name="twitter:description" content="Create contractor estimates from your phone. Start free; add AI drafting, scheduling, invoices, and payments with Pro." />
     <meta property="og:image" content="https://workcraftai.com/assets/workcraftai-og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -36,41 +37,72 @@
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:image" content="https://workcraftai.com/assets/workcraftai-og.png" />
     <meta name="twitter:image:alt" content="WorkCraft AI contractor workspace for estimates, jobs, and payments" />
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://workcraftai.com/#organization",
-            "name": "WorkCraft AI",
-            "url": "https://workcraftai.com/",
-            "logo": "https://workcraftai.com/assets/workcraft-ai-logo.svg",
-            "email": "support@workcraftai.com",
-            "sameAs": [
-              "https://www.facebook.com/profile.php?id=61595227071773",
-              "https://www.linkedin.com/company/workcraft-ai",
-              "https://www.instagram.com/workcraftai/"
-            ]
-          },
-          {
-            "@type": "SoftwareApplication",
-            "name": "WorkCraft AI",
-            "url": "https://app.workcraftai.com/",
-            "applicationCategory": "BusinessApplication",
-            "operatingSystem": "Web",
-            "description": "Create and share contractor estimates, manage jobs, and organize invoices in one workspace.",
-            "featureList": [
-              "Contractor estimates and proposals",
-              "Price book and estimate templates",
-              "Job scheduling and invoice tools",
-              "Customer payments through Stripe Connect"
-            ],
-            "provider": { "@id": "https://workcraftai.com/#organization" }
-          }
-        ]
-      }
-    </script>
+    <script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://workcraftai.com/#organization",
+      "name": "WorkCraft AI",
+      "url": "https://workcraftai.com/",
+      "logo": "https://workcraftai.com/assets/workcraft-ai-mark.svg",
+      "email": "support@workcraftai.com",
+      "sameAs": [
+        "https://www.facebook.com/profile.php?id=61595227071773",
+        "https://www.linkedin.com/company/workcraft-ai",
+        "https://www.instagram.com/workcraftai/"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://workcraftai.com/#website",
+      "url": "https://workcraftai.com/",
+      "name": "WorkCraft AI",
+      "publisher": {
+        "@id": "https://workcraftai.com/#organization"
+      },
+      "inLanguage": "en-US"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "WorkCraft AI",
+      "url": "https://app.workcraftai.com/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Create and share contractor estimates, manage jobs, and organize invoices in one workspace.",
+      "featureList": [
+        "Contractor estimates and proposals",
+        "Price book and estimate templates",
+        "Job scheduling and invoice tools",
+        "Customer payments through Stripe Connect"
+      ],
+      "provider": {
+        "@id": "https://workcraftai.com/#organization"
+      },
+      "@id": "https://workcraftai.com/#software",
+      "applicationSubCategory": "Contractor estimate and field service management software",
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "WorkCraft AI Free",
+          "price": "0.00",
+          "priceCurrency": "USD",
+          "category": "free",
+          "url": "https://app.workcraftai.com/signup"
+        },
+        {
+          "@type": "Offer",
+          "name": "WorkCraft AI Pro monthly",
+          "price": "9.99",
+          "priceCurrency": "USD",
+          "category": "subscription",
+          "description": "$9.99 per month after an eligible 14-day trial; add billing details to continue.",
+          "url": "https://workcraftai.com/#plans"
+        }
+      ]
+    }
+  ]
+}</script>
       <link rel="alternate" hreflang="en-US" href="https://workcraftai.com/" />
     <link rel="alternate" hreflang="es-US" href="https://workcraftai.com/es/" />
     <link rel="alternate" hreflang="x-default" href="https://workcraftai.com/" />
@@ -178,6 +210,8 @@
         <div class="payment-faq-list" aria-label="Pro trial questions"><details class="payment-faq-item"><summary>How does the free Pro trial work?</summary><p>Eligible accounts can start one 14-day trial from Profile → Your plan or an offer shown on Dashboard, Customers, Price Book, or a Pro feature. No payment method is required to start. During the trial, these offers change to Upgrade to Pro; paid Pro accounts no longer see them. Add billing in Manage billing before the trial ends to continue at $9.99/month. If you do not, the trial ends automatically, your account returns to Free, and your saved data remains.</p></details><details class="payment-faq-item"><summary>When does the $9.99 monthly charge begin?</summary><p>If you add a payment method before the trial ends, Pro continues at $9.99 per month after the trial unless you cancel first. If you do not add a payment method, there is no charge and the subscription cancels automatically.</p></details></div>
         <p class="plans-note">A free account is always available. Eligible accounts can start one 14-day Pro trial from Profile → Your plan or an in-app offer—no card required to start. Add billing details before the trial ends to continue at $9.99 per month; otherwise the subscription cancels automatically, the account returns to Free, and saved data remains. Plan caps are per account and reset at 00:00 UTC or at the start of each UTC month. Failed cloud AI provider attempts count. The Pro email allowance covers estimate emails, follow-ups, and customer-question alerts; provider-wide capacity may temporarily pause sending. Customer payments require Pro and completed Stripe onboarding. Customers can pay deposits or balances through Stripe Checkout from an accepted proposal. Charges go directly to the contractor’s Stripe account; Stripe deducts applicable processing fees and pays out on its schedule. New connections use the Full Stripe Dashboard with the contractor’s own Stripe login; an existing connection may keep its previous Dashboard access. WorkCraft AI does not receive or hold customer funds or add a per-payment fee.</p>
       </section>
+
+      <section class="trade-directory-section" id="trade-estimates" aria-labelledby="trade-estimates-title"><div class="section-wrap"><div class="section-heading"><div><p class="eyebrow"><span class="eyebrow-line"></span>Estimate examples by trade</p><h2 id="trade-estimates-title">Start with the work you do.</h2></div><p>Explore practical scope ideas for common trades. Add your own quantities, assumptions, and rates before sharing a proposal.</p></div><div class="trade-directory-grid"><a class="trade-directory-card" href="/estimates/landscaping/"><span class="trade-directory-index">01</span><strong>Landscaping estimate software</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/estimates/plumbing/"><span class="trade-directory-index">02</span><strong>Plumbing estimate software</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/estimates/electrical/"><span class="trade-directory-index">03</span><strong>Electrical estimate software</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/estimates/hvac/"><span class="trade-directory-index">04</span><strong>HVAC estimate software</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a><a class="trade-directory-card" href="/estimates/handyman/"><span class="trade-directory-index">05</span><strong>Handyman estimate software</strong><span class="trade-directory-arrow" aria-hidden="true">↗</span></a></div></div></section>
 
       <section class="payment-faq-section section-wrap" id="payment-faq" aria-labelledby="payment-faq-title">
         <div class="section-heading"><div><p class="eyebrow"><span class="eyebrow-line"></span>Stripe customer payments</p><h2 id="payment-faq-title">Customer payments, clearly explained.</h2></div><p>See how contractors connect Stripe, how customers pay, and where payments are managed.</p></div>
