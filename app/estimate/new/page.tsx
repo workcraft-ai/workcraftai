@@ -25,7 +25,6 @@ interface LineItemInput {
   unit_price: number;
   pricing_basis?: string;
   pricing_source?: "price_book" | "ai_suggested" | "unpriced" | "manual";
-  quantity_source?: "ai_estimated" | "contractor_measurement";
   pricing_assumption?: string;
   pricing_assumption_es?: string;
   review_note?: string;
@@ -89,8 +88,6 @@ interface LocalEstimateDraft {
   proposalSummary?: string;
   paymentTerms?: string;
   paymentTermsEs?: string;
-  roofAreaSqFt?: string;
-  reviewPromptContext?: string;
 }
 
 interface EstimateAttachment { file: File; mediaType: "photo" | "voice"; }
@@ -132,8 +129,6 @@ export default function CreateEstimatePage() {
   const [proposalSummary, setProposalSummary] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("");
   const [paymentTermsEs, setPaymentTermsEs] = useState("");
-  const [roofAreaSqFt, setRoofAreaSqFt] = useState("");
-  const [reviewPromptContext, setReviewPromptContext] = useState("");
   const [attachments, setAttachments] = useState<EstimateAttachment[]>([]);
   const [connectionOnline, setConnectionOnline] = useState(true);
   const [recording, setRecording] = useState(false);
@@ -180,7 +175,7 @@ export default function CreateEstimatePage() {
     const draft: LocalEstimateDraft = {
       clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
       depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
-      proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, savedAt: new Date().toISOString(),
+      proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, savedAt: new Date().toISOString(),
     };
     setSavedDraftNeedsChoice(false);
     void saveOfflineEstimateDraft(session.user.id, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
@@ -240,8 +235,6 @@ export default function CreateEstimatePage() {
     setProposalSummary(draft.proposalSummary ?? "");
     setPaymentTerms(draft.paymentTerms ?? "");
     setPaymentTermsEs(draft.paymentTermsEs ?? "");
-    setRoofAreaSqFt(draft.roofAreaSqFt ?? "");
-    setReviewPromptContext(draft.reviewPromptContext ?? "");
   };
 
   const deleteDraftFromDevice = async () => {
@@ -368,7 +361,7 @@ export default function CreateEstimatePage() {
       const draft: LocalEstimateDraft = {
         clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit,
         depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage,
-        proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, savedAt: new Date().toISOString(),
+        proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, savedAt: new Date().toISOString(),
       };
       setDraftStorageMessage(language === "es" ? "Guardando borrador solo en este dispositivo…" : "Saving draft on this device…");
       void saveOfflineEstimateDraft(draftOwnerId, draft, attachments.map(({ file, mediaType }) => ({ name: file.name, type: file.type, mediaType, blob: file })))
@@ -376,7 +369,7 @@ export default function CreateEstimatePage() {
         .catch(() => setDraftStorageMessage(language === "es" ? "No se pudo guardar el borrador en este dispositivo. Revisa el espacio disponible." : "This device could not save the draft. Check available storage."));
     }, 900);
     return () => window.clearTimeout(timeout);
-  }, [draftOwnerId, draftStorageReady, savedDraftNeedsChoice, saving, hasEstimateDraftContent, clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit, depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, roofAreaSqFt, reviewPromptContext, attachments, language]);
+  }, [draftOwnerId, draftStorageReady, savedDraftNeedsChoice, saving, hasEstimateDraftContent, clientName, clientEmail, clientPhone, jobAddress, trade, requireDeposit, depositPercentage, promptText, lineItems, packageOptions, taxRate, markupPercentage, proposalLanguage, proposalDisplayMode, proposalSummary, paymentTerms, paymentTermsEs, attachments, language]);
 
   const startNewEstimateOnDevice = async () => {
     if (!draftOwnerId) return;
@@ -398,7 +391,6 @@ export default function CreateEstimatePage() {
           prompt: promptText,
           trade,
           proposal_language: proposalLanguage,
-          ...(/roof/i.test(trade) && Number(roofAreaSqFt) > 0 ? { roof_area_sq_ft: Number(roofAreaSqFt) } : {}),
         }),
       });
 
@@ -423,7 +415,6 @@ export default function CreateEstimatePage() {
       if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
       const priced = applyPriceBookRates(data.line_items, priceBookItems, trade);
       const priceBookMatches = new Set<number>(priced.matchedIndexes);
-      const generatedScopeContext = promptText;
       const draftLines = priced.lines.map((item: LineItemInput, index: number) => ({
         ...item,
         unit: item.unit || "each",
@@ -432,7 +423,6 @@ export default function CreateEstimatePage() {
         price_book_suggestions: priceBookMatches.has(index) ? [] : priced.suggestionsByIndex[index] ?? [],
       }));
       setLineItems(draftLines);
-      setReviewPromptContext(generatedScopeContext);
       setZeroRateConfirmationKey("");
       setAiRateConfirmationKey("");
       setDraftReviewConfirmationKey("");
@@ -541,10 +531,7 @@ export default function CreateEstimatePage() {
   const aiRateReviewKey = JSON.stringify(aiSuggestedLineItems.map(({ description, quantity, unit, unit_price }) => [description.trim(), Number(quantity), unit || "each", Number(unit_price)]));
   const aiRatesConfirmed = aiSuggestedLineItems.length === 0 || aiRateConfirmationKey === aiRateReviewKey;
   const unresolvedUnitLineItems = lineItems.filter((item) => item.description.trim() && /^(unknown|unspecified|n\/a)$/i.test(item.unit?.trim() ?? ""));
-  const reviewContext = /roof/i.test(trade) && Number(roofAreaSqFt) > 0
-    ? `${reviewPromptContext}\nRoof surface area: ${roofAreaSqFt} sq ft.`
-    : reviewPromptContext;
-  const deterministicReviewNotes = estimateDraftReviewNotes(reviewContext, trade, lineItems, language);
+  const deterministicReviewNotes = estimateDraftReviewNotes(trade, lineItems, language);
   const reviewNotesByIndex = lineItems.map((item, index) => [...new Set([
     ...(deterministicReviewNotes[index] ?? []),
     ...(item.review_notes ?? []),
@@ -1022,7 +1009,6 @@ export default function CreateEstimatePage() {
                 </div>
                 {item.pricing_source === "ai_suggested" && <p className="text-[11px] font-medium text-amber-800">{language === "es" ? "Precio inicial sugerido por IA · no hubo una coincidencia clara en la lista de precios para este oficio, unidad y base de precio. Revísalo antes de compartir." : "AI suggested starting price · no confident Price Book match for this trade, unit, and pricing basis. Review before sharing."}</p>}
                 {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">{language === "es" ? "Se aplicó la tarifa de la lista de precios." : "Price Book rate applied."}</p>}
-                {item.quantity_source === "contractor_measurement" && <p className="text-[11px] font-medium text-blue-800">{language === "es" ? "Cantidad base calculada a partir del área del techo. Ajusta según la pendiente, el desperdicio y la complejidad." : "Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity."}</p>}
                 {item.pricing_source === "ai_suggested" && (item.pricing_assumption || item.pricing_assumption_es) && <p className="text-[11px] text-slate-600"><strong>{language === "es" ? "Suposición de precio de IA para verificar:" : "AI pricing assumption to verify:"}</strong> {language === "es" ? item.pricing_assumption_es || item.pricing_assumption : item.pricing_assumption}</p>}
                 {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">{language === "es" ? "Elige una unidad reconocida antes de guardar." : "Choose a recognized unit before saving this estimate."}</p>}
                 {reviewNotesByIndex[index].map((note, noteIndex) => <p key={`${index}-review-${noteIndex}`} role="note" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">{note}</p>)}
@@ -1079,12 +1065,8 @@ export default function CreateEstimatePage() {
             {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
             {isProSubscriber ? <div className="space-y-2">
               <label className="block text-xs font-medium text-slate-700">Job scope and details
-                <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe measurements, material or grade, access, existing conditions, and what is included or excluded." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe the work in a few sentences. Include counts or measurements, materials, access, and what to leave out when known." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
               </label>
-              {/roof/i.test(trade) && <label className="block max-w-xs text-xs font-medium text-slate-700">Measured roof surface area (sq. ft., optional)
-                <input type="number" min="1" max="10000000" step="1" inputMode="decimal" value={roofAreaSqFt} onChange={(event) => setRoofAreaSqFt(event.target.value)} placeholder="e.g. 2,000" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
-              </label>}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button type="button" onClick={handleGenerateItems} disabled={isGenerating || priceBookLoading || priceBookLoadFailed || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
               </div>

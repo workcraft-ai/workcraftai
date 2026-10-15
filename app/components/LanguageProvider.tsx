@@ -520,11 +520,7 @@ Object.assign(spanish, {
 Object.assign(spanish, {
   "Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.": "Describe el trabajo y las medidas. Gemini prepara un alcance editable, cantidades, unidades y precios iniciales. Las coincidencias claras de la lista de precios se aplican automáticamente; las posibles coincidencias se muestran para que elijas. Los precios de IA son estimaciones generales, no cotizaciones locales actuales.",
   "Job scope and details": "Alcance y detalles del trabajo",
-  "Describe measurements, material or grade, access, existing conditions, and what is included or excluded.": "Describe las medidas, el material o la calidad, el acceso, las condiciones existentes y lo que incluye o excluye el trabajo.",
-  "Measured roof surface area (sq. ft., optional)": "Superficie medida del techo (pies cuadrados, opcional)",
-  "e.g. 2,000": "p. ej., 2,000",
-  "Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.": "Ingresa la superficie real del techo, no la huella de la vivienda. Para las partidas en cuadros de techo, la aplicación calcula la cantidad base; ajústala según la pendiente, el desperdicio y la complejidad.",
-  "Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity.": "La cantidad base se calculó a partir de la superficie del techo. Ajústala según la pendiente, el desperdicio y la complejidad.",
+  "Describe the work in a few sentences. Include counts or measurements, materials, access, and what to leave out when known.": "Describe el trabajo en unas frases. Incluye cantidades o medidas, materiales, acceso y lo que se debe excluir cuando lo sepas.",
   "AI pricing assumption to verify:": "Supuesto del precio de IA que debes verificar:",
   "Choose a recognized unit before saving this estimate.": "Elige una unidad reconocida antes de guardar esta cotización.",
   "Possible Price Book matches · choose one to apply; none was applied automatically.": "Posibles coincidencias de la lista de precios · elige una para aplicarla; ninguna se aplicó automáticamente.",
@@ -533,7 +529,6 @@ Object.assign(spanish, {
   "Choose a unit in each highlighted line item. Units affect both quantities and rates.": "Elige una unidad para cada partida resaltada. Las unidades afectan las cantidades y las tarifas.",
   "Review the flagged quantities and possible scope overlap before saving.": "Revisa las cantidades marcadas y los posibles trabajos duplicados antes de guardar.",
   "I checked the flagged quantities, units, and included work against this job.": "Verifiqué las cantidades, unidades y trabajos incluidos marcados para este proyecto.",
-  "Enter a valid roof surface area, or clear the measurement field.": "Ingresa una superficie válida del techo o borra el campo de medida.",
 });
 
 Object.assign(spanish, {

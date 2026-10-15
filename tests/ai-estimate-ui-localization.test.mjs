@@ -15,10 +15,7 @@ test("AI estimate safety and pricing controls have Spanish translations", () => 
 
   for (const key of [
     "Job scope and details",
-    "Describe measurements, material or grade, access, existing conditions, and what is included or excluded.",
-    "Measured roof surface area (sq. ft., optional)",
-    "Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.",
-    "Base quantity calculated from your roof surface area. Adjust for pitch, waste, and roof complexity.",
+    "Describe the work in a few sentences. Include counts or measurements, materials, access, and what to leave out when known.",
     "AI pricing assumption to verify:",
     "Choose a recognized unit before saving this estimate.",
     "Possible Price Book matches · choose one to apply; none was applied automatically.",
@@ -26,7 +23,6 @@ test("AI estimate safety and pricing controls have Spanish translations", () => 
     "Choose a unit in each highlighted line item. Units affect both quantities and rates.",
     "Review the flagged quantities and possible scope overlap before saving.",
     "I checked the flagged quantities, units, and included work against this job.",
-    "Enter a valid roof surface area, or clear the measurement field.",
     "No. They are broad starting estimates, not live local supplier quotes. Exact or high-confidence Price Book matches can apply automatically; possible matches are shown for you to choose. Review the unit, quantity, labor, material, taxes, and final rate before sharing the estimate.",
   ]) {
     assert.ok(translationKeys.has(key), `Missing Spanish translation: ${key}`);
