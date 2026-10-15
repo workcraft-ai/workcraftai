@@ -3,7 +3,7 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.workcraftai.com" }],
+      "has": [{ "type": "host", "value": "www\\.workcraftai\\.com" }],
       "destination": "https://workcraftai.com/:path*",
       "permanent": true
     }
