@@ -181,7 +181,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
       action: "Several database backends are waiting on locks or I/O; inspect database queries and Supabase pooling telemetry." });
   } else if (waitingConnections > 0) {
     warnings.push({ code: "db_sessions_waiting", source: "supabase_database", used: waitingConnections,
-      action: "Database backends are waiting on locks or I/O; inspect query latency and Supabase pooling telemetry." });
+      action: "One or two database backends are briefly waiting on locks or I/O; watch for a sustained increase." });
   }
   if (idleInTransaction >= 3) {
     warnings.push({ code: "db_idle_transactions", source: "supabase_database", used: idleInTransaction,
@@ -247,9 +247,12 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
   }
 
   const urgentWarnings = warnings.some((warning) => [
-    "db_connections_warning", "db_sessions_waiting", "api_health_latency_sustained", "api_exceptions_warning", "api_5xx_warning",
+    "db_connections_warning", "api_health_latency_sustained", "api_exceptions_warning", "api_5xx_warning",
   ].includes(warning.code));
-  const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && warnings.length > 0);
+  // A single sampled backend wait is common and already reported above. Three
+  // or more waiting backends become a critical alert; do not page on 1-2.
+  const strictWarnings = warnings.some((warning) => warning.code !== "db_sessions_waiting");
+  const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && strictWarnings);
   const response = {
     ok: !failed,
     checked_at: nowIso,
