@@ -31,6 +31,7 @@ type AccountDetail = {
 type ProGrant = { id: string; grant_type: "temporary" | "permanent"; reason: string; created_at: string; starts_at: string; expires_at: string | null; revoked_at: string | null; is_expired: boolean };
 type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_monthly_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number }; this_month: { attempts_started: number } };
 type AppEmailSettings = { daily_limit: number; today: { emails_started: number } };
+type AccountStats = { created: number; email_verified: number; signed_in: number };
 
 const ADMIN_MFA_REQUIRED_EVENT = "workcraft:admin-mfa-required";
 
@@ -71,6 +72,8 @@ export default function AdminPage() {
   const [mfaBusy, setMfaBusy] = useState(false);
   const [mfaError, setMfaError] = useState("");
   const [accessState, setAccessState] = useState<"loading" | "ready" | "denied" | "error">("loading");
+  const [accountStats, setAccountStats] = useState<AccountStats | null>(null);
+  const [accountStatsError, setAccountStatsError] = useState("");
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -157,6 +160,17 @@ export default function AdminPage() {
     });
     return () => { cancelled = true; };
   }, [mfaRequired]);
+
+  useEffect(() => {
+    if (!role || mfaRequired) return;
+    let cancelled = false;
+    void requestJson("/api/admin/account-stats").then((result: AccountStats) => {
+      if (!cancelled) setAccountStats(result);
+    }).catch(() => {
+      if (!cancelled) setAccountStatsError("Could not load account totals. Refresh the page to try again.");
+    });
+    return () => { cancelled = true; };
+  }, [role, mfaRequired]);
 
   useEffect(() => {
     if (role !== "super_admin") return;
@@ -532,6 +546,18 @@ export default function AdminPage() {
       </div>
       {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
+
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="admin-account-totals">
+        <h2 id="admin-account-totals" className="text-lg font-bold text-slate-900">Account totals</h2>
+        <p className="mt-1 text-sm text-slate-600">Current Supabase Auth accounts, including test and admin accounts. Signed in means at least one recorded sign-in, not an active session.</p>
+        {accountStatsError ? <p role="alert" className="mt-4 text-sm text-red-800">{accountStatsError}</p> : accountStats ? (
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Accounts created</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.created.toLocaleString()}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Email verified</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.email_verified.toLocaleString()}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Signed in at least once</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.signed_in.toLocaleString()}</dd></div>
+          </dl>
+        ) : <p role="status" className="mt-4 text-sm text-slate-600">Loading account totals…</p>}
+      </section>
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Free-tier estimate limit</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free accounts can save up to 10 estimates per UTC day and 50 per UTC month. Set a lower daily ceiling here for testing or cost control. Estimates already created today count; edits do not. Changing the limit below usage already reached takes effect on the next creation attempt.</p></div>
