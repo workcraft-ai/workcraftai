@@ -49,7 +49,7 @@ export const helpGuides: HelpGuide[] = [
   {
     slug: "share-estimate", title: { en: "Share an estimate with a customer", es: "Comparte una cotización con un cliente" },
     summary: { en: "A saved estimate has a customer link; saving alone does not send it.", es: "Una cotización guardada tiene un enlace para el cliente; guardarla no lo envía." },
-    steps: { en: ["Save the estimate and open it from Dashboard.", "Review the customer proposal and copy its customer link.", "Send that link from your own text or email app, or use Email client with Pro.", "Check the customer email address before sending."], es: ["Guarda la cotización y ábrela desde el Panel.", "Revisa la propuesta y copia el enlace para el cliente.", "Envía el enlace desde tu aplicación de mensajes o correo, o usa Enviar correo al cliente con Pro.", "Comprueba la dirección del cliente antes de enviarlo."] },
+    steps: { en: ["Save the estimate and open it from Dashboard.", "Review the customer proposal and copy its customer link.", "Send that link from your own text or email app, or use Email client if your current plan includes it.", "Check the customer email address before sending."], es: ["Guarda la cotización y ábrela desde el Panel.", "Revisa la propuesta y copia el enlace para el cliente.", "Envía el enlace desde tu aplicación de mensajes o correo, o usa Enviar correo al cliente si tu plan actual lo incluye.", "Comprueba la dirección del cliente antes de enviarlo."] },
     note: { en: "Copying a link does not send an email or prove the customer opened it.", es: "Copiar un enlace no envía un correo ni demuestra que el cliente lo abrió." },
     action: { href: "/dashboard", en: "Open Dashboard", es: "Abrir Panel" },
   },

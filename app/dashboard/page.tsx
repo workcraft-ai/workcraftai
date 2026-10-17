@@ -9,6 +9,7 @@ import { LocalizedTree, translate, useLanguage } from "@/app/components/Language
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { latestEstimateEmailEvents } from "@/lib/email-delivery-status";
 import FirstFiveMinutes from "@/app/components/FirstFiveMinutes";
+import { MfaInvite } from "@/app/components/MfaSecurity";
 
 type GreetingKey = "Good morning" | "Good afternoon" | "Good evening";
 
@@ -173,16 +174,14 @@ export default function DashboardPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Email could not be sent.");
       if (!result.notificationPending) setEmailEvents((current) => ({ ...current, [id]: "sent" }));
-      if (typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number") {
-        setEmailAllowance((current) => current ? {
-          ...current,
-          daily_used: current.daily_limit - result.emailQuota.remainingToday,
-          monthly_used: current.monthly_limit - result.emailQuota.remainingThisMonth,
-        } : current);
-      }
-      setSendMessage(result.notificationPending ? "Estimate email queued. We will retry automatically; it has not been confirmed sent yet." : typeof result.emailQuota?.remainingToday === "number" && typeof result.emailQuota?.remainingThisMonth === "number"
-        ? `Estimate email sent. ${result.emailQuota.remainingToday} Pro emails remain today and ${result.emailQuota.remainingThisMonth} this month.`
-        : "Estimate email sent.");
+      void fetch("/api/account/usage", { cache: "no-store" }).then(async (usageResponse) => {
+        if (!usageResponse.ok) return;
+        const usage = await usageResponse.json();
+        if (usage.email) setEmailAllowance(usage.email as EmailAllowance);
+      }).catch(() => {});
+      setSendMessage(result.notificationPending
+        ? (language === "es" ? "Correo de la cotización en cola. Lo intentaremos de nuevo automáticamente; aún no se ha confirmado el envío." : "Estimate email queued. We will retry automatically; it has not been confirmed sent yet.")
+        : (language === "es" ? "Correo de la cotización enviado." : "Estimate email sent."));
     } catch (error) {
       setSendMessage(error instanceof Error ? error.message : "Email could not be sent.");
       void fetch("/api/account/usage", { cache: "no-store" }).then(async (usageResponse) => {
@@ -313,6 +312,7 @@ export default function DashboardPage() {
         </header>
 
         <FirstFiveMinutes onVisibilityChange={setOnboardingVisible} />
+        <MfaInvite />
 
         {!loading && !onboardingVisible && (estimates.length === 0 || (estimates.length === 1 && !estimates[0].is_archived && !estimates[0].proposal_viewed_at)) && <section aria-labelledby="first-quote-title" className="rounded-2xl border border-orange-200 bg-orange-50 p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.15em] text-orange-900">{translate(language, "Your first quote")}</p>
@@ -326,8 +326,8 @@ export default function DashboardPage() {
           <ToolLink href="/pricebook" title="Price book & templates" description="Save your rates and reusable scopes" />
           <ToolLink href="/reports" title="Reports" description="See estimate pipeline and job totals" />
         </nav>
-        {isPro && emailAllowance && <p role="status" className={`rounded-lg border bg-white px-4 py-3 text-sm ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) === 0 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) === 0 ? "border-red-200 font-semibold text-red-800" : Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) <= 1 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) <= 20 ? "border-amber-200 font-semibold text-amber-800" : "border-slate-200 text-slate-700"}`}>
-          {translate(language, `Customer email allowance: ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0)} of ${emailAllowance.daily_limit} left today · ${Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0)} of ${emailAllowance.monthly_limit} left this month (UTC).`)}
+        {emailAllowance && <p role="status" className={`rounded-lg border bg-white px-4 py-3 text-sm ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) === 0 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) === 0 ? "border-red-200 font-semibold text-red-800" : Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0) <= 1 || Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0) <= 20 ? "border-amber-200 font-semibold text-amber-800" : "border-slate-200 text-slate-700"}`}>
+          {language === "es" ? `Correos para clientes: quedan ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0)} de ${emailAllowance.daily_limit} hoy · ${Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0)} de ${emailAllowance.monthly_limit} este mes (UTC).` : `Customer emails: ${Math.max(emailAllowance.daily_limit - emailAllowance.daily_used, 0)} of ${emailAllowance.daily_limit} left today · ${Math.max(emailAllowance.monthly_limit - emailAllowance.monthly_used, 0)} of ${emailAllowance.monthly_limit} left this month (UTC).`}
         </p>}
         {sendMessage && <p role="status" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{sendMessage}</p>}
         {shareFallbackUrl && <label className="block rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800">{translate(language, "Customer link")}
@@ -413,7 +413,7 @@ export default function DashboardPage() {
                     <Link href={`/estimate/${est.id}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-orange-800 px-3 text-sm font-semibold text-white hover:bg-orange-900">{translate(language, "View Estimate")}</Link>
                     <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
                   </div>
-                  {isPro && <><button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>{!est.client_email.trim() && <p className="text-xs text-slate-600">{language === "es" ? "Agrega un correo al editar la cotización para enviarla por email." : "Add an email while editing this estimate to send it by email."}</p>}</>}
+                  {emailAllowance && emailAllowance.daily_limit > 0 && <><button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} className="mt-2 inline-flex min-h-12 items-center text-sm font-semibold text-orange-800 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>{!est.client_email.trim() && <p className="text-xs text-slate-600">{language === "es" ? "Agrega un correo al editar la cotización para enviarla por email." : "Add an email while editing this estimate to send it by email."}</p>}</>}
                   <label className="mt-3 block text-xs font-semibold text-slate-700">{translate(language, "My follow-up")}
                     <select aria-label={`${translate(language, "My follow-up")} — ${est.client_name}`} value={pipelineStages.includes(est.pipeline_stage as PipelineStage) ? est.pipeline_stage : "active"} disabled={statusSavingId !== null} onChange={(event) => void updatePipelineStage(est.id, event.target.value as PipelineStage)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 disabled:opacity-60">
                       {pipelineStages.map((stage) => <option key={stage} value={stage}>{translate(language, stage === "active" ? "Active" : stage === "follow_up" ? "Follow-up" : stage === "closed_won" ? "Closed won" : "Closed lost")}</option>)}
@@ -486,7 +486,7 @@ export default function DashboardPage() {
                           {translate(language, "View Estimate")}
                         </Link>
                         <button type="button" onClick={() => void copyCustomerLink(est.id)} disabled={copyingId === est.id} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, copyingId === est.id ? "Copying…" : "Copy customer link")}</button>
-                        {isPro && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} title={!est.client_email.trim() ? (language === "es" ? "Agrega un correo al editar esta cotización" : "Add an email while editing this estimate") : undefined} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
+                        {emailAllowance && emailAllowance.daily_limit > 0 && <button type="button" onClick={() => void sendEstimate(est.id)} disabled={sendingId === est.id || !est.client_email.trim()} title={!est.client_email.trim() ? (language === "es" ? "Agrega un correo al editar esta cotización" : "Add an email while editing this estimate") : undefined} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline disabled:opacity-50">{translate(language, sendingId === est.id ? "Sending…" : emailEvents[est.id] ? "Resend email" : "Email client")}</button>}
                         {emailEvents[est.id] && !["proposal_viewed", "follow_up_sent"].includes(emailEvents[est.id]) && <span className="text-[10px] font-semibold text-slate-600">{translate(language, estimateEmailEventLabel(emailEvents[est.id]))}</span>}
                         {(est.followup_sent_at || (est.status.toLowerCase() === "pending" && est.followup_at)) && <span className="whitespace-nowrap text-[10px] text-slate-600">{translate(language, est.followup_sent_at ? "Auto follow-up sent" : "Auto follow-up scheduled")} · {new Date((est.followup_sent_at || est.followup_at)!).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>}
                         {(est.proposal_viewed_at || emailEvents[est.id] === "proposal_viewed") && <span className="whitespace-nowrap text-[10px] font-semibold text-green-800">{translate(language, "Customer viewed")}{est.proposal_viewed_at ? ` · ${new Date(est.proposal_viewed_at).toLocaleDateString(locale, { month: "short", day: "numeric" })}` : ""}</span>}

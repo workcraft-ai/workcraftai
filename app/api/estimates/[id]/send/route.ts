@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
-import { getServerProAccess } from "@/lib/pro-access";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { enqueueNotification, processNotifications } from "@/lib/notification-outbox";
 import { createHash } from "node:crypto";
@@ -22,17 +21,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Sign in to send estimates." }, { status: 401 });
   const contractorReplyEmail = user.email?.trim();
   if (!contractorReplyEmail) return NextResponse.json({ error: "Add an email address to your account before sending an estimate." }, { status: 400 });
-  let hasPro = false;
-  try { hasPro = (await getServerProAccess(user.id)).hasPro; }
-  catch { return NextResponse.json({ error: "Could not verify your plan." }, { status: 503 }); }
-  if (!hasPro) return NextResponse.json({ error: "Branded estimate email is a Pro feature." }, { status: 403 });
-
   const apiKey = process.env.RESEND_API_KEY;
   const sender = getWorkCraftNoReplySender();
   if (!apiKey) return NextResponse.json({ error: "Estimate email sending is not configured. Set RESEND_API_KEY." }, { status: 503 });
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return NextResponse.json({ error: "Email sending is temporarily unavailable." }, { status: 503 });
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } });
+  const { data: usage, error: usageError } = await admin.rpc("workcraft_get_account_usage", { p_user_id: user.id });
+  if (usageError || !usage?.email) return NextResponse.json({ error: "Could not verify your email allowance. Please try again." }, { status: 503 });
+  const email = usage.email as { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
+  if (email.daily_limit === 0 || email.monthly_limit === 0) return NextResponse.json({ error: "Estimate email is not included in your current plan. Copy the customer link instead." }, { status: 403 });
+  if (email.daily_used >= email.daily_limit || email.monthly_used >= email.monthly_limit) return NextResponse.json({ error: "Your customer email allowance is used up. It resets at the next UTC day or month." }, { status: 429 });
 
   const { data: estimate, error: estimateError } = await supabase.from("estimates").select("id, reference_number, user_id, client_name, client_email, job_address, tax_rate, markup_percentage, proposal_language, proposal_display_mode, proposal_summary, updated_at").eq("id", id).eq("user_id", user.id).single();
   if (estimateError || !estimate) return NextResponse.json({ error: "Estimate not found in your account." }, { status: 404 });

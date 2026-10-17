@@ -26,7 +26,7 @@ const questions = [
   },
   {
     question: "What are the Pro usage limits?",
-    answer: "Pro ($9.99/month) includes up to 50 saved estimates per UTC day and 500 per UTC month; 5 cloud AI drafts per day and 50 per month; and 5 customer-facing emails—including estimate emails, follow-ups, customer-question alerts, and invoice emails—per day and 100 per month. Pro also includes 100 MB of new private media uploads per month, up to 250 MB and 100 files retained. View your current usage and how much remains in Profile. Counters reset at 00:00 UTC or the start of each UTC month. Failed AI provider attempts count. These are account allowances; shared provider capacity may pause an action sooner.",
+    answer: "Pro ($9.99/month) includes estimates, cloud AI drafts, customer emails, and private media. Trial and paid Pro share the same email allowance; Free accounts may receive an estimate-email allowance. Email limits can change. Open Profile to see your current daily and monthly limits and what remains. Counters reset at 00:00 UTC or the start of each UTC month. Shared provider capacity may pause an action sooner.",
   },
   {
     question: "How does the free Pro trial work?",

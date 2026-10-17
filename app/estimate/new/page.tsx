@@ -1126,7 +1126,7 @@ export default function CreateEstimatePage() {
           </section>
 
           {/* Submit Button */}
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; enviar cotizaciones por email es una función Pro." : "Saving creates a shareable proposal link but does not send an email. Find the link on your Dashboard; emailing clients is a Pro feature."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; tu cupo actual de correos aparece allí y en Perfil." : "Saving creates a shareable proposal link but does not send an email. Find it on your Dashboard; your current email allowance appears there and in Profile."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
           <button
             type="submit"
             disabled={saving || !connectionOnline || Boolean(partialSavedEstimateId)}
