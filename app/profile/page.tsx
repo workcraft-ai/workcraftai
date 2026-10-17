@@ -90,6 +90,7 @@ export default function ProfilePage() {
   const [proAccessExpiresAt, setProAccessExpiresAt] = useState<string | null>(null);
   const [trialAvailable, setTrialAvailable] = useState(false);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [entitlementGraceEnd, setEntitlementGraceEnd] = useState<string | null>(null);
   const [trialBillingReady, setTrialBillingReady] = useState<boolean | null>(null);
   const [planReturnStatus, setPlanReturnStatus] = useState<"pending" | "confirmed" | "delayed" | null>(null);
   const [upgrading, setUpgrading] = useState(false);
@@ -190,6 +191,7 @@ export default function ProfilePage() {
           setProAccessExpiresAt(entitlement.expires_at);
           setTrialAvailable(entitlement.trial_available);
           setTrialEndsAt(entitlement.trial_ends_at);
+          setEntitlementGraceEnd(entitlement.grace_ends_at);
           setTrialBillingReady(entitlement.trial_billing_ready);
         } else {
           setError("Could not verify your plan. Refresh the page before using Pro tools.");
@@ -330,6 +332,9 @@ export default function ProfilePage() {
 
   const hasBillingHistory = planStatus !== "free";
   const needsBillingAttention = ["past_due", "unpaid", "incomplete"].includes(planStatus);
+  const formattedGraceEnd = planStatus === "past_due" && entitlementGraceEnd
+    ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(entitlementGraceEnd))
+    : null;
   const formattedTrialEnd = trialEndsAt
     ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(trialEndsAt))
     : null;
@@ -363,6 +368,13 @@ export default function ProfilePage() {
       <section id="plan" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your plan</p><h2 className="mt-1 text-lg font-bold capitalize text-slate-900">{hasProAccess ? "WorkCraft AI Pro" : "WorkCraft AI Free"}</h2><p className="mt-1 text-xs text-slate-600">{proAccessSource === "admin_grant" ? <>{"Admin-granted Pro access"}{proAccessExpiresAt ? <> {"through"} {new Date(proAccessExpiresAt).toLocaleString()}.</> : <> {"until an administrator revokes it."}</>}</> : hasProAccess ? (language === "es" ? "Tu plan Pro incluye cotizaciones, borradores con IA, correos para clientes y cargas de archivos. Consulta los límites actuales y lo que te queda en el panel de uso." : "Your Pro plan includes estimates, AI drafts, customer emails, and media uploads. Check the current limits and what remains in the usage panel below.") : (language === "es" ? "Crea cotizaciones, administra tu lista de precios y comparte propuestas. Consulta abajo si tu plan incluye correos para clientes. Mejora a Pro para usar IA en la nube y programar trabajos." : "Create estimates, manage your price book, and share proposals. Check below whether your plan includes customer emails. Upgrade to Pro for cloud AI and job scheduling.")}</p>
           {proAccessSource === "stripe" && planStatus === "trialing" && <p role="status" className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">{trialNotice(language, formattedTrialEnd, trialBillingReady)}</p>}
+          {planStatus === "past_due" && proAccessSource !== "admin_grant" && <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">{hasProAccess
+            ? language === "es"
+              ? `No pudimos cobrar tu suscripción Pro. Conservas el acceso hasta ${formattedGraceEnd ?? "el final del período de gracia"} (hora del este). Selecciona Administrar facturación para actualizar el pago.`
+              : `Your Pro payment failed. You keep Pro access until ${formattedGraceEnd ?? "the end of your grace period"} (Eastern time). Select Manage billing to update payment.`
+            : language === "es"
+              ? "El plazo para actualizar tu pago terminó. Tu cuenta pasó al plan Gratis; tus datos siguen guardados. Selecciona Administrar facturación para recuperar Pro."
+              : "Your payment grace period ended. Your account moved to Free; your data is safe. Select Manage billing to restore Pro."}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasProAccess && <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-bold text-green-800">{proAccessSource === "admin_grant" ? "Admin granted" : planBadge(language, planStatus, trialBillingReady)}</span>}

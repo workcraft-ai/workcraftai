@@ -51,7 +51,7 @@ export const POST = withApiFailureMetrics("/api/webhooks/stripe", async (request
     const verifiedEvent = event;
     after(async () => {
       try {
-        const result = await processVerifiedStripeEvent(verifiedEvent, request.url);
+        const result = await processVerifiedStripeEvent(verifiedEvent);
         if (!result.ok) console.error("Deferred Stripe processing will be retried:", verifiedEvent.type, result.status);
       } catch (processingError) {
         console.error("Deferred Stripe processing failed:", verifiedEvent.type, processingError instanceof Error ? processingError.name : "unknown");

@@ -50,7 +50,7 @@ export const GET = withApiFailureMetrics("/api/cron/stripe-webhooks", async (req
       continue;
     }
     try {
-      const result = await processVerifiedStripeEvent(row.payload, request.url);
+      const result = await processVerifiedStripeEvent(row.payload);
       if (result.status === 202) inProgress++;
       else if (result.ok) processed++;
       else failed++;

@@ -74,7 +74,7 @@ const questions = [
   },
   {
     question: "What happens if my Pro subscription payment is past due?",
-    answer: "Your Pro access moves to the Free plan immediately, but your saved estimates, jobs, and other account data remain available. Sign in, open Profile, choose Manage billing, and update your payment method or pay the open invoice. Stripe restores Pro access after it confirms payment. WorkCraft AI sends a billing notice when the subscription first becomes past due.",
+    answer: "If a Pro payment fails, you keep Pro access for three business days from the first recorded failure, excluding weekends and measured in Eastern time. Stripe may retry the payment during or after this period. If it remains unpaid when the grace period ends, your account moves to Free but your saved data remains available. Open Profile → Manage billing to update your payment method or pay the open invoice. Pro returns after Stripe confirms payment. Stripe may email you about failed payments or an expiring card.",
   },
   {
     question: "Does WorkCraft AI send estimates or customer emails?",

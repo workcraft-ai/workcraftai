@@ -19,6 +19,16 @@ export const helpGuides: HelpGuide[] = [
     action: { href: "/profile#plan", en: "View my plan", es: "Ver mi plan" },
   },
   {
+    slug: "pro-payment-recovery", title: { en: "Fix a failed Pro subscription payment", es: "Soluciona un pago fallido de Pro" },
+    summary: { en: "Update your card and understand when Pro access changes.", es: "Actualiza tu tarjeta y consulta cuándo cambia tu acceso Pro." },
+    steps: {
+      en: ["Open Profile → Your plan and read the billing notice and grace deadline.", "Choose Manage billing to open Stripe's secure billing page.", "Update your payment method or pay the open invoice there. Check any Stripe email about the failed payment or expiring card.", "Return to WorkCraft AI and refresh your plan after Stripe confirms the payment."],
+      es: ["Abre Perfil → Tu plan y lee el aviso de facturación y la fecha límite.", "Elige Administrar facturación para abrir la página segura de Stripe.", "Actualiza el método de pago o paga la factura pendiente allí. Revisa los correos de Stripe sobre pagos fallidos o tarjetas por vencer.", "Regresa a WorkCraft AI y actualiza la página de tu plan cuando Stripe confirme el pago."],
+    },
+    note: { en: "A failed renewal keeps Pro available for three weekdays from the first recorded failure. Stripe may retry for longer. If the grace period ends first, Free features and saved data remain available.", es: "Después de un cobro fallido, Pro sigue disponible durante tres días de lunes a viernes desde el primer fallo registrado. Stripe puede seguir intentando cobrar después. Si vence ese plazo, permanecen disponibles las funciones gratuitas y tus datos guardados." },
+    action: { href: "/profile#plan", en: "Manage my plan", es: "Administrar mi plan" },
+  },
+  {
     slug: "first-estimate", title: { en: "Create your first estimate", es: "Crea tu primera cotización" },
     summary: { en: "Start with one customer, one job, and prices you control.", es: "Comienza con un cliente, un trabajo y los precios que tú eliges." },
     steps: { en: ["Open New estimate from the Dashboard.", "Enter the customer and job location.", "Add a line item with its quantity, unit, and price.", "Review the total and save. Open the customer view before sharing."], es: ["Abre Nueva cotización desde el Panel.", "Ingresa el cliente y la ubicación del trabajo.", "Agrega un concepto con cantidad, unidad y precio.", "Revisa el total y guarda. Abre la vista del cliente antes de compartir."] },

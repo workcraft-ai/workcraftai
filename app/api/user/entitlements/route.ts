@@ -44,11 +44,7 @@ export async function GET() {
       }
     }
 
-    const hasPro = access.source === "admin_grant"
-      ? access.hasPro
-      : access.source === "stripe"
-        ? stripeStatus === "active" || stripeStatus === "trialing"
-        : false;
+    const hasPro = access.hasPro;
     return NextResponse.json({
       has_pro: hasPro,
       source: access.source,
@@ -58,6 +54,7 @@ export async function GET() {
       trial_available: access.trialAvailable,
       trial_ends_at: trialEndsAt,
       trial_billing_ready: trialBillingReady,
+      grace_ends_at: access.graceEndsAt,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Pro entitlement lookup failed:", error instanceof Error ? error.message : "unknown error");

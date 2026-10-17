@@ -138,13 +138,26 @@ export function ProPlanBanner() {
   const { entitlement, loading } = useProPlan();
   const { language } = useLanguage();
 
-  if (loading || !entitlement || !isWorkspaceNavigation(pathname) || (entitlement.has_pro && entitlement.stripe_status !== "trialing")) return null;
+  if (loading || !entitlement || !isWorkspaceNavigation(pathname) ||
+    (entitlement.source === "admin_grant" && entitlement.stripe_status === "past_due") ||
+    (entitlement.has_pro && !["trialing", "past_due"].includes(entitlement.stripe_status))) return null;
 
   const date = entitlement.trial_ends_at
     ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(entitlement.trial_ends_at))
     : null;
   let message: string;
-  if (entitlement.has_pro && entitlement.stripe_status === "trialing") {
+  if (entitlement.stripe_status === "past_due") {
+    const graceEnd = entitlement.grace_ends_at
+      ? new Intl.DateTimeFormat(language === "es" ? "es-US" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(entitlement.grace_ends_at))
+      : null;
+    message = entitlement.has_pro
+      ? language === "es"
+        ? `No pudimos cobrar tu suscripción Pro. Conservas Pro hasta ${graceEnd ?? "el final del período de gracia"} (hora del este). Actualiza tu pago para evitar perder acceso.`
+        : `Your Pro payment did not go through. Pro stays available until ${graceEnd ?? "the end of your grace period"} (Eastern time). Update billing to keep access.`
+      : language === "es"
+        ? "El plazo para actualizar tu pago terminó y tu cuenta pasó al plan Gratis. Tus datos están guardados; actualiza la facturación para recuperar Pro."
+        : "Your payment grace period ended and your account moved to Free. Your data is safe; update billing to restore Pro.";
+  } else if (entitlement.has_pro && entitlement.stripe_status === "trialing") {
     if (entitlement.trial_billing_ready === true) {
       message = date
         ? translate(language, "Your Pro upgrade is set. Your 14-day trial ends {date}. Your saved payment method will be charged $9.99/month starting then unless you cancel before the trial ends. No charge is due today.").replace("{date}", date)
@@ -164,7 +177,9 @@ export function ProPlanBanner() {
     message = translate(language, "Upgrade to Pro for $9.99/month.");
   }
 
-  const label = entitlement.has_pro && entitlement.stripe_status === "trialing"
+  const label = entitlement.stripe_status === "past_due" || ["unpaid", "incomplete"].includes(entitlement.stripe_status)
+    ? translate(language, "Manage billing")
+    : entitlement.has_pro && entitlement.stripe_status === "trialing"
     ? translate(language, entitlement.trial_billing_ready === true ? "Manage billing" : entitlement.trial_billing_ready === false ? "Add payment method" : "Review billing")
     : translate(language, entitlement.trial_available ? "Start 14-day Pro trial" : "Upgrade to Pro");
   return (

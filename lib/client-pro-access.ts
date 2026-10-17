@@ -7,6 +7,7 @@ export type ClientProEntitlement = {
   trial_available: boolean;
   trial_ends_at: string | null;
   trial_billing_ready: boolean | null;
+  grace_ends_at: string | null;
 };
 
 export async function getClientProEntitlement(): Promise<ClientProEntitlement | null> {
@@ -24,6 +25,7 @@ export async function getClientProEntitlement(): Promise<ClientProEntitlement | 
       trial_available: result.trial_available === true,
       trial_ends_at: typeof result.trial_ends_at === "string" ? result.trial_ends_at : null,
       trial_billing_ready: typeof result.trial_billing_ready === "boolean" ? result.trial_billing_ready : null,
+      grace_ends_at: typeof result.grace_ends_at === "string" ? result.grace_ends_at : null,
     };
   } catch {
     return null;
