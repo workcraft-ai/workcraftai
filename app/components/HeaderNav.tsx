@@ -89,6 +89,10 @@ export default function HeaderNav() {
     router.refresh();
   };
 
+  // A password-only session is intentionally present while the authenticator
+  // challenge runs. Do not show private navigation or account actions there.
+  if (pathname === "/mfa") return null;
+
   if (loading) {
     return <div aria-hidden="true" className="h-9 w-24 animate-pulse rounded-lg bg-slate-800" />;
   }
