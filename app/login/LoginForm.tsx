@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
@@ -16,8 +15,6 @@ export default function LoginForm() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
   const { language } = useLanguage();
-
-  const router = useRouter();
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,8 +48,9 @@ export default function LoginForm() {
 
       const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (assuranceError || !assurance) throw assuranceError ?? new Error("Could not check MFA status");
-      router.push(assurance.currentLevel !== "aal2" && assurance.nextLevel === "aal2" ? "/mfa" : "/dashboard");
-      router.refresh();
+      // Start the next phase with the newly saved session cookie on a fresh
+      // request; a client transition can reuse a route cached before sign-in.
+      window.location.replace(assurance.currentLevel !== "aal2" && assurance.nextLevel === "aal2" ? "/mfa" : "/dashboard");
     } catch {
       setError(translate(language, "We could not sign you in. Please try again."));
     } finally {

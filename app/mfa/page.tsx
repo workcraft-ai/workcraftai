@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/app/utils/supabase/client";
 import Logo from "@/app/components/Logo";
 import { useLanguage } from "@/app/components/LanguageProvider";
@@ -12,7 +11,6 @@ type FactorChoice = { id: string; friendly_name?: string | null };
 export default function MfaPage() {
   const { language } = useLanguage();
   const es = language === "es";
-  const router = useRouter();
   const [factors, setFactors] = useState<FactorChoice[]>([]);
   const [factorId, setFactorId] = useState("");
   const [code, setCode] = useState("");
@@ -23,28 +21,31 @@ export default function MfaPage() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.replace("/login"); return; }
-      const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (assuranceError || !assurance) {
-        if (active) { setError(es ? "No pudimos verificar tu sesión. Actualiza esta página." : "We could not check your session. Refresh this page."); setLoading(false); }
-        return;
-      }
-      if (assurance.currentLevel === "aal2" || assurance.nextLevel !== "aal2") { router.replace("/dashboard"); return; }
-      const { data, error: factorsError } = await supabase.auth.mfa.listFactors();
-      if (!active) return;
-      if (assuranceError || factorsError || !data?.totp?.length) {
-        setError(es ? "No pudimos cargar tu autenticador. Actualiza la página o contacta con soporte." : "We could not load your authenticator. Refresh this page or contact support.");
-      } else {
-        const verified = data.totp.filter((factor) => factor.status === "verified");
+      try {
+        const supabase = createClient();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) { window.location.replace("/login"); return; }
+        const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (assuranceError || !assurance) throw assuranceError ?? new Error("Assurance unavailable");
+        if (assurance.currentLevel === "aal2" || assurance.nextLevel !== "aal2") { window.location.replace("/dashboard"); return; }
+        const { data, error: factorsError } = await supabase.auth.mfa.listFactors();
+        if (factorsError) throw factorsError;
+        if (!active) return;
+        const verified = (data?.totp ?? []).filter((factor) => factor.status === "verified");
+        if (!verified.length) throw new Error("No verified authenticator available");
         setFactors(verified);
-        setFactorId(verified[0]?.id ?? "");
+        setFactorId(verified[0].id);
+        setLoading(false);
+      } catch {
+        if (active) {
+          setError(es ? "No pudimos cargar tu autenticador. Actualiza la página o contacta con soporte." : "We could not load your authenticator. Refresh this page or contact support.");
+          setLoading(false);
+        }
       }
-      setLoading(false);
     })();
     return () => { active = false; };
-  }, [es, router]);
+  }, [es]);
 
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,19 +58,20 @@ export default function MfaPage() {
       if (challengeError || !challenge) throw challengeError ?? new Error("Challenge unavailable");
       const { error: verifyError } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
       if (verifyError) throw verifyError;
-      router.replace("/dashboard");
-      router.refresh();
+      // The MFA response saves an AAL2 session. A full navigation makes the
+      // server read the updated cookies instead of reusing an AAL1 route cache.
+      window.location.replace("/dashboard");
     } catch {
       setError(es ? "No se pudo verificar el código. Revisa tu autenticador e inténtalo de nuevo." : "The code could not be verified. Check your authenticator and try again.");
       setCode("");
-    } finally { setBusy(false); }
+      setBusy(false);
+    }
   }
 
   async function signOut() {
     setBusy(true);
     await createClient().auth.signOut({ scope: "local" });
-    router.replace("/login");
-    router.refresh();
+    window.location.replace("/login");
   }
 
   return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100">
