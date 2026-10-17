@@ -31,6 +31,7 @@ type AccountDetail = {
 type ProGrant = { id: string; grant_type: "temporary" | "permanent"; reason: string; created_at: string; starts_at: string; expires_at: string | null; revoked_at: string | null; is_expired: boolean };
 type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_limit: number; ai_monthly_generation_limit: number; ai_global_daily_generation_limit: number; today: { attempts_started: number; succeeded: number; failed: number; global_attempts_started: number }; this_month: { attempts_started: number } };
 type AppEmailSettings = { daily_limit: number; today: { emails_started: number } };
+type AccountEmailLimits = { free_email_daily_limit: number; free_email_monthly_limit: number; pro_email_daily_limit: number; pro_email_monthly_limit: number };
 type AccountStats = { created: number; email_verified: number; signed_in: number };
 
 const ADMIN_MFA_REQUIRED_EVENT = "workcraft:admin-mfa-required";
@@ -104,6 +105,9 @@ export default function AdminPage() {
   const [appEmailLimitInput, setAppEmailLimitInput] = useState("");
   const [appEmailLimitReason, setAppEmailLimitReason] = useState("");
   const [appEmailSettingsLoading, setAppEmailSettingsLoading] = useState(true);
+  const [accountEmailLimits, setAccountEmailLimits] = useState<AccountEmailLimits | null>(null);
+  const [accountEmailInputs, setAccountEmailInputs] = useState({ free_daily: "0", free_monthly: "0", pro_daily: "5", pro_monthly: "100" });
+  const [accountEmailReason, setAccountEmailReason] = useState("");
   const [estimateTradeOptions, setEstimateTradeOptions] = useState(DEFAULT_ESTIMATE_TRADES.map((option) => ({ ...option })));
   const [estimateTradeOptionsLoading, setEstimateTradeOptionsLoading] = useState(true);
   const [estimateTradeOptionsReason, setEstimateTradeOptionsReason] = useState("");
@@ -214,6 +218,19 @@ export default function AdminPage() {
       if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load the app email limit.");
     }).finally(() => {
       if (!cancelled) setAppEmailSettingsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [role]);
+
+  useEffect(() => {
+    if (role !== "super_admin") return;
+    let cancelled = false;
+    void requestJson("/api/admin/account-email-limits").then((result: AccountEmailLimits) => {
+      if (cancelled) return;
+      setAccountEmailLimits(result);
+      setAccountEmailInputs({ free_daily: String(result.free_email_daily_limit), free_monthly: String(result.free_email_monthly_limit), pro_daily: String(result.pro_email_daily_limit), pro_monthly: String(result.pro_email_monthly_limit) });
+    }).catch((cause) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load account email allowances.");
     });
     return () => { cancelled = true; };
   }, [role]);
@@ -500,6 +517,21 @@ export default function AdminPage() {
     }
   };
 
+  const saveAccountEmailLimits = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy("account-email-limits"); setError(""); setNotice("");
+    try {
+      const result = await requestJson("/api/admin/account-email-limits", {
+        method: "POST", body: JSON.stringify({ ...accountEmailInputs, reason: accountEmailReason }),
+      });
+      setAccountEmailLimits({ free_email_daily_limit: result.free_daily, free_email_monthly_limit: result.free_monthly, pro_email_daily_limit: result.pro_daily, pro_email_monthly_limit: result.pro_monthly });
+      setAccountEmailReason("");
+      setNotice(result.message);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update account email allowances.");
+    } finally { setBusy(""); }
+  };
+
   const saveEstimateTradeOptions = async (event: FormEvent) => {
     event.preventDefault();
     const options = parseEstimateTradeOptions(estimateTradeOptions);
@@ -586,7 +618,16 @@ export default function AdminPage() {
       </section>}
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro accounts can send 5 customer emails per UTC day and 100 per UTC month. App mail is capped at 75 per UTC day, with separate reserves of 20 Auth emails and 5 billing emails. The Auth reserve requires the Supabase Send Email hook to be configured; custom SMTP traffic bypasses this app budget. Accepted or ambiguous provider requests count; definite rejections release their reservation.</p></div>
+        <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free account email allowances apply to estimate emails; trial and paid Pro share one allowance for estimate emails, follow-ups, customer-question alerts, and invoices. The separate app-wide cap is 75 per UTC day, with reserves of 20 Auth emails and 5 billing emails. The Auth reserve requires the Supabase Send Email hook; custom SMTP bypasses this app budget. Accepted or ambiguous provider requests count; definite rejections release their reservation.</p></div>
+        {accountEmailLimits && <>
+          <p className="mt-4 text-sm text-slate-700"><strong>Current per-account allowances:</strong> Free {accountEmailLimits.free_email_daily_limit}/day, {accountEmailLimits.free_email_monthly_limit}/month · Trial/Pro {accountEmailLimits.pro_email_daily_limit}/day, {accountEmailLimits.pro_email_monthly_limit}/month (UTC).</p>
+          <form onSubmit={saveAccountEmailLimits} className="mt-4 grid gap-3 sm:grid-cols-4">
+            {(["free_daily", "free_monthly", "pro_daily", "pro_monthly"] as const).map((field) => <label key={field} className="block text-xs font-semibold text-slate-700">{({ free_daily: "Free per day", free_monthly: "Free per month", pro_daily: "Trial/Pro per day", pro_monthly: "Trial/Pro per month" })[field]}<input type="number" inputMode="numeric" step={1} min={field.startsWith("free") ? 0 : 1} max={field === "free_daily" ? 10 : field === "free_monthly" ? 100 : field === "pro_daily" ? 50 : 1000} value={accountEmailInputs[field]} onChange={(event) => setAccountEmailInputs((current) => ({ ...current, [field]: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>)}
+            <label className="block text-xs font-semibold text-slate-700 sm:col-span-3">Reason for change<input value={accountEmailReason} onChange={(event) => setAccountEmailReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: adjust pilot email allowances" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <button type="submit" disabled={busy !== "" || accountEmailReason.trim().length < 8} className="self-end rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "account-email-limits" ? "Saving…" : "Save plan allowances"}</button>
+          </form>
+          <p className="mt-2 text-xs text-slate-500">Free 0/day and 0/month disables app-sent estimate email. Monthly must be at least daily. Each change applies immediately to all accounts and is recorded in the admin audit log. The app-wide cap remains independent.</p>
+        </>}
         {appEmailSettings && <>
           <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Current cap:</strong> {appEmailSettings.daily_limit} / day</p><p className="mt-1"><strong>Today:</strong> {appEmailSettings.today.emails_started} app email reservations used (UTC)</p></div>
           <form onSubmit={saveAppEmailLimit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr_auto] sm:items-end">

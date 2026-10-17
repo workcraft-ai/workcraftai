@@ -49,7 +49,9 @@ export default function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceError || !assurance) throw assuranceError ?? new Error("Could not check MFA status");
+      router.push(assurance.currentLevel !== "aal2" && assurance.nextLevel === "aal2" ? "/mfa" : "/dashboard");
       router.refresh();
     } catch {
       setError(translate(language, "We could not sign you in. Please try again."));

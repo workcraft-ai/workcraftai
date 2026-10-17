@@ -41,8 +41,7 @@ export async function updateSession(request: NextRequest) {
   const internalRoots = ["/dashboard", "/customers", "/schedule", "/pricebook", "/reports", "/profile", "/admin", "/invoice"];
   const isProtectedRoute =
     internalRoots.some((root) => path === root || path.startsWith(`${root}/`)) ||
-    path === "/estimate/new" ||
-    (path.startsWith("/estimate") && path.endsWith("/edit"));
+    path === "/estimate" || path.startsWith("/estimate/");
 
   const redirectWithSession = () => {
     const response = NextResponse.redirect(url);
@@ -56,9 +55,30 @@ export async function updateSession(request: NextRequest) {
     return redirectWithSession();
   }
 
+  // A verified TOTP factor makes the password-only session incomplete. Gate
+  // both pages and app APIs before any handler can use the service role.
+  // Auth callbacks, password recovery, public customer links, and machine
+  // webhooks remain reachable without an app session.
+  const externalApi = /^\/api\/(?:auth\/|cron\/|webhooks\/|health(?:\/|$)|support(?:\/|$)|proposals\/)/.test(path);
+  if (user && (isProtectedRoute || (path.startsWith("/api/") && !externalApi))) {
+    const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (assuranceError || !assurance) {
+      if (path.startsWith("/api/")) return NextResponse.json({ error: "Could not verify your sign-in security." }, { status: 503 });
+      url.pathname = "/mfa";
+      return redirectWithSession();
+    }
+    if (assurance.currentLevel !== "aal2" && assurance.nextLevel === "aal2") {
+      if (path.startsWith("/api/")) return NextResponse.json({ error: "Complete the authenticator check to continue.", code: "mfa_required" }, { status: 403 });
+      url.pathname = "/mfa";
+      url.search = "";
+      return redirectWithSession();
+    }
+  }
+
   // Redirect authenticated users away from /login or /signup to /dashboard
   if (user && (path === "/login" || path === "/signup")) {
-    url.pathname = "/dashboard";
+    const { data: assurance } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    url.pathname = assurance?.nextLevel === "aal2" && assurance.currentLevel !== "aal2" ? "/mfa" : "/dashboard";
     return redirectWithSession();
   }
 
