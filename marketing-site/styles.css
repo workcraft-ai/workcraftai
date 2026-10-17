@@ -226,3 +226,21 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 .footer-badge-row{display:flex;justify-content:flex-end;align-items:center;padding-block:6px}.footer-badge-row img{display:block;width:150px;height:auto;max-width:100%}@media(max-width:650px){.footer-badge-row{justify-content:center}}
 /* Keep the language control before every primary navigation link at all widths. */
 .site-header>.language-toggle{order:1;flex:0 0 auto}.site-header>.main-nav{order:2}.site-header>.menu-toggle{order:3}.site-header>.header-actions{order:4}
+
+/* Keep essential plan terms readable; details remain in the nearby FAQs. */
+.plans-note{max-width:810px;margin:24px auto 0;padding:20px 22px;border:1px solid #dce1d9;border-radius:12px;background:#fffefa;text-align:left}
+.plans-note h3{margin:0 0 12px;color:#1d2925;font:800 17px/1.35 Manrope,sans-serif}
+.plans-note ul{display:grid;gap:9px;margin:0;padding-left:20px;color:#364139;font-size:14px;line-height:1.55}
+.plans-note a{color:#9a3e20;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+
+/* The signup action appears after the hero leaves view on phone screens. */
+.mobile-signup-cta[hidden]{display:none}
+.mobile-signup-cta{display:none}
+@media(max-width:650px){
+  .plans-note{padding:19px 18px}
+  .plans-note ul{font-size:14px}
+  .mobile-signup-cta:not([hidden]){position:fixed;z-index:30;right:0;bottom:0;left:0;display:flex;align-items:center;gap:12px;padding:10px max(16px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));border-top:1px solid #dce1d9;background:#fffefa;box-shadow:0 -8px 25px #1929231c}
+  .mobile-signup-cta a{display:flex;min-height:48px;flex:1;align-items:center;justify-content:center;border-radius:8px;background:#1d2925;color:#fffefa;font-size:14px;font-weight:700;text-decoration:none}
+  .mobile-signup-cta span{max-width:110px;color:#56615a;font-size:11px;line-height:1.3}
+  body:has(.analytics-banner:not([hidden])) .mobile-signup-cta{display:none}
+}
