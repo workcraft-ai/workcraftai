@@ -104,14 +104,22 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.dashboard-mobile-cta {
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+}
+
 @media (max-width: 1023px) {
   body:has(.mobile-app-nav) {
     padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+  body:has(.dashboard-mobile-cta) {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom));
   }
 }
 
 @media print {
   .mobile-app-nav { display: none !important; }
+  .dashboard-mobile-cta { display: none !important; }
   body:has(.mobile-app-nav) { padding-bottom: 0 !important; }
 }
 

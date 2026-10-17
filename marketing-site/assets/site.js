@@ -47,3 +47,24 @@ if (menuButton && mobileNavigation) {
     }
   });
 }
+
+const mobileSignupCta = document.querySelector(".mobile-signup-cta");
+const hero = document.querySelector(".hero");
+const footer = document.querySelector(".site-footer");
+if (mobileSignupCta && hero && footer && "IntersectionObserver" in window) {
+  let heroVisible = true;
+  let footerVisible = false;
+  const updateMobileSignupCta = () => {
+    mobileSignupCta.hidden = heroVisible || footerVisible || menuButton?.getAttribute("aria-expanded") === "true";
+  };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.target === hero) heroVisible = entry.isIntersecting;
+      if (entry.target === footer) footerVisible = entry.isIntersecting;
+    });
+    updateMobileSignupCta();
+  });
+  observer.observe(hero);
+  observer.observe(footer);
+  menuButton?.addEventListener("click", updateMobileSignupCta);
+}

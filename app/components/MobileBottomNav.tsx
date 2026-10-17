@@ -51,6 +51,14 @@ function NavIcon({ name }: { name: string }) {
 export default function MobileBottomNav({ pathname, adminRole }: MobileBottomNavProps) {
   const { language } = useLanguage();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [showDashboardCta, setShowDashboardCta] = useState(false);
+  useEffect(() => {
+    if (pathname !== "/dashboard") return;
+    const update = () => setShowDashboardCta(window.scrollY > 240);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [pathname]);
   useEffect(() => {
     if (!moreOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -68,6 +76,11 @@ export default function MobileBottomNav({ pathname, adminRole }: MobileBottomNav
 
   return (
     <>
+      {pathname === "/dashboard" && showDashboardCta && !moreOpen && (
+        <Link href="/estimate/new" className="dashboard-mobile-cta fixed inset-x-4 z-[49] mx-auto flex min-h-12 max-w-md items-center justify-center rounded-xl bg-orange-800 px-4 text-sm font-bold text-white shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 lg:hidden">
+          {translate(language, "+ New estimate")}
+        </Link>
+      )}
       {moreOpen && <button type="button" aria-label={translate(language, "Close more navigation")} className="fixed inset-0 z-[48] cursor-default bg-black/10 lg:hidden" onClick={() => setMoreOpen(false)} />}
       <nav aria-label={translate(language, "Mobile navigation")} className="mobile-app-nav fixed inset-x-0 bottom-0 z-[50] grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pt-1 text-slate-700 shadow-[0_-8px_24px_rgba(15,23,42,.10)] backdrop-blur lg:hidden">
         {primaryLinks.map(({ href, label, icon }) => {
