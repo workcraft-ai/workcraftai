@@ -51,13 +51,13 @@ export default function RootLayout({
       React.createElement(AccountActivityTracker, null),
       React.createElement(
           "header",
-          { className: "print:hidden relative z-20 bg-slate-900 text-white px-4 md:px-8 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 shadow-sm" },
+          { className: "print:hidden relative z-20 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-3 border-b border-slate-800 bg-slate-900 px-4 py-3.5 text-white shadow-sm md:px-8 lg:flex lg:flex-wrap lg:gap-x-3" },
           React.createElement(
             "div",
-            { className: "flex shrink-0 items-center gap-3" },
-            React.createElement(Logo, null),
-            React.createElement(HeaderLanguageToggle, null)
+            { className: "col-span-2 flex items-center lg:col-auto" },
+            React.createElement(Logo, null)
           ),
+          React.createElement(HeaderLanguageToggle, null),
           React.createElement(HeaderNav, null)
         ),
         React.createElement(ProPlanBanner, null),
