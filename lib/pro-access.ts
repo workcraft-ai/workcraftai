@@ -9,6 +9,7 @@ export type ProAccess = {
   expiresAt: string | null;
   trialAvailable: boolean;
   trialEndsAt: string | null;
+  graceEndsAt: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
 };
@@ -23,7 +24,7 @@ export function createProAccessAdminClient(deadlineAt?:number) {
 export async function getProAccess(admin: SupabaseClient, userId: string): Promise<ProAccess> {
   const now = new Date().toISOString();
   const [{ data: subscription, error: subscriptionError }, { data: grant, error: grantError }] = await Promise.all([
-    admin.from("subscriptions").select("status,stripe_customer_id,stripe_subscription_id,current_period_end").eq("user_id", userId).maybeSingle(),
+    admin.from("subscriptions").select("status,stripe_customer_id,stripe_subscription_id,current_period_end,grace_ends_at").eq("user_id", userId).maybeSingle(),
     admin.from("tradeflow_pro_access_grants")
       .select("grant_type, expires_at")
       .eq("user_id", userId)
@@ -41,7 +42,9 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
 
   const stripeStatus = subscription?.status ?? "free";
   const trialAvailable = !subscription?.stripe_customer_id && !subscription?.stripe_subscription_id;
-  if (stripeStatus === "active" || stripeStatus === "trialing") {
+  const graceEndsAt = stripeStatus === "past_due" ? subscription?.grace_ends_at ?? null : null;
+  if (stripeStatus === "active" || stripeStatus === "trialing" ||
+    (graceEndsAt && new Date(graceEndsAt).getTime() > Date.now())) {
     return {
       hasPro: true,
       source: "stripe",
@@ -50,6 +53,7 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
       expiresAt: null,
       trialAvailable: false,
       trialEndsAt: stripeStatus === "trialing" ? subscription?.current_period_end ?? null : null,
+      graceEndsAt,
       stripeCustomerId: subscription?.stripe_customer_id ?? null,
       stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
     };
@@ -63,6 +67,7 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
       expiresAt: grant.expires_at,
       trialAvailable,
       trialEndsAt: null,
+      graceEndsAt,
       stripeCustomerId: subscription?.stripe_customer_id ?? null,
       stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
     };
@@ -75,6 +80,7 @@ export async function getProAccess(admin: SupabaseClient, userId: string): Promi
     expiresAt: null,
     trialAvailable,
     trialEndsAt: null,
+    graceEndsAt,
     stripeCustomerId: subscription?.stripe_customer_id ?? null,
     stripeSubscriptionId: subscription?.stripe_subscription_id ?? null,
   };

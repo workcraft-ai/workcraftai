@@ -4,13 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getStripeWebhookClaimAction } from "@/lib/stripe-webhook-claim.mjs";
 import { getInvoiceSubscriptionId } from "@/lib/stripe-invoice.mjs";
-import { buildPastDueBillingEmail, pastDueNoticeIdempotencyKey, shouldSendPastDueNotice } from "@/lib/subscription-billing-notice.mjs";
 import { enqueueNotification, escapeEmailHtml, notificationFrame, processNotifications } from "@/lib/notification-outbox";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 import { getServiceSupabase } from "@/lib/stripe-server";
 
-export async function processVerifiedStripeEvent(event: Stripe.Event, requestUrl: string) {
+export async function processVerifiedStripeEvent(event: Stripe.Event) {
   const deadlineAt = Date.now() + 25_000;
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -60,30 +59,6 @@ export async function processVerifiedStripeEvent(event: Stripe.Event, requestUrl
   }
 
   const syncSubscription = (subscriptionId: string) => syncStripeSubscription(admin, stripe, subscriptionId);
-
-  async function sendPastDueBillingNotice(userId: string, eventId: string) {
-    const sender = getWorkCraftNoReplySender();
-
-    const { data, error } = await admin.auth.admin.getUserById(userId);
-    if (error) throw new Error("Could not load the account email for a past-due notice.");
-    const recipient = data.user?.email;
-    if (!recipient) throw new Error("The account has no email address for a past-due notice.");
-
-    const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@workcraftai.com";
-    const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(requestUrl).origin;
-    const billingUrl = new URL("/profile", appOrigin).toString();
-    const language = data.user?.user_metadata?.app_language === "es" ? "es" : "en";
-    const email = buildPastDueBillingEmail({ language, billingUrl, supportEmail });
-    const queued = await enqueueNotification(admin, {
-      user_id: userId, source: "billing", send_key: pastDueNoticeIdempotencyKey(eventId),
-      payload: {from: sender, reply_to: supportEmail, to: [recipient], ...email},
-    });
-    // Entitlement sync must complete even if a provider is down or the reserved
-    // billing pool is full. The durable worker retries the notice separately.
-    try { await processNotifications(admin, [queued.id], 1, 3_000, deadlineAt); }
-    catch { console.error("Billing notification remains queued."); }
-
-  }
 
   async function notifyConnectedPaymentDispute(disputeId: string, connectedAccountId: string) {
     // Retrieve current state so an old webhook cannot send a stale action alert.
@@ -207,24 +182,18 @@ export async function processVerifiedStripeEvent(event: Stripe.Event, requestUrl
 
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
-    const previousStatus = (event.data.previous_attributes as { status?: string } | null)?.status;
     const synced = await syncSubscription(subscription.id);
     if (!synced) {
       const { error } = await admin.rpc("workcraft_complete_stripe_webhook", { p_event_id: event.id });
       if (error) throw error;
       return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
     }
-    if (shouldSendPastDueNotice({
-      eventType: event.type,
-      eventStatus: subscription.status,
-      previousStatus,
-      currentStatus: synced.subscription.status,
-    })) {
-      await sendPastDueBillingNotice(synced.userId, event.id);
-    }
+    // Stripe Billing owns recovery emails. The app displays the access grace
+    // period and billing action without duplicating each provider reminder.
   }
 
-  if (event.type === "invoice.paid" || event.type === "invoice.payment_failed" || event.type === "invoice.payment_action_required") {
+  if (!event.account && (event.type === "invoice.paid" || event.type === "invoice.payment_failed"
+    || event.type === "invoice.payment_action_required" || event.type === "invoice.updated")) {
     const invoice = event.data.object as Stripe.Invoice;
     const subscriptionId = getInvoiceSubscriptionId(invoice);
     if (subscriptionId) {
@@ -234,6 +203,25 @@ export async function processVerifiedStripeEvent(event: Stripe.Event, requestUrl
         if (error) throw error;
         return NextResponse.json({ received: true, ignored: "subscription is unlinked or superseded" });
       }
+      const currentInvoice = await stripe.invoices.retrieve(invoice.id);
+      if (getInvoiceSubscriptionId(currentInvoice) !== subscriptionId || !currentInvoice.status) {
+        throw new Error("Subscription invoice changed during refresh.");
+      }
+      const { error: invoiceError } = await admin.rpc("workcraft_record_subscription_invoice", {
+        p_invoice_id: currentInvoice.id,
+        p_user_id: synced.userId,
+        p_subscription_id: subscriptionId,
+        p_status: currentInvoice.status,
+        p_amount_due: currentInvoice.amount_due,
+        p_currency: currentInvoice.currency,
+        p_attempt_count: currentInvoice.attempt_count,
+        p_next_retry_at: currentInvoice.next_payment_attempt
+          ? new Date(currentInvoice.next_payment_attempt * 1000).toISOString() : null,
+        p_failed_at: event.type === "invoice.payment_failed" ? new Date(event.created * 1000).toISOString() : null,
+        p_paid_at: currentInvoice.status === "paid"
+          ? new Date((currentInvoice.status_transitions?.paid_at ?? event.created) * 1000).toISOString() : null,
+      });
+      if (invoiceError) throw invoiceError;
     }
   }
 

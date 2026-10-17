@@ -33,6 +33,10 @@ type AiDraftingSettings = { ai_drafting_enabled: boolean; ai_daily_generation_li
 type AppEmailSettings = { daily_limit: number; today: { emails_started: number } };
 type AccountEmailLimits = { free_email_daily_limit: number; free_email_monthly_limit: number; pro_email_daily_limit: number; pro_email_monthly_limit: number };
 type AccountStats = { created: number; email_verified: number; signed_in: number };
+type RecoverySummary = {
+  counts: { past_due: number; in_grace: number; grace_ended: number; retry_scheduled: number; recovered_this_month: number };
+  invoices: { invoice_id: string; email: string; status: string; amount_due: number; currency: string; attempt_count: number; next_retry_at: string | null; first_failed_at: string | null; last_failed_at: string | null; paid_at: string | null }[];
+};
 
 const ADMIN_MFA_REQUIRED_EVENT = "workcraft:admin-mfa-required";
 
@@ -75,6 +79,8 @@ export default function AdminPage() {
   const [accessState, setAccessState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [accountStats, setAccountStats] = useState<AccountStats | null>(null);
   const [accountStatsError, setAccountStatsError] = useState("");
+  const [recovery, setRecovery] = useState<RecoverySummary | null>(null);
+  const [recoveryError, setRecoveryError] = useState("");
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -175,6 +181,20 @@ export default function AdminPage() {
     });
     return () => { cancelled = true; };
   }, [role, mfaRequired]);
+
+  const loadRecovery = useCallback(async () => {
+    try {
+      setRecoveryError("");
+      setRecovery(await requestJson("/api/admin/subscription-recovery") as RecoverySummary);
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "Could not load subscription recovery.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!role || role === "support" || mfaRequired) return;
+    void loadRecovery();
+  }, [role, mfaRequired, loadRecovery]);
 
   useEffect(() => {
     if (role !== "super_admin") return;
@@ -590,6 +610,22 @@ export default function AdminPage() {
           </dl>
         ) : <p role="status" className="mt-4 text-sm text-slate-600">Loading account totals…</p>}
       </section>
+
+      {role !== "support" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="recovery-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="recovery-heading" className="text-lg font-bold text-slate-900">{language === "es" ? "Recuperación de pagos de Pro" : "Pro payment recovery"}</h2><p className="mt-1 text-sm text-slate-600">{language === "es" ? "Solo suscripciones de WorkCraft AI. El acceso Pro continúa durante tres días hábiles después del primer fallo; Stripe puede seguir intentando el cobro después." : "WorkCraft AI subscriptions only. Pro access continues for three weekdays after the first failure; Stripe may continue retrying afterward."}</p></div><button type="button" onClick={() => void loadRecovery()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">{language === "es" ? "Actualizar" : "Refresh"}</button></div>
+        {recoveryError && <p role="alert" className="mt-3 text-sm text-red-800">{recoveryError}</p>}
+        {recovery ? <>
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{([
+            ["past_due", language === "es" ? "Pagos vencidos" : "Past due"],
+            ["in_grace", language === "es" ? "En plazo de gracia" : "In grace"],
+            ["grace_ended", language === "es" ? "Plazo terminado" : "Grace ended"],
+            ["retry_scheduled", language === "es" ? "Reintento previsto" : "Retry scheduled"],
+            ["recovered_this_month", language === "es" ? "Recuperados este mes" : "Recovered this month"],
+          ] as const).map(([key, label]) => <div key={key} className="rounded-xl bg-slate-50 p-3"><dt className="text-xs font-semibold text-slate-600">{label}</dt><dd className="mt-1 text-2xl font-bold text-slate-950">{recovery.counts[key]}</dd></div>)}</dl>
+          <div className="mt-5 space-y-2"><h3 className="text-sm font-bold text-slate-900">{language === "es" ? "Facturas con fallos recientes" : "Recent invoices with failed payments"}</h3>{recovery.invoices.length === 0 ? <p className="text-sm text-slate-600">{language === "es" ? "No hay fallos registrados." : "No failed payments recorded."}</p> : recovery.invoices.map((item) => <div key={item.invoice_id} className="rounded-lg border border-slate-200 p-3 text-xs leading-5 text-slate-700"><p className="font-semibold text-slate-900">{item.email} · {new Intl.NumberFormat(language === "es" ? "es-US" : "en-US", { style: "currency", currency: item.currency.toUpperCase() }).format(item.amount_due / 100)} · {item.status}</p><p>{language === "es" ? "Intentos" : "Attempts"}: {item.attempt_count} · {language === "es" ? "Último fallo" : "Last failure"}: {date(item.last_failed_at)} · {language === "es" ? "Próximo intento" : "Next retry"}: {date(item.next_retry_at)}</p><a href={`https://dashboard.stripe.com/invoices/${encodeURIComponent(item.invoice_id)}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-800 underline">{language === "es" ? "Ver factura en Stripe" : "View invoice in Stripe"}</a></div>)}</div>
+        </> : !recoveryError && <p role="status" className="mt-3 text-sm text-slate-600">{language === "es" ? "Cargando…" : "Loading…"}</p>}
+        <p className="mt-4 text-xs text-slate-600">{language === "es" ? "Stripe administra los avisos de tarjetas próximas a vencer y los reintentos. Consulta los detalles y los registros de correos en Stripe → Revenue recovery. Aquí no se guardan números completos de tarjeta." : "Stripe manages expiring-card emails and retry timing. Review card notices and email logs in Stripe → Revenue recovery. Full card numbers are never stored here."}</p>
+      </section>}
 
       {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Free-tier estimate limit</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free accounts can save up to 10 estimates per UTC day and 50 per UTC month. Set a lower daily ceiling here for testing or cost control. Estimates already created today count; edits do not. Changing the limit below usage already reached takes effect on the next creation attempt.</p></div>
