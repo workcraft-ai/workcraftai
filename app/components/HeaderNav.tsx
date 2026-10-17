@@ -144,16 +144,18 @@ export default function HeaderNav() {
 
   return (
     <>
-    <div className="relative flex w-full items-center justify-end gap-1 sm:gap-2 lg:w-auto">
+    <div className="relative flex min-w-0 w-full items-center justify-end gap-1 sm:gap-2 lg:ml-auto lg:w-auto">
       <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
         {renderLinks()}
       </nav>
 
       <Link
         href="/estimate/new"
+        aria-label={translate(language, "+ New estimate")}
         className="inline-flex min-h-12 items-center whitespace-nowrap rounded-lg bg-orange-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-orange-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 lg:hidden"
       >
-        {translate(language, "+ New estimate")}
+        <span className="max-[370px]:hidden">{translate(language, "+ New estimate")}</span>
+        <span className="hidden text-lg max-[370px]:inline" aria-hidden="true">+</span>
       </Link>
 
       <NotificationBell key={user.id} userId={user.id} />
