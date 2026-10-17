@@ -134,12 +134,7 @@ begin
   end if;
 
   if v_user_limited and (v_daily_limit = 0 or v_monthly_limit = 0) then
-    return query select false, 'account_daily_limit'::text, null::uuid, v_today, v_platform_limit,
-      coalesce((select u.emails_started from public.tradeflow_app_email_daily_usage u where u.usage_date = v_today), 0),
-      v_daily_limit, v_monthly_limit,
-      coalesce((select u.email_count from public.estimate_email_daily_usage u where u.user_id = p_user_id and u.usage_date = v_today), 0),
-      coalesce((select u.email_count from public.estimate_email_monthly_usage u where u.user_id = p_user_id and u.usage_month = v_month), 0);
-    return;
+    raise exception using errcode = '42501', message = 'WORKCRAFT_PRO_REQUIRED';
   end if;
 
   delete from public.tradeflow_app_email_reservations as reservation
