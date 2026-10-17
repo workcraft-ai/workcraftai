@@ -162,6 +162,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
     active_connections?: number;
     waiting_connections?: number;
     idle_in_transaction?: number;
+    idle_in_transaction_over_5m?: number;
   } | null;
   const connections = pressure?.connections ?? 0;
   const maxConnections = pressure?.max_connections ?? 0;
@@ -176,6 +177,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
   }
   const waitingConnections = pressure?.waiting_connections ?? 0;
   const idleInTransaction = pressure?.idle_in_transaction ?? 0;
+  const staleIdleTransactions = pressure?.idle_in_transaction_over_5m ?? 0;
   if (waitingConnections >= 3) {
     criticalAlerts.push({ code: "db_sessions_waiting", count: waitingConnections,
       action: "Several database backends are waiting on locks or I/O; inspect database queries and Supabase pooling telemetry." });
@@ -183,9 +185,12 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
     warnings.push({ code: "db_sessions_waiting", source: "supabase_database", used: waitingConnections,
       action: "One or two database backends are briefly waiting on locks or I/O; watch for a sustained increase." });
   }
-  if (idleInTransaction >= 3) {
+  if (staleIdleTransactions > 0) {
+    criticalAlerts.push({ code: "db_idle_transactions_stale", count: staleIdleTransactions,
+      action: "Database sessions have been idle in a transaction for over five minutes; inspect open transactions and function logs." });
+  } else if (idleInTransaction >= 3) {
     warnings.push({ code: "db_idle_transactions", source: "supabase_database", used: idleInTransaction,
-      action: "Several database sessions are idle in a transaction; inspect open transactions and function logs." });
+      action: "Several database sessions are briefly idle in a transaction; watch for sessions lasting over five minutes." });
   }
   // This endpoint deliberately returns 503 when it detects an alert condition.
   // Exclude its own alert responses so the monitor cannot inflate the API 5xx
@@ -251,7 +256,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
   ].includes(warning.code));
   // A single sampled backend wait is common and already reported above. Three
   // or more waiting backends become a critical alert; do not page on 1-2.
-  const strictWarnings = warnings.some((warning) => warning.code !== "db_sessions_waiting");
+  const strictWarnings = warnings.some((warning) => !["db_sessions_waiting", "db_idle_transactions"].includes(warning.code));
   const failed = criticalAlerts.length > 0 || urgentWarnings || (strictUsage && strictWarnings);
   const response = {
     ok: !failed,
@@ -277,6 +282,7 @@ export const GET = withApiFailureMetrics("/api/cron/operations-check", async (re
       database_active_connections: pressure?.active_connections ?? null,
       database_waiting_connections: waitingConnections,
       database_idle_in_transaction: idleInTransaction,
+      database_idle_in_transaction_over_5m: staleIdleTransactions,
       monitored_api_5xx_in_15m: apiFailureCount,
       uncaught_api_exceptions_15m: recentExceptions,
       app_health_status_code: probe.status_code,
