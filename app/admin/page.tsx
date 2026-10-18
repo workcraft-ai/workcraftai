@@ -5,8 +5,10 @@ import Image from "next/image";
 import { createClient } from "@/app/utils/supabase/client";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
+import CronJobsPanel from "@/app/admin/CronJobsPanel";
 
 type AdminRole = "support" | "billing" | "super_admin";
+type AdminTab = "accounts" | "billing" | "settings" | "cron";
 type Account = {
   id: string;
   email: string;
@@ -68,6 +70,7 @@ async function requestJson(url: string, options?: RequestInit) {
 export default function AdminPage() {
   const { language } = useLanguage();
   const [role, setRole] = useState<AdminRole | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("accounts");
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaVerifiedFactor, setMfaVerifiedFactor] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState("");
@@ -441,6 +444,31 @@ export default function AdminPage() {
     void runAction("retention", `/api/admin/accounts/${encodeURIComponent(selectedId)}/retention`, { action: "cancel_pending_deletion", reason: retentionReason }, "Pending deletion canceled.").then((canceled) => { if (canceled) setRetentionReason(""); });
   };
 
+  const adminTabs = [
+    { id: "accounts" as const, label: language === "es" ? "Cuentas" : "Accounts", controls: "accounts-summary-panel accounts-records-panel" },
+    ...(role !== "support" ? [{ id: "billing" as const, label: language === "es" ? "Facturación" : "Billing", controls: "billing-panel" }] : []),
+    ...(role === "super_admin" ? [{ id: "settings" as const, label: language === "es" ? "Configuración" : "Settings", controls: "settings-panel" }] : []),
+    { id: "cron" as const, label: language === "es" ? "Tareas programadas" : "Cron jobs", controls: "cron-panel" },
+  ];
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentTab: AdminTab) => {
+    const currentIndex = adminTabs.findIndex((tab) => tab.id === currentTab);
+    const nextIndex = event.key === "ArrowRight"
+      ? (currentIndex + 1) % adminTabs.length
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + adminTabs.length) % adminTabs.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? adminTabs.length - 1
+            : -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextTab = adminTabs[nextIndex];
+    setActiveTab(nextTab.id);
+    document.getElementById(`admin-tab-${nextTab.id}`)?.focus();
+  };
+
   const saveFreeEstimateLimit = async (event: FormEvent) => {
     event.preventDefault();
     if (!freeEstimateLimitInput.trim()) return;
@@ -599,19 +627,40 @@ export default function AdminPage() {
       {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
 
-      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="admin-account-totals">
-        <h2 id="admin-account-totals" className="text-lg font-bold text-slate-900">Account totals</h2>
-        <p className="mt-1 text-sm text-slate-600">Current Supabase Auth accounts, including test and admin accounts. Signed in means at least one recorded sign-in, not an active session.</p>
+      <div className="mb-6 border-b border-slate-200">
+        <div role="tablist" aria-label={language === "es" ? "Secciones de soporte de administración" : "Admin support sections"} className="flex gap-2 overflow-x-auto pb-2">
+          {adminTabs.map((tab) => (
+            <button
+              key={tab.id}
+              id={`admin-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={tab.controls}
+              tabIndex={activeTab === tab.id ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+              className={`min-h-11 shrink-0 rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 ${activeTab === tab.id ? "border-b-2 border-orange-700 bg-orange-50 text-orange-900" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section id="accounts-summary-panel" role="tabpanel" aria-labelledby="admin-tab-accounts" tabIndex={0} hidden={activeTab !== "accounts"} className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 sm:p-6">
+        <h2 id="admin-account-totals" className="text-lg font-bold text-slate-900">{translate(language, "Account totals")}</h2>
+        <p className="mt-1 text-sm text-slate-600">{translate(language, "Current Supabase Auth accounts, including test and admin accounts. Signed in means at least one recorded sign-in, not an active session.")}</p>
         {accountStatsError ? <p role="alert" className="mt-4 text-sm text-red-800">{accountStatsError}</p> : accountStats ? (
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Accounts created</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.created.toLocaleString()}</dd></div>
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Email verified</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.email_verified.toLocaleString()}</dd></div>
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">Signed in at least once</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.signed_in.toLocaleString()}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">{translate(language, "Accounts created")}</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.created.toLocaleString()}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">{translate(language, "Email verified")}</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.email_verified.toLocaleString()}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-sm font-medium text-slate-600">{translate(language, "Signed in at least once")}</dt><dd className="mt-2 text-3xl font-bold text-slate-950">{accountStats.signed_in.toLocaleString()}</dd></div>
           </dl>
-        ) : <p role="status" className="mt-4 text-sm text-slate-600">Loading account totals…</p>}
+        ) : <p role="status" className="mt-4 text-sm text-slate-600">{translate(language, "Loading account totals…")}</p>}
       </section>
 
-      {role !== "support" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="recovery-heading">
+      {role !== "support" && <section id="billing-panel" role="tabpanel" aria-labelledby="admin-tab-billing" tabIndex={0} hidden={activeTab !== "billing"} className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="recovery-heading" className="text-lg font-bold text-slate-900">{language === "es" ? "Recuperación de pagos de Pro" : "Pro payment recovery"}</h2><p className="mt-1 text-sm text-slate-600">{language === "es" ? "Solo suscripciones de WorkCraft AI. El acceso Pro continúa durante tres días hábiles después del primer fallo; Stripe puede seguir intentando el cobro después." : "WorkCraft AI subscriptions only. Pro access continues for three weekdays after the first failure; Stripe may continue retrying afterward."}</p></div><button type="button" onClick={() => void loadRecovery()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">{language === "es" ? "Actualizar" : "Refresh"}</button></div>
         {recoveryError && <p role="alert" className="mt-3 text-sm text-red-800">{recoveryError}</p>}
         {recovery ? <>
@@ -627,7 +676,8 @@ export default function AdminPage() {
         <p className="mt-4 text-xs text-slate-600">{language === "es" ? "Stripe administra los avisos de tarjetas próximas a vencer y los reintentos. Consulta los detalles y los registros de correos en Stripe → Revenue recovery. Aquí no se guardan números completos de tarjeta." : "Stripe manages expiring-card emails and retry timing. Review card notices and email logs in Stripe → Revenue recovery. Full card numbers are never stored here."}</p>
       </section>}
 
-      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      {role === "super_admin" && <div id="settings-panel" role="tabpanel" aria-labelledby="admin-tab-settings" tabIndex={0} hidden={activeTab !== "settings"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Free-tier estimate limit</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free accounts can save up to 10 estimates per UTC day and 50 per UTC month. Set a lower daily ceiling here for testing or cost control. Estimates already created today count; edits do not. Changing the limit below usage already reached takes effect on the next creation attempt.</p></div>
         <form onSubmit={saveFreeEstimateLimit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr_auto] sm:items-end">
           <label className="block text-xs font-semibold text-slate-700">Free estimates per day<input aria-label="Free estimates per UTC day" type="number" min={0} max={10} step={1} value={freeEstimateLimitInput} onChange={(event) => setFreeEstimateLimitInput(event.target.value)} disabled={freeEstimateLimitLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
@@ -635,9 +685,9 @@ export default function AdminPage() {
           <button type="submit" disabled={busy !== "" || freeEstimateLimit === null || !freeEstimateLimitInput.trim() || !Number.isInteger(Number(freeEstimateLimitInput)) || Number(freeEstimateLimitInput) < 0 || Number(freeEstimateLimitInput) > 10 || freeEstimateLimitReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "free-estimate-limit" ? "Saving…" : "Save limit"}</button>
         </form>
         <p className="mt-2 text-xs text-slate-500">Allowed daily range: 0–10. The monthly cap is fixed at 50. A daily limit of 0 pauses new free-tier estimate creation. Every change is written to the admin audit log.</p>
-      </section>}
+      </section>
 
-      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Cloud AI drafting cost controls</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro includes up to 5 cloud drafting attempts per account per UTC day and 50 per UTC month. The daily account limit can be lowered here; the monthly cap remains 50. The platform-wide ceiling remains 250 attempts across all accounts per UTC day. A valid attempt counts when admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.</p></div>
         {aiDraftingSettings && <>
           <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Status:</strong> {aiDraftingSettings.ai_drafting_enabled ? "Enabled" : "Paused"} · <strong>Per account:</strong> {aiDraftingSettings.ai_daily_generation_limit} / day, {aiDraftingSettings.ai_monthly_generation_limit} / month · <strong>Platform:</strong> {aiDraftingSettings.ai_global_daily_generation_limit} / day</p><p className="mt-1"><strong>Today:</strong> {aiDraftingSettings.today.attempts_started} attempted ({aiDraftingSettings.today.succeeded} succeeded, {aiDraftingSettings.today.failed} failed) · {aiDraftingSettings.today.global_attempts_started} of {aiDraftingSettings.ai_global_daily_generation_limit} platform attempts used</p><p className="mt-1"><strong>This month, all accounts:</strong> {aiDraftingSettings.this_month.attempts_started} attempts</p></div>
@@ -651,9 +701,9 @@ export default function AdminPage() {
           <p className="mt-2 text-xs text-slate-500">Allowed ranges: 1–5 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.</p>
         </>}
         {aiSettingsLoading && !aiDraftingSettings && <p className="mt-3 text-sm text-slate-500">Loading AI drafting settings…</p>}
-      </section>}
+      </section>
 
-      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free account email allowances apply to estimate emails; trial and paid Pro share one allowance for estimate emails, follow-ups, customer-question alerts, and invoices. The separate app-wide cap is 75 per UTC day, with reserves of 20 Auth emails and 5 billing emails. The Auth reserve requires the Supabase Send Email hook; custom SMTP bypasses this app budget. Accepted or ambiguous provider requests count; definite rejections release their reservation.</p></div>
         {accountEmailLimits && <>
           <p className="mt-4 text-sm text-slate-700"><strong>Current per-account allowances:</strong> Free {accountEmailLimits.free_email_daily_limit}/day, {accountEmailLimits.free_email_monthly_limit}/month · Trial/Pro {accountEmailLimits.pro_email_daily_limit}/day, {accountEmailLimits.pro_email_monthly_limit}/month (UTC).</p>
@@ -674,9 +724,9 @@ export default function AdminPage() {
           <p className="mt-2 text-xs text-slate-500">Allowed range: 1–75 app emails per UTC day. Changes are recorded in the admin audit log. If the limit is reached, email sending pauses until 00:00 UTC; estimate data and saved support questions remain available.</p>
         </>}
         {appEmailSettingsLoading && !appEmailSettings && <p className="mt-3 text-sm text-slate-500">Loading email capacity…</p>}
-      </section>}
+      </section>
 
-      {role === "super_admin" && <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Estimate trade options</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Manage the choices shown in the Trade dropdown when creating an estimate. Add an English name and its Spanish label for each trade. Use the up and down buttons to change their order, then save. Changes apply to new estimate forms; existing estimates keep their saved trade.</p></div>
         <form onSubmit={saveEstimateTradeOptions} className="mt-4 space-y-3">
           <div className="space-y-3">
@@ -698,10 +748,16 @@ export default function AdminPage() {
           <p className="text-xs text-slate-500">Keep each name unique. Custom trade names need both labels; every change is recorded in the admin audit log.</p>
           {estimateTradeOptionsLoading && <p className="text-sm text-slate-500">Loading estimate trade options…</p>}
         </form>
-      </section>}
+      </section>
+      </div>}
 
+      <div id="cron-panel" role="tabpanel" aria-labelledby="admin-tab-cron" tabIndex={0} hidden={activeTab !== "cron"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
+        <CronJobsPanel language={language} />
+      </div>
+
+      <div id="accounts-records-panel" role="tabpanel" aria-labelledby="admin-tab-accounts" tabIndex={0} hidden={activeTab !== "accounts"} className="space-y-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-bold text-slate-900">Find a customer account</h2>
+        <h2 className="text-lg font-bold text-slate-900">{translate(language, "Find a customer account")}</h2>
         <form onSubmit={searchAccounts} className="mt-4 flex flex-col gap-3 sm:flex-row">
           <label className="sr-only" htmlFor="account-search">Email or business name</label>
           <input id="account-search" value={search} onChange={(event) => setSearch(event.target.value)} minLength={3} maxLength={120} placeholder="Search by email or business name" className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none focus:border-orange-600 focus:ring-2 focus:ring-orange-100" />
@@ -721,7 +777,7 @@ export default function AdminPage() {
         {detail.pro_grants.length > 0 && <div className="mt-4 border-t border-slate-100 pt-3"><h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">Grant history</h3><ul className="mt-2 space-y-2">{detail.pro_grants.map((grant) => <li key={grant.id} className="flex flex-wrap justify-between gap-2 text-xs text-slate-600"><span>{grant.grant_type === "permanent" ? "Permanent" : "Temporary"} · {grant.revoked_at ? `revoked ${date(grant.revoked_at)}` : grant.is_expired ? `expired ${date(grant.expires_at)}` : grant.expires_at ? `expires ${date(grant.expires_at)}` : "active until revoked"}</span><span>{grant.reason}</span></li>)}</ul></div>}
       </section>}
 
-      {detail && <div className="mt-6 grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+      {detail && <div className="grid items-start gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div><p className="text-xs font-bold uppercase tracking-wide text-slate-500">Account</p><h2 className="mt-1 break-all text-xl font-bold text-slate-950">{detail.account.email}</h2><p className="mt-1 text-sm text-slate-600">{detail.account.business_name || "No business name on file"}</p></div>
           <dl className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Email confirmed</dt><dd className="mt-1 font-semibold text-slate-900">{detail.account.email_confirmed_at ? "Yes" : "No"}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Plan status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{adminPlanStatus(detail.account)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Joined</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.created_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last sign in</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_sign_in_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Last app activity</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.last_active_at)}</dd></div><div className="rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Retention status</dt><dd className="mt-1 font-semibold capitalize text-slate-900">{detail.account.deletion_status.replaceAll("_", " ")}</dd></div><div className="col-span-2 rounded-lg bg-slate-50 p-3"><dt className="text-xs text-slate-500">Current billing period ends</dt><dd className="mt-1 font-medium text-slate-900">{date(detail.account.current_period_end)}</dd></div></dl>
@@ -751,6 +807,7 @@ export default function AdminPage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-bold text-slate-900">Admin audit log</h2>{detail.audit.length ? <ol className="mt-4 space-y-3">{detail.audit.map((entry) => <li key={entry.id} className="rounded-xl border border-slate-100 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{entry.action.replaceAll("_", " ")}</p><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold capitalize text-slate-700">{entry.outcome}</span></div><p className="mt-1 text-sm text-slate-600">{entry.reason}</p><p className="mt-2 text-xs text-slate-500">{date(entry.created_at)} · {entry.actor_email || "Admin"}</p></li>)}</ol> : <p className="mt-3 text-sm text-slate-500">No admin actions recorded.</p>}</div>
         </section>
       </div>}
+      </div>
     </main>
     </LocalizedTree>
   );
