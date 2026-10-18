@@ -91,6 +91,13 @@ test("copper pipe footage aliases match the same unit", () => {
   assert.equal(result.matchedCount,1);
   assert.equal(result.lines[0].unit_price,4.5);
 });
+test("a diagnostic visit can suggest an each-priced service fee without treating all visits as each", () => {
+  const rate={name:"Diagnostic service fee",trade:"Plumbing",unit:"each",pricing_basis:"labor",unit_price:95};
+  const diagnostic=applyPriceBookRates([{description:"On-site diagnostic service fee",quantity:1,unit:"visit",pricing_basis:"labor",unit_price:110}],[rate],"Plumbing");
+  assert.equal(diagnostic.suggestionsByIndex[0][0].unit_price,95);
+  const unrelated=applyPriceBookRates([{description:"Water heater service",quantity:1,unit:"visit",pricing_basis:"labor",unit_price:110}],[rate],"Plumbing");
+  assert.equal(unrelated.suggestionsByIndex[0],undefined);
+});
 test("CSV preserves an explicitly selected pricing basis",()=>{
  assert.equal(parsePriceBookCsv("Name,Trade,Unit,Price,Pricing_basis\nOSB,Roofing,sheet,75,installed")[0].pricing_basis,"installed");
 });
