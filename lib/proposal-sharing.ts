@@ -16,7 +16,10 @@ export async function customerShareAllowed(admin:SupabaseClient,id:string,reques
  const state=data as ShareState;
  if(allowOwner&&request.headers.has("cookie")){
   const userClient=await createUserSupabaseClient();const {data:{user}}=await userClient.auth.getUser();
-  if(user?.id===state.user_id)return true;
+  if(user?.id===state.user_id){
+   const {data:assurance,error:assuranceError}=await userClient.auth.mfa.getAuthenticatorAssuranceLevel();
+   if(!assuranceError&&assurance&&(assurance.nextLevel!=="aal2"||assurance.currentLevel==="aal2"))return true;
+  }
  }
  if(state.share_revoked_at||(state.share_expires_at&&new Date(state.share_expires_at).getTime()<=Date.now()))return false;
  if(!state.share_token_hash)return true; // Existing UUID links survive until the owner replaces/disables them.

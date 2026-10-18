@@ -76,12 +76,20 @@ for (const unit of ["job", "roll", "box", "each", "visit", "system"]) {
     assert.equal(result.matchedCount,0); assert.equal(result.lines[0].unit_price,75);
   });
 }
-test("unknown and different inclusion bases never auto-apply", () => {
-  for (const basis of [undefined,"unknown","materials"]) {
+test("unknown inclusion bases can be reviewed, while conflicting bases are excluded", () => {
+  for (const basis of [undefined,"unknown"]) {
     const result=applyPriceBookRates([{description:"OSB decking",quantity:10,unit:"sheet",pricing_basis:basis,unit_price:75}],[{name:"OSB decking",trade:"Roofing",unit:"sheet",pricing_basis:"installed",unit_price:150}],"Roofing");
     assert.equal(result.matchedCount,0); assert.equal(result.lines[0].unit_price,75);
     assert.equal(result.suggestionsByIndex[0][0].unit_price,150);
   }
+  const incompatible=applyPriceBookRates([{description:"50 gallon water heater unit",quantity:1,unit:"each",pricing_basis:"materials",unit_price:650}],[{name:"Standard 50 gallon water heater installation",trade:"Plumbing",unit:"each",pricing_basis:"installed",unit_price:1200}],"Plumbing");
+  assert.equal(incompatible.matchedCount,0);
+  assert.equal(incompatible.suggestionsByIndex[0],undefined);
+});
+test("copper pipe footage aliases match the same unit", () => {
+  const result=applyPriceBookRates([{description:"1/2 inch copper pipe",quantity:10,unit:"linear ft",pricing_basis:"materials",unit_price:5}],[{name:"1/2 inch copper pipe",trade:"Plumbing",unit:"ft",pricing_basis:"materials",unit_price:4.5}],"Plumbing");
+  assert.equal(result.matchedCount,1);
+  assert.equal(result.lines[0].unit_price,4.5);
 });
 test("CSV preserves an explicitly selected pricing basis",()=>{
  assert.equal(parsePriceBookCsv("Name,Trade,Unit,Price,Pricing_basis\nOSB,Roofing,sheet,75,installed")[0].pricing_basis,"installed");

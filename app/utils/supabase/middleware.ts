@@ -39,9 +39,12 @@ export async function updateSession(request: NextRequest) {
 
   // Protect internal routes: Redirect unauthenticated users to /login
   const internalRoots = ["/dashboard", "/customers", "/schedule", "/pricebook", "/reports", "/profile", "/admin", "/invoice"];
+  // The UUID proposal page is shared with customers. Its API validates the
+  // revocable share token; only the estimate editor needs a contractor session.
+  const isCustomerProposal = /^\/estimate\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path);
   const isProtectedRoute =
     internalRoots.some((root) => path === root || path.startsWith(`${root}/`)) ||
-    path === "/estimate" || path.startsWith("/estimate/");
+    (path === "/estimate" || path.startsWith("/estimate/")) && !isCustomerProposal;
 
   const redirectWithSession = () => {
     const response = NextResponse.redirect(url);

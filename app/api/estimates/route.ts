@@ -1,8 +1,11 @@
 import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
+import { getServiceSupabase } from "@/lib/stripe-server";
+import { encryptShareToken } from "@/lib/proposal-sharing";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -105,7 +108,28 @@ export const POST = withApiFailureMetrics("/api/estimates", async (request: Requ
     return NextResponse.json({ error: "Unable to save this estimate. Please try again." }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, id: estimateId }, {
+  // New estimates receive a revocable, 30-day customer link immediately.
+  // The estimate RPC has already committed, so report sharing separately if
+  // initialization fails; the client must never retry creation as a result.
+  let shareReady = false;
+  try {
+    const token = randomBytes(32).toString("base64url");
+    const admin = getServiceSupabase();
+    const { data: changed, error: shareError } = await admin.rpc("workcraft_set_proposal_share", {
+      p_estimate_id: estimateId,
+      p_user_id: user.id,
+      p_hash: createHash("sha256").update(token).digest("hex"),
+      p_encrypted: encryptShareToken(token),
+      p_expires: new Date(Date.now() + 30 * 86400000).toISOString(),
+      p_revoke: false,
+    });
+    if (shareError || !changed) throw new Error(shareError?.message ?? "share initialization failed");
+    shareReady = true;
+  } catch (shareError) {
+    console.error("Estimate created without an initial customer link:", shareError);
+  }
+
+  return NextResponse.json({ success: true, id: estimateId, share_ready: shareReady }, {
     status: 201,
     headers: { "Cache-Control": "private, no-store" },
   });
