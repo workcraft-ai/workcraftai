@@ -737,29 +737,6 @@ export default function CreateEstimatePage() {
 
           {formError && <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"><p>{formError}</p>{partialSavedEstimateId && <Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Abrir cotización guardada" : "Open saved estimate"}</Link>}</div>}
 
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
-            <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
-              <legend className="sr-only">Proposal detail</legend>
-              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
-              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
-            </fieldset>
-            {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
-              <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-              <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
-            </label>}
-          </section>
-
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
-              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
-              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
-          </section>
-
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-sm font-semibold text-slate-800">{language === "es" ? "Cotización sin terminar" : "Unfinished estimate"}</h2><p className="mt-1 text-xs text-slate-600">{language === "es" ? "Los borradores se guardan automáticamente solo en este navegador y dispositivo. Incluyen datos de contacto del cliente; bórralos en dispositivos compartidos." : "Drafts auto-save in this browser on this device only. They include customer contact details; clear them on shared devices."}</p></div>
@@ -901,6 +878,40 @@ export default function CreateEstimatePage() {
             {!!attachments.length && <ul className="mt-3 space-y-1.5">{attachments.map(({ file, mediaType }, index) => <li key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-xs text-slate-700"><span>{mediaType === "photo" ? "Photo" : "Voice note"}: {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="font-semibold text-red-700 underline">Remove</button></li>)}</ul>}
           </section>
 
+          <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
+              <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
+            </div>
+            <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
+            <p className="text-xs text-slate-600">{language === "es" ? "La IA utiliza la descripción escrita del trabajo; no analiza las fotos ni las notas de voz adjuntas." : "AI uses your written job description; it does not analyze attached photos or voice notes."}</p>
+            {!isProSubscriber && <div className="rounded-lg border border-purple-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-900">{language === "es" ? "La redacción de partidas con IA está incluida con Pro." : "AI line-item drafting is included with Pro."}</p>
+              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "La redacción con IA forma parte de Pro. Puedes seguir creando partidas y usando tu lista de precios gratis." : "AI drafting is part of Pro. Your manual estimates and Price Book remain available on Free."}</p>
+              <ProPlanAction className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800 hover:bg-purple-50" />
+            </div>}
+            {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
+            {isProSubscriber ? <div className="space-y-2">
+              <label className="block text-xs font-medium text-slate-700">Job scope and details
+                <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe measurements, material or grade, access, existing conditions, and what is included or excluded." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+              </label>
+              {/roof/i.test(trade) && <label className="block max-w-xs text-xs font-medium text-slate-700">Measured roof surface area (sq. ft., optional)
+                <input type="number" min="1" max="10000000" step="1" inputMode="decimal" value={roofAreaSqFt} onChange={(event) => setRoofAreaSqFt(event.target.value)} placeholder="e.g. 2,000" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
+              </label>}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || priceBookLoading || priceBookLoadFailed || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
+              </div>
+            </div> : <div className="space-y-2" aria-label={language === "es" ? "Vista previa de la función Pro" : "Pro feature preview"}>
+              <label className="block text-xs font-medium text-slate-700">{language === "es" ? "Detalles del trabajo" : "Job scope and details"}
+                <textarea disabled rows={3} placeholder={language === "es" ? "Describe el trabajo y las medidas…" : "Describe the work and measurements…"} className="mt-1.5 w-full resize-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
+              </label>
+              <button type="button" disabled className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white opacity-50">{language === "es" ? "Preparar partidas" : "Draft Line Items"}</button>
+            </div>}
+            {priceBookLoadFailed && <p role="alert" className="text-sm text-red-800">{language === "es" ? "No se pudo cargar la lista de precios completa. Actualiza la página antes de generar partidas con IA." : "Could not load the complete price book. Refresh before generating AI line items."}</p>}
+            {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
+          </section>
+
           {/* Scope of Work Table */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1027,47 +1038,27 @@ export default function CreateEstimatePage() {
             </label>
           </div>}
 
-          <section className="space-y-3 rounded-xl border border-purple-200 bg-purple-50/70 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-slate-900">Generative AI Assistant (Pro)</h2>
-              <span className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">Cloud AI</span>
-            </div>
-            <p className="text-xs text-slate-600">Describe the work and measurements. Gemini drafts editable scope, quantities, units, and starting prices. Clear Price Book matches apply automatically; possible matches are suggestions for you to choose. AI rates are broad estimates, not live local quotes.</p>
-            {!isProSubscriber && <div className="rounded-lg border border-purple-200 bg-white p-3">
-              <p className="text-sm font-semibold text-slate-900">{language === "es" ? "La redacción de partidas con IA está incluida con Pro." : "AI line-item drafting is included with Pro."}</p>
-              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "La redacción con IA forma parte de Pro. Puedes seguir creando partidas y usando tu lista de precios gratis." : "AI drafting is part of Pro. Your manual estimates and Price Book remain available on Free."}</p>
-              <ProPlanAction className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-purple-700 px-4 text-sm font-semibold text-purple-800 hover:bg-purple-50" />
-            </div>}
-            {aiDailyAllowance && <p role="status" className={`text-[11px] ${aiDailyAllowance.remaining === 0 || aiDailyAllowance.monthly_remaining === 0 ? "font-semibold text-red-800" : aiDailyAllowance.remaining <= 1 || aiDailyAllowance.monthly_remaining <= 10 ? "font-semibold text-amber-800" : "text-slate-500"}`}>{aiDailyAllowance.enabled ? `${aiDailyAllowance.remaining} of ${aiDailyAllowance.daily_limit} cloud drafting attempts remain today (UTC). ${aiDailyAllowance.monthly_remaining} of ${aiDailyAllowance.monthly_limit} remain this month. Failed provider attempts count.` : "Cloud estimate drafting is temporarily paused."}</p>}
-            {isProSubscriber ? <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-700">Job scope and details
-                <textarea aria-label="Describe the work and measurements" value={promptText} onChange={(event) => setPromptText(event.target.value)} rows={3} maxLength={6000} placeholder="Describe measurements, material or grade, access, existing conditions, and what is included or excluded." className="mt-1.5 min-w-0 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-              </label>
-              {/roof/i.test(trade) && <label className="block max-w-xs text-xs font-medium text-slate-700">Measured roof surface area (sq. ft., optional)
-                <input type="number" min="1" max="10000000" step="1" inputMode="decimal" value={roofAreaSqFt} onChange={(event) => setRoofAreaSqFt(event.target.value)} placeholder="e.g. 2,000" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <span className="mt-1 block font-normal text-slate-500">Enter the actual roof surface area, not the home footprint. For roofing-square items, the app calculates the base quantity; adjust for pitch, waste, and complexity.</span>
-              </label>}
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button type="button" onClick={handleGenerateItems} disabled={isGenerating || priceBookLoading || priceBookLoadFailed || !promptText.trim() || (aiDailyAllowance?.remaining ?? 1) <= 0 || (aiDailyAllowance?.monthly_remaining ?? 1) <= 0} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-600 disabled:opacity-50">{isGenerating ? "Drafting..." : "Draft Line Items"}</button>
-              </div>
-            </div> : <div className="space-y-2" aria-label={language === "es" ? "Vista previa de la función Pro" : "Pro feature preview"}>
-              <label className="block text-xs font-medium text-slate-700">{language === "es" ? "Detalles del trabajo" : "Job scope and details"}
-                <textarea disabled rows={3} placeholder={language === "es" ? "Describe el trabajo y las medidas…" : "Describe the work and measurements…"} className="mt-1.5 w-full resize-none rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
-              </label>
-              <button type="button" disabled className="inline-flex min-h-12 items-center justify-center rounded-lg bg-purple-700 px-4 py-2 text-xs font-semibold text-white opacity-50">{language === "es" ? "Preparar partidas" : "Draft Line Items"}</button>
-            </div>}
-            {priceBookLoadFailed && <p role="alert" className="text-sm text-red-800">{language === "es" ? "No se pudo cargar la lista de precios completa. Actualiza la página antes de generar partidas con IA." : "Could not load the complete price book. Refresh before generating AI line items."}</p>}
-            {draftMessage && <p role="status" className="rounded-md border border-purple-200 bg-white/80 px-3 py-2 text-xs text-slate-700">{draftMessage}</p>}
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
+            <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
+              <legend className="sr-only">Proposal detail</legend>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
+            </fieldset>
+            {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
+              <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+              <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
+            </label>}
           </section>
 
-          <details className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Template name<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
-              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
-              {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
+          <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
+              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
             </div>
-          </details>
+            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
+            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
+          </section>
 
           {/* Deposit & Financial Options */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -1116,14 +1107,24 @@ export default function CreateEstimatePage() {
             )}
           </div>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best options</h2><p className="mt-1 text-xs text-slate-500">Offer customers a choice of service levels on the proposal.</p></div>
-              {isProSubscriber ? <button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add three options"}</button> : <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">Pro</span>}
-            </div>
-            {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
-            {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
+              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
+              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
           </section>
+
+          <details className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="min-w-48 flex-1 text-xs font-medium text-slate-700">Template name<input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="e.g. Standard drain clearing" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" /></label>
+              <button type="button" disabled={!templateName.trim()} onClick={() => void saveTemplate()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Save template</button>
+              {templateMessage && <p role="status" className="w-full text-xs text-slate-600">{templateMessage}</p>}
+            </div>
+          </details>
 
           {/* Submit Button */}
           <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; tu cupo actual de correos aparece allí y en Perfil." : "Saving creates a shareable proposal link but does not send an email. Find it on your Dashboard; your current email allowance appears there and in Profile."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>

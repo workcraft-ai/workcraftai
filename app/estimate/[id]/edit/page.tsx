@@ -294,36 +294,6 @@ export default function EditEstimatePage() {
             </div>
           </div>
 
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
-            <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
-              <legend className="sr-only">Proposal detail</legend>
-              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
-              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
-            </fieldset>
-            {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
-              <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-              <span className="mt-1 block text-xs text-slate-500">The proposal will show this summary and the total, without individual quantities or rates. You can edit the AI draft.</span>
-            </label>}
-          </section>
-
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
-              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
-            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
-              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
-            </label>
-          </section>
-
-          {/* Line Items Editor */}
-          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Estimate pricing</h2>
-            <p className="mt-1 text-xs text-slate-600">Markup is applied before sales tax. Check local tax rules for taxable labor and materials.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">Markup (%)<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(event) => setMarkupPercentage(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">Sales tax (%)<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label></div>
-          </section>
-
           {/* Line Items Editor */}
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -422,6 +392,26 @@ export default function EditEstimatePage() {
             </label>
           </div>}
 
+          {/* Pricing adjustments for the line items above */}
+          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h2 className="text-sm font-semibold text-slate-900">Estimate pricing</h2>
+            <p className="mt-1 text-xs text-slate-600">Markup is applied before sales tax. Check local tax rules for taxable labor and materials.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">Markup (%)<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(event) => setMarkupPercentage(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">Sales tax (%)<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label></div>
+          </section>
+
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
+            <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
+              <legend className="sr-only">Proposal detail</legend>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="detailed" checked={proposalDisplayMode === "detailed"} onChange={() => setProposalDisplayMode("detailed")} /><span>Detailed line items</span></label>
+              <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"><input type="radio" name="proposal-display-mode" value="summary" checked={proposalDisplayMode === "summary"} onChange={() => setProposalDisplayMode("summary")} /><span>Summary and total only</span></label>
+            </fieldset>
+            {proposalDisplayMode === "summary" && <label className="block text-xs font-medium text-slate-700">Customer-facing work summary
+              <textarea value={proposalSummary} maxLength={1200} onChange={(event) => setProposalSummary(event.target.value)} rows={3} placeholder="Briefly describe the work included in this quote" className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+              <span className="mt-1 block text-xs text-slate-500">{language === "es" ? "La propuesta mostrará este resumen y el total, sin cantidades ni tarifas individuales. Puedes ajustar el resumen antes de actualizar la propuesta." : "The proposal will show this summary and the total, without individual quantities or rates. You can adjust the summary before updating the proposal."}</span>
+            </label>}
+          </section>
+
           {isPro ? <section className="space-y-3 rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best</h2><p className="mt-1 text-xs text-slate-500">Add or adjust service options customers can choose from.</p></div><button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add options"}</button></div>
             {packageOptions.length > 0 && <div className="grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-600">{option.name}</p><input aria-label={`${option.name} description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="What's included?" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm" /></div>)}</div>}
@@ -471,6 +461,16 @@ export default function EditEstimatePage() {
               </div>
             )}
           </div>
+
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (English)
+              <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
+            <label className="block text-xs font-medium text-slate-700">Payment terms (Spanish, optional)
+              <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
+            </label>
+          </section>
 
           <p className="text-center text-xs text-slate-600">Updating the proposal does not send an email. Share it from your Dashboard when you are ready.</p>
           {/* Actions */}
