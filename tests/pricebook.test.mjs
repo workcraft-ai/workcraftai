@@ -90,6 +90,9 @@ test("copper pipe footage aliases match the same unit", () => {
   const result=applyPriceBookRates([{description:"1/2 inch copper pipe",quantity:10,unit:"linear ft",pricing_basis:"materials",unit_price:5}],[{name:"1/2 inch copper pipe",trade:"Plumbing",unit:"ft",pricing_basis:"materials",unit_price:4.5}],"Plumbing");
   assert.equal(result.matchedCount,1);
   assert.equal(result.lines[0].unit_price,4.5);
+  const piping=applyPriceBookRates([{description:"1/2-inch copper piping",quantity:10,unit:"linear ft",pricing_basis:"materials",unit_price:5.5}],[{name:"1/2-inch copper pipe",trade:"Plumbing",unit:"ft",pricing_basis:"materials",unit_price:4.5}],"Plumbing");
+  assert.equal(piping.matchedCount,1);
+  assert.equal(piping.lines[0].unit_price,4.5);
 });
 test("a unique diagnostic visit uses an each-priced diagnostic fee without treating all visits as each", () => {
   const rate={name:"Diagnostic service fee",trade:"Plumbing",unit:"each",pricing_basis:"labor",unit_price:95};
