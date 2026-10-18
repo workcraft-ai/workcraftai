@@ -1,28 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { readAllPages } from "@/lib/read-all-pages";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LocalizedTree } from "@/app/components/LanguageProvider";
+import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { parsePriceBookCsv } from "@/lib/priceBookCsv.mjs";
 import type { ImportedPriceBookItem } from "@/lib/priceBookCsv.mjs";
 import SetupReturnLink from "@/app/components/SetupReturnLink";
+import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
+import { hasAtMostTwoDecimalPlaces } from "@/lib/estimate-money.mjs";
 
 type PriceItem = { id: string; name: string; description: string; trade: string; unit: string; unit_price: number; pricing_basis?: string };
 type EstimateLine = { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number };
 type EstimateTemplate = { id: string; name: string; trade: string; line_items: EstimateLine[]; package_options?: { name: string; description: string; total: number }[]; require_deposit: boolean; deposit_percentage: number };
 
-const trades = ["Plumbing", "Electrical", "Roofing", "HVAC", "Painting", "Carpentry", "General", "Other"];
 const fieldClass = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function PriceBookPage() {
   const router = useRouter();
+  const { language } = useLanguage();
   const [tab, setTab] = useState<"items" | "templates">("items");
   const [items, setItems] = useState<PriceItem[]>([]);
   const [templates, setTemplates] = useState<EstimateTemplate[]>([]);
+  const [trades, setTrades] = useState(() => DEFAULT_ESTIMATE_TRADES.map((option) => option.value));
+  const initialTradeSelected = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -35,12 +39,23 @@ export default function PriceBookPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [importRows, setImportRows] = useState<ImportedPriceBookItem[]>([]);
   const [importing, setImporting] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
+  const savingItemRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    const [itemResult, templateResult] = await Promise.all([
+    const [itemResult, templateResult, tradeResult] = await Promise.all([
       readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to)),
       readAllPages((from, to) => supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name").order("id").range(from, to)),
+      fetch("/api/estimate/trades", { cache: "no-store" }).then(async (response) => response.ok ? response.json() : null).catch(() => null),
     ]);
+    const configuredTrades = parseEstimateTradeOptions(tradeResult?.trades);
+    if (configuredTrades?.length) {
+      setTrades(configuredTrades.map((option) => option.value));
+      if (!initialTradeSelected.current) {
+        setTrade(configuredTrades[0].value);
+        initialTradeSelected.current = true;
+      }
+    }
     if (itemResult.error || templateResult.error) {
       setError("WorkCraft AI setup is needed for the price book and templates. Apply the operations migration in supabase/migrations.");
     } else {
@@ -59,18 +74,33 @@ export default function PriceBookPage() {
   const addItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice(""); setError("");
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setError("Sign in to manage your price book."); return; }
-    const item = { name, description, trade, unit, pricing_basis: pricingBasis, unit_price: Number(unitPrice), updated_at: new Date().toISOString() };
-    const { error: insertError } = editingId
-      ? await supabase.from("price_book_items").update(item).eq("id", editingId).eq("user_id", user.id)
-      : await supabase.from("price_book_items").insert({ ...item, user_id: user.id });
-    if (insertError) setError("Could not save this Price Book item. Please check the details and try again.");
-    else {
-      setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null);
-      setNotice(editingId ? "Price book item updated." : "Price book item added.");
-      await loadData();
-      if (new URLSearchParams(window.location.search).get("setup") === "1") window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!name.trim() || name.trim().length > 200 || description.length > 500 || trade.length > 60 || unit.trim().length > 40
+      || !hasAtMostTwoDecimalPlaces(Number(unitPrice)) || Number(unitPrice) < 0 || Number(unitPrice) > 100000000) {
+      setError(language === "es" ? "Usa un nombre de hasta 200 caracteres, descripción de hasta 500, oficio de hasta 60, unidad de hasta 40 y precio con un máximo de dos decimales." : "Use a name up to 200 characters, description up to 500, trade up to 60, unit up to 40, and a price with at most two decimal places.");
+      return;
+    }
+    if (savingItemRef.current) return;
+    savingItemRef.current = true;
+    setSavingItem(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setError(language === "es" ? "Inicia sesión para administrar tu lista de precios." : "Sign in to manage your price book."); return; }
+      const item = { name: name.trim(), description: description.trim(), trade, unit: unit.trim(), pricing_basis: pricingBasis, unit_price: Number(unitPrice), updated_at: new Date().toISOString() };
+      const { error: insertError } = editingId
+        ? await supabase.from("price_book_items").update(item).eq("id", editingId).eq("user_id", user.id)
+        : await supabase.from("price_book_items").insert({ ...item, user_id: user.id });
+      if (insertError) setError(language === "es" ? "No se pudo guardar este artículo. Revisa los datos e inténtalo de nuevo." : "Could not save this Price Book item. Please check the details and try again.");
+      else {
+        setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null);
+        setNotice(editingId ? "Price book item updated." : "Price book item added.");
+        await loadData();
+        if (new URLSearchParams(window.location.search).get("setup") === "1") window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch {
+      setError(language === "es" ? "No se pudo guardar este artículo. Inténtalo de nuevo." : "Could not save this Price Book item. Please try again.");
+    } finally {
+      savingItemRef.current = false;
+      setSavingItem(false);
     }
   };
 
@@ -163,16 +193,16 @@ export default function PriceBookPage() {
           <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
             <form id="add-price-book-item" onSubmit={addItem} className="h-fit scroll-mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold">{editingId ? "Edit price book item" : "Add a price book item"}</h2>
-              <Field label="Item or service"><input required value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} placeholder="Faucet installation" /></Field>
-              <Field label="Description"><input value={description} onChange={(event) => setDescription(event.target.value)} className={fieldClass} placeholder="Standard fixture install" /></Field>
+              <Field label="Item or service"><input required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} placeholder="Faucet installation" /></Field>
+              <Field label="Description"><input maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} className={fieldClass} placeholder="Standard fixture install" /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Trade"><select value={trade} onChange={(event) => setTrade(event.target.value)} className={fieldClass}>{trades.map((value) => <option key={value}>{value}</option>)}</select></Field>
-                <Field label="Unit"><input required value={unit} onChange={(event) => setUnit(event.target.value)} className={fieldClass} placeholder="each, hour, sq ft" /></Field>
+                <Field label="Trade"><select value={trade} onChange={(event) => setTrade(event.target.value)} className={fieldClass}>{!trades.includes(trade) && <option value={trade}>{trade}</option>}{trades.map((value) => <option key={value}>{value}</option>)}</select></Field>
+                <Field label="Unit"><input required maxLength={40} value={unit} onChange={(event) => setUnit(event.target.value)} className={fieldClass} placeholder="each, hour, sq ft" /></Field>
               </div>
               <Field label="Pricing basis"><select value={pricingBasis} onChange={(event) => setPricingBasis(event.target.value)} className={fieldClass}><option value="unknown">Not specified</option><option value="labor">Labor only</option><option value="materials">Materials only</option><option value="installed">Labor and materials</option><option value="other">Other costs</option></select></Field>
               <p className="text-xs text-slate-600">AI applies a saved rate automatically only when its unit and pricing basis match. Unspecified rates remain suggestions for your review.</p>
               <Field label="Your price per unit"><input type="number" required min="0" step="0.01" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} className={fieldClass} /></Field>
-              <button className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">{editingId ? "Save rate" : "Add to my price book"}</button>
+              <button disabled={savingItem} className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">{savingItem ? (language === "es" ? "Guardando…" : "Saving…") : editingId ? (language === "es" ? "Guardar tarifa" : "Save rate") : (language === "es" ? "Agregar a mi lista de precios" : "Add to my price book")}</button>
               {editingId && <button type="button" onClick={() => { setEditingId(null); setName(""); setDescription(""); setUnitPrice("0"); }} className="inline-flex min-h-12 w-full items-center justify-center text-xs font-semibold text-slate-600 underline">Cancel edit</button>}
             </form>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

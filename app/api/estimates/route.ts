@@ -1,4 +1,4 @@
-import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { calculateEstimateMoney, hasAtMostTwoDecimalPlaces } from "@/lib/estimate-money.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
@@ -6,6 +6,7 @@ import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 import { getServiceSupabase } from "@/lib/stripe-server";
 import { encryptShareToken } from "@/lib/proposal-sharing";
+import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -22,7 +23,7 @@ function validLineItems(value: unknown): value is Array<{ description: string; d
       && (item.description_es === undefined || item.description_es === null || (typeof item.description_es === "string" && item.description_es.length <= 240))
       && (item.unit === undefined || (typeof item.unit === "string" && item.unit.trim().length > 0 && item.unit.length <= 40))
       && typeof item.quantity === "number" && Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000
-      && typeof item.unit_price === "number" && Number.isFinite(item.unit_price) && item.unit_price >= 0 && item.unit_price <= 100000000;
+      && typeof item.unit_price === "number" && Number.isFinite(item.unit_price) && hasAtMostTwoDecimalPlaces(item.unit_price) && item.unit_price >= 0 && item.unit_price <= 100000000;
     if (!valid) return false;
     subtotalCents += calculateEstimateMoney({}, [{ quantity: Number(item.quantity), unit_price: Number(item.unit_price) }]).subtotalCents;
     return subtotalCents <= 100_000_000_000;
@@ -34,7 +35,7 @@ function validPackages(value: unknown) {
     isRecord(item) && typeof item.name === "string" && ["Good", "Better", "Best"].includes(item.name)
       && typeof item.description === "string" && item.description.length <= 500
       && (item.description_es === undefined || typeof item.description_es === "string" && item.description_es.length <= 500)
-      && typeof item.total === "number" && Number.isFinite(item.total) && item.total >= 0 && item.total <= 100000000));
+      && typeof item.total === "number" && Number.isFinite(item.total) && hasAtMostTwoDecimalPlaces(item.total) && item.total >= 0 && item.total <= 100000000));
 }
 
 export const POST = withApiFailureMetrics("/api/estimates", async (request: Request) => {
@@ -64,9 +65,13 @@ export const POST = withApiFailureMetrics("/api/estimates", async (request: Requ
   const proposalSummary = typeof body.proposal_summary === "string" ? body.proposal_summary.trim() : "";
   const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
   const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
+  const clientRequestId = typeof body.client_request_id === "string" ? body.client_request_id.trim() : "";
 
   if (!clientName || clientName.length > 200 || (clientEmail.length > 0 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320))
-    || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(lineItems) || !validPackages(packages)
+    || (body.client_phone !== undefined && body.client_phone !== null && typeof body.client_phone !== "string")
+    || (body.client_request_id !== undefined && body.client_request_id !== null && typeof body.client_request_id !== "string")
+    || !isValidOptionalPhone(clientPhone) || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(lineItems) || !validPackages(packages)
+    || (clientRequestId !== "" && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientRequestId))
     || !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100
     || !Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100
     || !Number.isFinite(markupPercentage) || markupPercentage < 0 || markupPercentage > 500
@@ -95,12 +100,16 @@ export const POST = withApiFailureMetrics("/api/estimates", async (request: Requ
       proposal_summary: proposalSummary || null,
       payment_terms: paymentTerms || null,
       payment_terms_es: paymentTermsEs || null,
+      client_request_id: clientRequestId || null,
     },
     p_line_items: lineItems,
   });
   if (error) {
     const estimateLimitMatch = error.message.match(/(?:FREE|PRO)_(?:DAILY|MONTHLY)_ESTIMATE_LIMIT/);
     if (estimateLimitMatch) return NextResponse.json({ error: estimateLimitMatch[0], code: estimateLimitMatch[0] }, { status: 429 });
+    if (error.message.includes("ESTIMATE_REQUEST_KEY_REUSED")) {
+      return NextResponse.json({ error: "ESTIMATE_REQUEST_KEY_REUSED" }, { status: 409 });
+    }
     if (error.message.includes("WORKCRAFT_PRO_REQUIRED")) return NextResponse.json({ error: "Deposits and proposal packages require WorkCraft AI Pro." }, { status: 403 });
     if (error.message.includes("ESTIMATE_TOTAL_TOO_LARGE")) return NextResponse.json({ error: "Estimate line-item subtotal cannot exceed $1,000,000,000." }, { status: 400 });
     if (error.message.includes("INVALID_LINE_ITEMS") || error.message.includes("INVALID_ESTIMATE")) return NextResponse.json({ error: "Check the estimate details and try again." }, { status: 400 });
@@ -115,13 +124,12 @@ export const POST = withApiFailureMetrics("/api/estimates", async (request: Requ
   try {
     const token = randomBytes(32).toString("base64url");
     const admin = getServiceSupabase();
-    const { data: changed, error: shareError } = await admin.rpc("workcraft_set_proposal_share", {
+    const { data: changed, error: shareError } = await admin.rpc("workcraft_ensure_proposal_share", {
       p_estimate_id: estimateId,
       p_user_id: user.id,
       p_hash: createHash("sha256").update(token).digest("hex"),
       p_encrypted: encryptShareToken(token),
       p_expires: new Date(Date.now() + 30 * 86400000).toISOString(),
-      p_revoke: false,
     });
     if (shareError || !changed) throw new Error(shareError?.message ?? "share initialization failed");
     shareReady = true;

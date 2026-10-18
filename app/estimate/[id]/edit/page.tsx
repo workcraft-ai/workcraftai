@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
-import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { calculateEstimateMoney, hasAtMostTwoDecimalPlaces } from "@/lib/estimate-money.mjs";
+import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import PackageTotalInput from "@/app/components/PackageTotalInput";
 import { ProPlanAction } from "@/app/components/ProPlanExperience";
@@ -148,8 +149,16 @@ export default function EditEstimatePage() {
       setFormError(language === "es" ? "Agrega al menos una partida con una descripción." : "Add at least one line item with a description.");
       return;
     }
-    if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0)) {
-      setFormError(language === "es" ? "Las cantidades deben ser mayores que cero y los precios no pueden ser negativos." : "Quantities must be greater than zero and prices cannot be negative.");
+    if (nonEmptyLineItems.some((item) => !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price) < 0 || !hasAtMostTwoDecimalPlaces(Number(item.unit_price)))) {
+      setFormError(language === "es" ? "Las cantidades deben ser mayores que cero y los precios deben tener como máximo dos decimales." : "Quantities must be greater than zero, and prices must have no more than two decimal places.");
+      return;
+    }
+    if (!isValidOptionalPhone(clientPhone)) {
+      setFormError(language === "es" ? "Ingresa un número de teléfono válido o deja el campo vacío." : "Enter a valid phone number or leave the field blank.");
+      return;
+    }
+    if (packageOptions.some((option) => !hasAtMostTwoDecimalPlaces(Number(option.total)))) {
+      setFormError(language === "es" ? "Los totales de los paquetes deben tener como máximo dos decimales." : "Package totals must have no more than two decimal places.");
       return;
     }
     if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {

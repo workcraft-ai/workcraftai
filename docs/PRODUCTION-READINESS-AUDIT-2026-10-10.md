@@ -414,20 +414,11 @@ if (!knownBasis.has(line.pricing_basis)
     || line.pricing_basis !== rate.pricing_basis) return [];
 ```
 
-### AI-3 [MEDIUM] Full roof area overrides quantities for partial repairs
+### AI-3 [MEDIUM] Full roof area overrides quantities for partial repairs — RESOLVED 2026-10-18
 
-**Reference:** `app/api/generate-estimate/route.ts:206`, `:321–327`.
+**Reference:** current AI drafting flow in `app/api/generate-estimate/route.ts` and `app/estimate/new/page.tsx`.
 
-**Vector:** a roofing/decking description with sq-ft units receives the full measured roof area, even if the prompt specifies repairing only 50 sq ft of damaged decking on a 2,000 sq-ft roof. The code can inflate an otherwise reasonable generated quantity.
-
-**Fix:** add validated `quantity_basis` to the response schema (`full_roof`, `specified_area`, `count`, `unverified`). Apply measured full area only to full-roof tasks; preserve explicitly stated partial quantities. Explain the basis in English and Spanish and require review of ambiguous measurements.
-
-```ts
-if (measuredRoofAreaSqFt !== null && item.quantity_basis === 'full_roof') {
-  if (unit === 'roofing square') quantity = measuredRoofAreaSqFt / 100;
-  else if (unit === 'sq ft') quantity = measuredRoofAreaSqFt;
-}
-```
+The trade-specific roof-area input and quantity rewrite have been removed. AI uses the contractor's written scope for every trade, preserves stated quantities, and flags an uncertain quantity for review instead of calculating it from a separate roof measurement field. The shared estimate review now checks generic duplicate/overlapping scope without changing quantities.
 
 ### TIME-1 [LOW] DST overlap lacks an explicit choice
 

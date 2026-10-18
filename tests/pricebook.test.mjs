@@ -13,6 +13,12 @@ test("CSV import rejects missing prices and malformed quoting", () => {
   assert.throws(() => parsePriceBookCsv('Name,Price\n"Faucet,25'), /unclosed quotation/);
 });
 
+test("CSV import rejects fractional cents and oversized fields instead of silently truncating", () => {
+  assert.throws(() => parsePriceBookCsv("Name,Price\nFaucet,12.345"), /valid non-negative unit price/);
+  assert.throws(() => parsePriceBookCsv(`Name,Price\n${"x".repeat(201)},12.00`), /200 characters or less/);
+  assert.throws(() => parsePriceBookCsv(`Name,Description,Price\nFaucet,${"x".repeat(501)},12.00`), /description must be 500/);
+});
+
 test("a weak single-word Price Book match is suggested instead of auto-applied", () => {
   const result = applyPriceBookRates(
     [{ description: "Faucet replacement / installation", quantity: 2, unit: "each", unit_price: 225 }],
@@ -33,6 +39,16 @@ test("clear multi-word matches auto-apply after unit aliases are normalized", ()
   assert.equal(result.lines[0].unit_price, 475);
   assert.equal(result.matchedCount, 1);
   assert.deepEqual(result.suggestionsByIndex, {});
+});
+
+test("explicit contractor-provided rate is preserved even when a Price Book item matches", () => {
+  const result = applyPriceBookRates(
+    [{ description: "Replace water heater", quantity: 1, unit: "job", pricing_basis: "installed", unit_price: 1100, pricing_source: "contractor_provided" }],
+    [{ name: "Water heater replacement", trade: "Plumbing", unit: "job", pricing_basis: "installed", unit_price: 1200 }],
+    "Plumbing",
+  );
+  assert.equal(result.lines[0].unit_price, 1100);
+  assert.equal(result.matchedCount, 0);
 });
 
 test("hourly and measurement-based rates require the same units", () => {

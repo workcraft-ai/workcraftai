@@ -30,8 +30,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const today = new Date().toISOString().slice(0, 10);
     const month = `${today.slice(0, 7)}-01`;
     const [{ data: dailyUsage, error: dailyUsageError }, { data: monthlyUsage, error: monthlyUsageError }, { data: aiSettings, error: aiSettingsError }] = await Promise.all([
-      access.admin.from("tradeflow_ai_daily_usage").select("attempts_started").eq("user_id", id).eq("usage_date", today).maybeSingle(),
-      access.admin.from("tradeflow_ai_monthly_usage").select("attempts_started").eq("user_id", id).eq("usage_month", month).maybeSingle(),
+      access.admin.from("tradeflow_ai_daily_usage").select("billable_attempts").eq("user_id", id).eq("usage_date", today).maybeSingle(),
+      access.admin.from("tradeflow_ai_monthly_usage").select("billable_attempts").eq("user_id", id).eq("usage_month", month).maybeSingle(),
       access.admin.from("tradeflow_app_settings").select("ai_daily_generation_limit, ai_monthly_generation_limit").eq("singleton", true).single(),
     ]);
     if (dailyUsageError || monthlyUsageError || aiSettingsError) {
@@ -40,10 +40,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     }
     aiUsage = {
       daily_date: today,
-      daily_used: dailyUsage?.attempts_started ?? 0,
+      daily_used: dailyUsage?.billable_attempts ?? 0,
       daily_limit: aiSettings.ai_daily_generation_limit,
       monthly_month: month,
-      monthly_used: monthlyUsage?.attempts_started ?? 0,
+      monthly_used: monthlyUsage?.billable_attempts ?? 0,
       monthly_limit: aiSettings.ai_monthly_generation_limit,
     };
   }
