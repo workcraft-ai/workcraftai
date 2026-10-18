@@ -434,7 +434,7 @@ export default function CreateEstimatePage() {
   const addSelectedPriceBookItem = () => {
     const item = priceBookItems.find((priceBookItem) => priceBookItem.id === selectedPriceBookItemId);
     if (!item) return;
-    setLineItems((current) => [...current, {
+    setLineItems((current) => [...(current.length === 1 && !current[0].description.trim() ? [] : current), {
       description: item.description ? `${item.name} — ${item.description}` : item.name,
       quantity: 1,
       unit: item.unit,
@@ -445,10 +445,16 @@ export default function CreateEstimatePage() {
   };
 
   const applyPriceBookSuggestion = (lineIndex: number, suggestion: PriceBookSuggestion) => {
+    const currentBasis = lineItems[lineIndex]?.pricing_basis;
+    if (currentBasis && currentBasis !== "unknown" && suggestion.pricing_basis && suggestion.pricing_basis !== "unknown" && currentBasis !== suggestion.pricing_basis) {
+      setDraftMessage(language === "es" ? "Ese precio incluye un tipo de trabajo diferente. Revisa si incluye mano de obra y materiales antes de usarlo." : "That Price Book rate includes a different type of work. Check its labor and material inclusions before using it.");
+      return;
+    }
     setLineItems((current) => current.map((item, index) => index === lineIndex ? {
       ...item,
       unit: suggestion.unit,
       unit_price: Number(suggestion.unit_price),
+      pricing_basis: suggestion.pricing_basis ?? item.pricing_basis,
       pricing_source: "price_book",
       pricing_assumption: undefined,
       pricing_assumption_es: undefined,
@@ -588,6 +594,7 @@ export default function CreateEstimatePage() {
 
     setSaving(true);
     let createdEstimateId: string | null = null;
+    let shareInitializationFailed = false;
     try {
       if (!navigator.onLine) throw new Error("You are offline. Save the draft on this device, then reconnect to create and upload it.");
       if (attachments.length > 0 && !isProSubscriber) throw new Error("Photo and voice-note uploads require Pro. Your saved draft remains on this device; remove its attachments or upgrade to continue.");
@@ -643,6 +650,10 @@ export default function CreateEstimatePage() {
         throw new Error(typeof createResult.error === "string" ? createResult.error : "Unable to save this estimate.");
       }
       createdEstimateId = createResult.id;
+      if (createResult.share_ready === false) {
+        shareInitializationFailed = true;
+        throw new Error("The estimate was saved, but its customer link is not ready. Open it from your dashboard and replace the customer link before sharing.");
+      }
 
       for (const attachment of attachments) {
         const path = `${user.id}/${createdEstimateId}/${crypto.randomUUID()}-${attachment.file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180)}`;
@@ -684,7 +695,9 @@ export default function CreateEstimatePage() {
           : message.includes("ESTIMATE_MEDIA_STORAGE_LIMIT")
             ? language === "es" ? "Alcanzaste el límite de almacenamiento Pro. Elimina archivos privados antiguos o revisa Perfil." : "You’ve reached the Pro storage limit. Remove older private files or review Profile."
         : null;
-      const safeError = createdEstimateId
+      const safeError = shareInitializationFailed
+        ? language === "es" ? "La cotización se guardó, pero su enlace para el cliente no está listo. Ábrela desde el panel y reemplaza el enlace antes de compartirla." : "The estimate was saved, but its customer link is not ready. Open it from your dashboard and replace the link before sharing."
+        : createdEstimateId
         ? quotaMessage
           ? language === "es" ? `La cotización se creó, pero no se completó un paso posterior. No la vuelvas a crear. ${quotaMessage}` : `The estimate was created, but a later step did not finish. Do not create it again. ${quotaMessage}`
           : language === "es" ? "La cotización se creó, pero no se completó un paso posterior. Ábrela desde el panel; no la vuelvas a crear." : "The estimate was created, but a later step did not finish. Open it from your dashboard; do not create it again."
