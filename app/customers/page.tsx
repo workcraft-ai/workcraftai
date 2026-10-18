@@ -6,6 +6,7 @@ import Link from "next/link";
 import { readAllPages } from "@/lib/read-all-pages";
 import { supabase } from "@/lib/supabase";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
+import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
 
 type CustomerContact = {
   id: string;
@@ -78,9 +79,9 @@ export default function CustomersPage() {
     const email = form.email.trim();
     const phone = form.phone.trim();
     const job_address = form.job_address.trim();
-    if (!name || name.length > 200 || email.length > 320 || phone.length > 80 || job_address.length > 500
+    if (!name || name.length > 200 || email.length > 320 || !isValidOptionalPhone(phone) || phone.length > 80 || job_address.length > 500
       || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
-      setError("Check the customer name, email, phone, and address.");
+      setError(language === "es" ? "Revisa el nombre, correo, teléfono y dirección del cliente." : "Check the customer name, email, phone, and address.");
       return;
     }
 

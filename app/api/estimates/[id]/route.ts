@@ -1,8 +1,9 @@
-import { calculateEstimateMoney } from "@/lib/estimate-money.mjs";
+import { calculateEstimateMoney, hasAtMostTwoDecimalPlaces } from "@/lib/estimate-money.mjs";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
+import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -34,6 +35,7 @@ function validLineItems(value: unknown): value is LineItemInput[] {
       typeof candidate.unit_price === "number" &&
       Number.isFinite(candidate.unit_price) &&
       candidate.unit_price >= 0 &&
+      hasAtMostTwoDecimalPlaces(candidate.unit_price) &&
       candidate.unit_price <= 100000000 &&
       (candidate.unit === undefined || (typeof candidate.unit === "string" && candidate.unit.trim().length > 0 && candidate.unit.length <= 40)) &&
       (candidate.description_es === undefined || candidate.description_es === null || (typeof candidate.description_es === "string" && candidate.description_es.length <= 240));
@@ -124,7 +126,8 @@ export async function PUT(
   const paymentTerms = typeof body.payment_terms === "string" ? body.payment_terms.trim() : "";
   const paymentTermsEs = typeof body.payment_terms_es === "string" ? body.payment_terms_es.trim() : "";
   if (!clientName || clientName.length > 200 || (clientEmail.length > 0 && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail) || clientEmail.length > 320)) ||
-      clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(body.lineItems) ||
+      (body.client_phone !== undefined && body.client_phone !== null && typeof body.client_phone !== "string") ||
+      !isValidOptionalPhone(clientPhone) || clientPhone.length > 80 || jobAddress.length > 500 || !validLineItems(body.lineItems) ||
       !Number.isFinite(depositPercentage) || depositPercentage < 0 || depositPercentage > 100) {
     return jsonError("Check the customer details, deposit percentage, and line items.", 400);
   }
@@ -171,7 +174,7 @@ export async function PUT(
     return ["Good", "Better", "Best"].includes(String(option.name))
       && typeof option.description === "string" && option.description.length <= 500
       && (option.description_es === undefined || typeof option.description_es === "string" && option.description_es.length <= 500)
-      && typeof option.total === "number" && Number.isFinite(option.total) && option.total >= 0 && option.total <= 100000000;
+      && typeof option.total === "number" && Number.isFinite(option.total) && hasAtMostTwoDecimalPlaces(option.total) && option.total >= 0 && option.total <= 100000000;
   });
   if (!validPackages) return jsonError("Proposal package details are invalid.", 400);
   const isEnablingProOptions = (body.require_deposit === true && existing.require_deposit !== true)
