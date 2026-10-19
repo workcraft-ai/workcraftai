@@ -7,9 +7,10 @@ import { LocalizedTree, translate, useLanguage } from "@/app/components/Language
 import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 import CronJobsPanel from "@/app/admin/CronJobsPanel";
 import AiMatchMetricsPanel from "@/app/admin/AiMatchMetricsPanel";
+import InfrastructurePanel from "@/app/admin/InfrastructurePanel";
 
 type AdminRole = "support" | "billing" | "super_admin";
-type AdminTab = "accounts" | "billing" | "settings" | "ai" | "cron";
+type AdminTab = "accounts" | "billing" | "settings" | "ai" | "infrastructure" | "cron";
 type Account = {
   id: string;
   email: string;
@@ -450,6 +451,7 @@ export default function AdminPage() {
     ...(role !== "support" ? [{ id: "billing" as const, label: language === "es" ? "Facturación" : "Billing", controls: "billing-panel" }] : []),
     ...(role === "super_admin" ? [{ id: "settings" as const, label: language === "es" ? "Configuración" : "Settings", controls: "settings-panel" }] : []),
     ...(role === "super_admin" ? [{ id: "ai" as const, label: language === "es" ? "IA generativa" : "Generative AI", controls: "ai-panel" }] : []),
+    ...(role === "super_admin" ? [{ id: "infrastructure" as const, label: language === "es" ? "Infraestructura" : "Infrastructure", controls: "infrastructure-panel" }] : []),
     { id: "cron" as const, label: language === "es" ? "Tareas programadas" : "Cron jobs", controls: "cron-panel" },
   ];
 
@@ -755,6 +757,10 @@ export default function AdminPage() {
       </section>
 
         <AiMatchMetricsPanel language={language} active={activeTab === "ai"} />
+      </div>}
+
+      {role === "super_admin" && <div id="infrastructure-panel" role="tabpanel" aria-labelledby="admin-tab-infrastructure" tabIndex={0} hidden={activeTab !== "infrastructure"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
+        <InfrastructurePanel language={language} active={activeTab === "infrastructure"} />
       </div>}
 
       <div id="cron-panel" role="tabpanel" aria-labelledby="admin-tab-cron" tabIndex={0} hidden={activeTab !== "cron"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
