@@ -6,7 +6,7 @@ import { brandedEmailFrame } from "@/lib/branded-email.mjs";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export type NotificationMail = { from?: string; to: string[]; reply_to?: string; subject: string; text: string; html: string };
-type Notification = { id: string; user_id: string | null; estimate_id: string | null; job_id: string | null; source: "estimate"|"proposal_question"|"invoice"|"follow_up"|"billing"|"auth"|"welcome"; send_key: string; payload: Partial<NotificationMail>; attempts: number; reservation_id: string | null; first_attempt_at: string | null; created_at: string };
+type Notification = { id: string; user_id: string | null; estimate_id: string | null; job_id: string | null; source: "estimate"|"proposal_question"|"invoice"|"follow_up"|"billing"|"auth"|"welcome"|"engagement"; send_key: string; payload: Partial<NotificationMail>; attempts: number; reservation_id: string | null; first_attempt_at: string | null; created_at: string };
 export const escapeEmailHtml = (value: string) => value.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
 export function notificationFrame(language: "en"|"es", title: string, content: string) {
   return brandedEmailFrame({language,title,preheader:title,eyebrow:language==="es"?"ACTUALIZACIÓN DE WORKCRAFT AI":"WORKCRAFT AI UPDATE",content});
@@ -57,14 +57,22 @@ export async function processNotifications(admin:SupabaseClient, ids?:string[], 
    let quota:unknown;
    try{
     if(row.source==="auth"&&Date.now()-new Date(row.created_at).getTime()>10*60000){await retry(row,"auth_link_expired",true);results.push({id:row.id,sent:false});return;}
+    if(row.source==="engagement"){
+     const {data:allowed,error:eligibilityError}=await admin.rpc("workcraft_engagement_send_allowed",{p_outbox_id:row.id});
+     if(eligibilityError)throw new Error("engagement_eligibility");
+     if(!allowed){
+      if(row.reservation_id)await releaseAppEmail(admin,row.reservation_id);
+      await retry(row,"superseded_or_unsubscribed",true);results.push({id:row.id,sent:false});return;
+     }
+    }
     if(row.first_attempt_at&&Date.now()-new Date(row.first_attempt_at).getTime()>=23*3600000){await retry(row,"idempotency_window_expired",true);results.push({id:row.id,sent:false});return;}
     const mail=row.source==="proposal_question"?await questionMail(admin,row):row.payload as NotificationMail;
     if(!mail?.to?.length||!mail.subject||!mail.html){await retry(row,"invalid_mail",true);results.push({id:row.id,sent:false});return;}
     if(!row.reservation_id){
      // Welcome mail is operational mail, not part of a contractor's Pro quota.
      // The existing general app pool uses the support reservation category.
-     const quotaSource=row.source==="welcome"?"support":row.source;
-     const {reservation,error:reserveError}=await reserveAppEmail(admin,quotaSource,row.source==="welcome"?undefined:row.user_id??undefined,row.source==="invoice"?undefined:row.estimate_id??undefined,row.job_id??undefined);
+     const quotaSource=row.source==="welcome"||row.source==="engagement"?"support":row.source;
+     const {reservation,error:reserveError}=await reserveAppEmail(admin,quotaSource,row.source==="welcome"||row.source==="engagement"?undefined:row.user_id??undefined,row.source==="invoice"?undefined:row.estimate_id??undefined,row.job_id??undefined);
      if(reserveError||!reservation?.allowed||!reservation.reservation_id){await retry(row,reserveError?"quota_lookup":reservation?.reason??"quota_lookup",false,3600);results.push({id:row.id,sent:false});return;}
      quota=reservation;
      const {error:saveError}=await admin.from("notification_outbox").update({reservation_id:reservation.reservation_id,first_attempt_at:new Date().toISOString()}).eq("id",row.id);

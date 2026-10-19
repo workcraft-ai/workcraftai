@@ -13,5 +13,10 @@ export async function POST(request: Request) {
     console.error("Could not record account activity:", activityError.message);
     return NextResponse.json({ error: "Account activity could not be recorded." }, { status: 503 });
   }
+  if (user.email_confirmed_at) {
+    const { error: engagementError } = await getServiceSupabase().from("workcraft_engagement_preferences")
+      .upsert({ user_id: user.id }, { onConflict: "user_id", ignoreDuplicates: true });
+    if (engagementError) console.error("Could not record first app visit for engagement emails:", engagementError.message);
+  }
   return NextResponse.json({ status }, { headers: { "Cache-Control": "no-store" } });
 }

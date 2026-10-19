@@ -44,6 +44,21 @@ const cronJobs: CronJob[] = [
     historyUrl: "https://vercel.com/dashboard",
   },
   {
+    platform: { en: "Vercel Cron", es: "Vercel Cron" },
+    name: { en: "Account engagement emails", es: "Correos de seguimiento de cuentas" },
+    schedule: { en: "Daily at 13:00 UTC", es: "Todos los días a las 13:00 UTC" },
+    purpose: {
+      en: "Checks confirmed accounts for one eligible getting-started, preview, Price Book, return, or opted-in guide email. Essential notices use their existing jobs. A business mailing address can be configured for the footer.",
+      es: "Revisa las cuentas confirmadas y envía un correo elegible de ayuda inicial, revisión, lista de precios, regreso o guía aceptada. Los avisos esenciales siguen sus tareas actuales. Se puede configurar una dirección postal comercial para el pie de página.",
+    },
+    scheduleSource: { label: { en: "Schedule", es: "Calendario" }, path: "vercel.json" },
+    logicSources: [
+      { label: { en: "Job logic", es: "Lógica del trabajo" }, path: "app/api/cron/engagement/route.ts" },
+      { label: { en: "Eligibility rules", es: "Reglas de elegibilidad" }, path: "supabase/migrations/20261019130728_engagement_email_lifecycle.sql" },
+    ],
+    historyUrl: "https://vercel.com/dashboard",
+  },
+  {
     platform: { en: "Supabase Cron", es: "Supabase Cron" },
     name: { en: "Operations and retry worker", es: "Procesos operativos y reintentos" },
     schedule: { en: "Every 5 minutes", es: "Cada 5 minutos" },
