@@ -28,19 +28,22 @@ export default function AiMatchMetricsPanel({ language, active }: { language: "e
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
     if (!active) return;
-    let cancelled = false;
-    fetch("/api/admin/ai-match-metrics", { cache: "no-store" }).then(async (response) => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    fetch("/api/admin/ai-match-metrics", { cache: "no-store", signal: controller.signal }).then(async (response) => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not load match metrics.");
-      if (!cancelled) { setMetrics(result); setError(""); }
+      if (!controller.signal.aborted) { setMetrics(result); setUpdatedAt(new Date()); }
     }).catch((cause) => {
-      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load match metrics.");
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not load match metrics.");
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [active, refresh]);
 
   const es = language === "es";
@@ -58,8 +61,8 @@ export default function AiMatchMetricsPanel({ language, active }: { language: "e
 
   return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-lg font-bold text-slate-900">{es ? "Calidad de coincidencias de IA" : "AI matching quality"}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{es ? "Últimos 30 días. Se registran recuentos y decisiones al guardar, sin el texto de trabajos ni clientes. Los nombres aprendidos permanecen privados en cada cuenta." : "Last 30 days. Counts and saved choices are recorded without job or customer text. Learned names stay private to each account."}</p></div>
-      <button type="button" onClick={() => { setLoading(true); setRefresh((value) => value + 1); }} disabled={loading} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">{es ? "Actualizar" : "Refresh"}</button>
+      <div><h2 className="text-lg font-bold text-slate-900">{es ? "Calidad de coincidencias de IA" : "AI matching quality"}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{es ? "Últimos 30 días. Se registran recuentos y decisiones al guardar, sin el texto de trabajos ni clientes. Los nombres aprendidos permanecen privados en cada cuenta." : "Last 30 days. Counts and saved choices are recorded without job or customer text. Learned names stay private to each account."}</p><p role="status" aria-live="polite" className="mt-2 text-xs text-slate-600">{loading ? (es ? "Actualizando…" : "Refreshing…") : updatedAt ? `${es ? "Actualizado" : "Updated"}: ${updatedAt.toLocaleString(es ? "es" : "en")}` : ""}</p></div>
+      <button type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loading} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-wait disabled:opacity-60">{loading ? (es ? "Actualizando…" : "Refreshing…") : (es ? "Actualizar" : "Refresh")}</button>
     </div>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!metrics && !error && <p role="status" className="mt-3 text-sm text-slate-600">{es ? "Cargando métricas…" : "Loading metrics…"}</p>}

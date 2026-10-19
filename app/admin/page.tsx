@@ -87,6 +87,8 @@ export default function AdminPage() {
   const [accountStatsError, setAccountStatsError] = useState("");
   const [recovery, setRecovery] = useState<RecoverySummary | null>(null);
   const [recoveryError, setRecoveryError] = useState("");
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoveryUpdatedAt, setRecoveryUpdatedAt] = useState<Date | null>(null);
   const [search, setSearch] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -189,11 +191,16 @@ export default function AdminPage() {
   }, [role, mfaRequired]);
 
   const loadRecovery = useCallback(async () => {
+    setRecoveryLoading(true);
     try {
       setRecoveryError("");
-      setRecovery(await requestJson("/api/admin/subscription-recovery") as RecoverySummary);
+      const result = await requestJson("/api/admin/subscription-recovery") as RecoverySummary;
+      setRecovery(result);
+      setRecoveryUpdatedAt(new Date());
     } catch (cause) {
       setRecoveryError(cause instanceof Error ? cause.message : "Could not load subscription recovery.");
+    } finally {
+      setRecoveryLoading(false);
     }
   }, []);
 
@@ -667,7 +674,7 @@ export default function AdminPage() {
       </section>
 
       {role !== "support" && <section id="billing-panel" role="tabpanel" aria-labelledby="admin-tab-billing" tabIndex={0} hidden={activeTab !== "billing"} className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="recovery-heading" className="text-lg font-bold text-slate-900">{language === "es" ? "Recuperación de pagos de Pro" : "Pro payment recovery"}</h2><p className="mt-1 text-sm text-slate-600">{language === "es" ? "Solo suscripciones de WorkCraft AI. El acceso Pro continúa durante tres días hábiles después del primer fallo; Stripe puede seguir intentando el cobro después." : "WorkCraft AI subscriptions only. Pro access continues for three weekdays after the first failure; Stripe may continue retrying afterward."}</p></div><button type="button" onClick={() => void loadRecovery()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800">{language === "es" ? "Actualizar" : "Refresh"}</button></div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="recovery-heading" className="text-lg font-bold text-slate-900">{language === "es" ? "Recuperación de pagos de Pro" : "Pro payment recovery"}</h2><p className="mt-1 text-sm text-slate-600">{language === "es" ? "Solo suscripciones de WorkCraft AI. El acceso Pro continúa durante tres días hábiles después del primer fallo; Stripe puede seguir intentando el cobro después." : "WorkCraft AI subscriptions only. Pro access continues for three weekdays after the first failure; Stripe may continue retrying afterward."}</p><p role="status" aria-live="polite" className="mt-2 text-xs text-slate-600">{recoveryLoading ? (language === "es" ? "Actualizando…" : "Refreshing…") : recoveryUpdatedAt ? `${language === "es" ? "Actualizado" : "Updated"}: ${recoveryUpdatedAt.toLocaleString(language === "es" ? "es" : "en")}` : ""}</p></div><button type="button" onClick={() => void loadRecovery()} disabled={recoveryLoading} className="min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-wait disabled:opacity-60">{recoveryLoading ? (language === "es" ? "Actualizando…" : "Refreshing…") : (language === "es" ? "Actualizar" : "Refresh")}</button></div>
         {recoveryError && <p role="alert" className="mt-3 text-sm text-red-800">{recoveryError}</p>}
         {recovery ? <>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{([

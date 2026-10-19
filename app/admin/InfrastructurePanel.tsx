@@ -44,19 +44,22 @@ export default function InfrastructurePanel({ language, active }: { language: "e
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     if (!active) return;
-    let cancelled = false;
-    fetch("/api/admin/infrastructure", { cache: "no-store" }).then(async (response) => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    fetch("/api/admin/infrastructure", { cache: "no-store", signal: controller.signal }).then(async (response) => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not load infrastructure usage.");
-      if (!cancelled) { setSnapshot(result); setError(""); }
+      if (!controller.signal.aborted) { setSnapshot(result); setUpdatedAt(new Date()); }
     }).catch((cause) => {
-      if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load infrastructure usage.");
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not load infrastructure usage.");
+    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [active, revision]);
 
   const heartbeat = (name: string) => snapshot?.heartbeats?.find((item) => item.name === name)?.last_success_at;
@@ -66,7 +69,7 @@ export default function InfrastructurePanel({ language, active }: { language: "e
   };
 
   return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-950">{es ? "Resumen de infraestructura" : "Infrastructure overview"}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{es ? "Capacidad y salud de los servicios que ejecutan WorkCraft AI. Las cifras en vivo se distinguen de los límites de referencia del plan gratuito y de las revisiones manuales. Confirma el plan actual antes de decidir una ampliación." : "Capacity and health for the services running WorkCraft AI. Live figures are separate from free-plan reference limits and manual dashboard checks. Confirm the current plan before deciding to upgrade."}</p>{snapshot && <p className="mt-2 text-xs text-slate-500">{es ? "Actualizado" : "Updated"}: {new Date(snapshot.checked_at).toLocaleString()}</p>}</div><button type="button" onClick={() => { setLoading(true); setRevision((value) => value + 1); }} disabled={loading} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">{loading ? (es ? "Actualizando…" : "Refreshing…") : (es ? "Actualizar" : "Refresh")}</button></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-950">{es ? "Resumen de infraestructura" : "Infrastructure overview"}</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{es ? "Capacidad y salud de los servicios que ejecutan WorkCraft AI. Las cifras en vivo se distinguen de los límites de referencia del plan gratuito y de las revisiones manuales. Confirma el plan actual antes de decidir una ampliación." : "Capacity and health for the services running WorkCraft AI. Live figures are separate from free-plan reference limits and manual dashboard checks. Confirm the current plan before deciding to upgrade."}</p><p role="status" aria-live="polite" className="mt-2 text-xs text-slate-600">{loading ? (es ? "Actualizando…" : "Refreshing…") : updatedAt ? `${es ? "Actualizado" : "Updated"}: ${updatedAt.toLocaleString(es ? "es" : "en")}` : ""}</p></div><button type="button" onClick={() => setRevision((value) => value + 1)} disabled={loading} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:cursor-wait disabled:opacity-60">{loading ? (es ? "Actualizando…" : "Refreshing…") : (es ? "Actualizar" : "Refresh")}</button></div>
     {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!snapshot && !error && <p role="status" className="mt-4 text-sm text-slate-600">{es ? "Cargando uso…" : "Loading usage…"}</p>}
     {snapshot && <>
