@@ -6,9 +6,10 @@ import { createClient } from "@/app/utils/supabase/client";
 import { LocalizedTree, translate, useLanguage } from "@/app/components/LanguageProvider";
 import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 import CronJobsPanel from "@/app/admin/CronJobsPanel";
+import AiMatchMetricsPanel from "@/app/admin/AiMatchMetricsPanel";
 
 type AdminRole = "support" | "billing" | "super_admin";
-type AdminTab = "accounts" | "billing" | "settings" | "cron";
+type AdminTab = "accounts" | "billing" | "settings" | "ai" | "cron";
 type Account = {
   id: string;
   email: string;
@@ -448,6 +449,7 @@ export default function AdminPage() {
     { id: "accounts" as const, label: language === "es" ? "Cuentas" : "Accounts", controls: "accounts-summary-panel accounts-records-panel" },
     ...(role !== "support" ? [{ id: "billing" as const, label: language === "es" ? "Facturación" : "Billing", controls: "billing-panel" }] : []),
     ...(role === "super_admin" ? [{ id: "settings" as const, label: language === "es" ? "Configuración" : "Settings", controls: "settings-panel" }] : []),
+    ...(role === "super_admin" ? [{ id: "ai" as const, label: language === "es" ? "IA generativa" : "Generative AI", controls: "ai-panel" }] : []),
     { id: "cron" as const, label: language === "es" ? "Tareas programadas" : "Cron jobs", controls: "cron-panel" },
   ];
 
@@ -688,22 +690,6 @@ export default function AdminPage() {
       </section>
 
       <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div><h2 className="text-lg font-bold text-slate-900">Cloud AI drafting cost controls</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro includes up to 5 cloud drafting attempts per account per UTC day and 50 per UTC month. The daily account limit can be lowered here; the monthly cap remains 50. The platform-wide ceiling remains 250 attempts across all accounts per UTC day. A valid attempt counts when admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.</p></div>
-        {aiDraftingSettings && <>
-          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Status:</strong> {aiDraftingSettings.ai_drafting_enabled ? "Enabled" : "Paused"} · <strong>Per account:</strong> {aiDraftingSettings.ai_daily_generation_limit} / day, {aiDraftingSettings.ai_monthly_generation_limit} / month · <strong>Platform:</strong> {aiDraftingSettings.ai_global_daily_generation_limit} / day</p><p className="mt-1"><strong>Today:</strong> {aiDraftingSettings.today.attempts_started} attempted ({aiDraftingSettings.today.succeeded} succeeded, {aiDraftingSettings.today.failed} failed) · {aiDraftingSettings.today.global_attempts_started} of {aiDraftingSettings.ai_global_daily_generation_limit} platform attempts used</p><p className="mt-1"><strong>This month, all accounts:</strong> {aiDraftingSettings.this_month.attempts_started} attempts</p></div>
-          <form onSubmit={saveAiDraftingSettings} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_minmax(8rem,12rem)_1fr_auto] sm:items-end">
-            <label className="block text-xs font-semibold text-slate-700">Draft attempts per day<input aria-label="AI drafting attempts per UTC day" type="number" min={1} max={5} step={1} value={aiDailyLimitInput} onChange={(event) => setAiDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
-            <label className="block text-xs font-semibold text-slate-700">Platform attempts per day<input aria-label="Platform AI drafting attempts per UTC day" type="number" min={1} max={5000} step={1} value={aiGlobalDailyLimitInput} onChange={(event) => setAiGlobalDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
-            <label className="block text-xs font-semibold text-slate-700">Reason for change<input value={aiSettingsReason} onChange={(event) => setAiSettingsReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: reduce provider spend during testing" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
-            <button type="submit" disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings || !Number.isInteger(Number(aiDailyLimitInput)) || Number(aiDailyLimitInput) < 1 || Number(aiDailyLimitInput) > 5 || !Number.isInteger(Number(aiGlobalDailyLimitInput)) || Number(aiGlobalDailyLimitInput) < 1 || Number(aiGlobalDailyLimitInput) > 5000 || aiSettingsReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "ai-drafting-settings" ? "Saving…" : "Save AI limits"}</button>
-          </form>
-          <div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => void setAiDraftingEnabled(false)} disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">Pause cloud drafting</button><button type="button" onClick={() => void setAiDraftingEnabled(true)} disabled={busy !== "" || aiSettingsLoading || aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">Resume cloud drafting</button></div>
-          <p className="mt-2 text-xs text-slate-500">Allowed ranges: 1–5 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.</p>
-        </>}
-        {aiSettingsLoading && !aiDraftingSettings && <p className="mt-3 text-sm text-slate-500">Loading AI drafting settings…</p>}
-      </section>
-
-      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="text-lg font-bold text-slate-900">Transactional email capacity</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Free account email allowances apply to estimate emails; trial and paid Pro share one allowance for estimate emails, follow-ups, customer-question alerts, and invoices. The separate app-wide cap is 75 per UTC day, with reserves of 20 Auth emails and 5 billing emails. The Auth reserve requires the Supabase Send Email hook; custom SMTP bypasses this app budget. Accepted or ambiguous provider requests count; definite rejections release their reservation.</p></div>
         {accountEmailLimits && <>
           <p className="mt-4 text-sm text-slate-700"><strong>Current per-account allowances:</strong> Free {accountEmailLimits.free_email_daily_limit}/day, {accountEmailLimits.free_email_monthly_limit}/month · Trial/Pro {accountEmailLimits.pro_email_daily_limit}/day, {accountEmailLimits.pro_email_monthly_limit}/month (UTC).</p>
@@ -749,6 +735,26 @@ export default function AdminPage() {
           {estimateTradeOptionsLoading && <p className="text-sm text-slate-500">Loading estimate trade options…</p>}
         </form>
       </section>
+      </div>}
+
+      {role === "super_admin" && <div id="ai-panel" role="tabpanel" aria-labelledby="admin-tab-ai" tabIndex={0} hidden={activeTab !== "ai"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div><h2 className="text-lg font-bold text-slate-900">Cloud AI drafting cost controls</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Pro includes up to 5 cloud drafting attempts per account per UTC day and 50 per UTC month. The daily account limit can be lowered here; the monthly cap remains 50. The platform-wide ceiling remains 250 attempts across all accounts per UTC day. A valid attempt counts when admitted for provider processing, including provider failures. We record counts, model, prompt length, outcome, and response status; prompts and generated content are not stored in the usage log. Records older than 90 days are pruned when drafting requests run. Usage data is private and available only to authorized administrators.</p></div>
+        {aiDraftingSettings && <>
+          <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><p><strong>Status:</strong> {aiDraftingSettings.ai_drafting_enabled ? "Enabled" : "Paused"} · <strong>Per account:</strong> {aiDraftingSettings.ai_daily_generation_limit} / day, {aiDraftingSettings.ai_monthly_generation_limit} / month · <strong>Platform:</strong> {aiDraftingSettings.ai_global_daily_generation_limit} / day</p><p className="mt-1"><strong>Today:</strong> {aiDraftingSettings.today.attempts_started} attempted ({aiDraftingSettings.today.succeeded} succeeded, {aiDraftingSettings.today.failed} failed) · {aiDraftingSettings.today.global_attempts_started} of {aiDraftingSettings.ai_global_daily_generation_limit} platform attempts used</p><p className="mt-1"><strong>This month, all accounts:</strong> {aiDraftingSettings.this_month.attempts_started} attempts</p></div>
+          <form onSubmit={saveAiDraftingSettings} className="mt-4 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_minmax(8rem,12rem)_1fr_auto] sm:items-end">
+            <label className="block text-xs font-semibold text-slate-700">Draft attempts per day<input aria-label="AI drafting attempts per UTC day" type="number" min={1} max={5} step={1} value={aiDailyLimitInput} onChange={(event) => setAiDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <label className="block text-xs font-semibold text-slate-700">Platform attempts per day<input aria-label="Platform AI drafting attempts per UTC day" type="number" min={1} max={5000} step={1} value={aiGlobalDailyLimitInput} onChange={(event) => setAiGlobalDailyLimitInput(event.target.value)} disabled={aiSettingsLoading} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <label className="block text-xs font-semibold text-slate-700">Reason for change<input value={aiSettingsReason} onChange={(event) => setAiSettingsReason(event.target.value)} minLength={8} maxLength={500} placeholder="For example: reduce provider spend during testing" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label>
+            <button type="submit" disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings || !Number.isInteger(Number(aiDailyLimitInput)) || Number(aiDailyLimitInput) < 1 || Number(aiDailyLimitInput) > 5 || !Number.isInteger(Number(aiGlobalDailyLimitInput)) || Number(aiGlobalDailyLimitInput) < 1 || Number(aiGlobalDailyLimitInput) > 5000 || aiSettingsReason.trim().length < 8} className="rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "ai-drafting-settings" ? "Saving…" : "Save AI limits"}</button>
+          </form>
+          <div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => void setAiDraftingEnabled(false)} disabled={busy !== "" || aiSettingsLoading || !aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">Pause cloud drafting</button><button type="button" onClick={() => void setAiDraftingEnabled(true)} disabled={busy !== "" || aiSettingsLoading || aiDraftingSettings.ai_drafting_enabled || aiSettingsReason.trim().length < 8} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">Resume cloud drafting</button></div>
+          <p className="mt-2 text-xs text-slate-500">Allowed ranges: 1–5 attempts per account and 1–5,000 platform attempts per UTC day. Changes and pause/resume actions are recorded in the admin audit log. Failed provider calls count toward both limits.</p>
+        </>}
+        {aiSettingsLoading && !aiDraftingSettings && <p className="mt-3 text-sm text-slate-500">Loading AI drafting settings…</p>}
+      </section>
+
+        <AiMatchMetricsPanel language={language} active={activeTab === "ai"} />
       </div>}
 
       <div id="cron-panel" role="tabpanel" aria-labelledby="admin-tab-cron" tabIndex={0} hidden={activeTab !== "cron"} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-600">
