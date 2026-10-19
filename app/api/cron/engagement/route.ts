@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 export const GET = withApiFailureMetrics("/api/cron/engagement", async (request: Request) => {
   if (!getCronCredential(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  const address = process.env.ENGAGEMENT_POSTAL_ADDRESS?.trim();
+  const address = process.env.ENGAGEMENT_POSTAL_ADDRESS?.trim() ?? "";
   if (!process.env.RESEND_API_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ error: "Engagement email service is not configured." }, { status: 503 });
   }
