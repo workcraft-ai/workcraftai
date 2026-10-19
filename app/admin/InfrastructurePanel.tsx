@@ -14,10 +14,9 @@ type Snapshot = {
 };
 
 const MB = 1024 * 1024;
-const GB = 1024 * MB;
 
 function quantity(value: number, unit: string) {
-  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value)} ${unit}`;
+  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value)}${unit ? ` ${unit}` : ""}`;
 }
 
 function Meter({ label, used, limit, unit, note, es }: { label: string; used: number | null; limit: number | null; unit?: string; note?: string; es: boolean }) {
@@ -27,7 +26,7 @@ function Meter({ label, used, limit, unit, note, es }: { label: string; used: nu
   return <div className="rounded-xl border border-slate-200 bg-white p-4">
     <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="text-sm font-semibold text-slate-900">{label}</p><p className="text-sm font-bold tabular-nums text-slate-950">{used === null ? (es ? "No disponible" : "Unavailable") : quantity(used, unit ?? "")} {limit !== null && <span className="font-normal text-slate-600">/ {quantity(limit, unit ?? "")}</span>}</p></div>
     {percent !== null && <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="meter" aria-label={label} aria-valuenow={used ?? undefined} aria-valuemin={0} aria-valuemax={limit ?? undefined}><div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} /></div>}
-    {percent !== null && <p className="mt-1 text-xs font-semibold text-slate-600">{percent}% {es ? "utilizado" : "used"}{percent >= 85 ? ` · ${es ? "revisar ahora" : "review now"}` : percent >= 70 ? ` · ${es ? "vigilar" : "watch"}` : ""}</p>}
+    {percent !== null && <p className="mt-1 text-xs font-semibold text-slate-600">{percent === 0 && used !== null && used > 0 ? "<1" : percent}% {es ? "utilizado" : "used"}{percent >= 85 ? ` · ${es ? "revisar ahora" : "review now"}` : percent >= 70 ? ` · ${es ? "vigilar" : "watch"}` : ""}</p>}
     {note && <p className="mt-2 text-xs leading-5 text-slate-600">{note}</p>}
   </div>;
 }
@@ -76,7 +75,7 @@ export default function InfrastructurePanel({ language, active }: { language: "e
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <Provider title="Supabase" kind="app" href="https://supabase.com/dashboard/org/_/usage" es={es}>
           <Meter label={es ? "Base de datos de Production" : "Production database"} used={snapshot.supabase ? Number(snapshot.supabase.database_bytes) / MB : null} limit={500} unit="MB" note={es ? "Medición de PostgreSQL. 500 MB es la referencia del plan Free por proyecto; el panel de Supabase confirma el plan y la facturación." : "PostgreSQL measurement. 500 MB is the Free reference per project; Supabase confirms the actual plan and billing."} es={es} />
-          <Meter label={es ? "Archivos almacenados" : "Stored file payloads"} used={snapshot.supabase ? Number(snapshot.supabase.storage_payload_bytes) / GB : null} limit={1} unit="GB" note={es ? "Suma aproximada de los archivos de Production; la facturación de Storage usa GB-horas y puede diferir. Free incluye 1 GB." : "Approximate Production file payload total; Storage billing uses GB-hours and can differ. Free includes 1 GB."} es={es} />
+          <Meter label={es ? "Archivos almacenados" : "Stored file payloads"} used={snapshot.supabase ? Number(snapshot.supabase.storage_payload_bytes) / MB : null} limit={1024} unit="MB" note={es ? "Suma aproximada de los archivos de Production; la facturación de Storage usa GB-horas y puede diferir. Free incluye 1 GB." : "Approximate Production file payload total; Storage billing uses GB-hours and can differ. Free includes 1 GB."} es={es} />
           <Meter label={es ? "Conexiones de base de datos" : "Database connections"} used={snapshot.connections?.connections ?? null} limit={snapshot.connections?.max_connections ?? null} es={es} />
           <p className="text-xs text-slate-600">{es ? "Archivos:" : "Objects:"} {snapshot.supabase?.storage_objects ?? "—"}. {es ? "Consulta también MAU y transferencia en Supabase Usage; no son equivalentes a las cuentas creadas." : "Check MAU and egress in Supabase Usage too; created accounts are not the same as billable MAU."}</p>
           <p className="text-xs text-slate-600">{es ? "Referencia Free: 50 000 MAU y 5 GB de transferencia mensual. Uso actual: consulta el panel." : "Free reference: 50,000 MAU and 5 GB monthly egress. Current usage: check the dashboard."}</p>
