@@ -18,22 +18,27 @@ export default function EngagementEmailsPanel({ language, active }: { language: 
   const es = language === "es";
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     if (!active) return;
-    let canceled = false;
-    fetch("/api/admin/engagement", { cache: "no-store" })
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    fetch("/api/admin/engagement", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("load_failed");
         return response.json() as Promise<Snapshot>;
       })
-      .then((result) => { if (!canceled) { setData(result); setError(""); } })
-      .catch(() => { if (!canceled) setError(es ? "No se pudo cargar el historial de correos." : "Email history could not load."); });
-    return () => { canceled = true; };
+      .then((result) => { if (!controller.signal.aborted) { setData(result); setUpdatedAt(new Date()); } })
+      .catch(() => { if (!controller.signal.aborted) setError(es ? "No se pudo cargar el historial de correos." : "Email history could not load."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [active, es, revision]);
 
   return <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-950">{es ? "Correos de seguimiento" : "Engagement emails"}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{es ? "La bienvenida se gestiona por separado. Aquí se muestran los correos de ayuda y regreso de los últimos 90 días. Las acciones observadas no prueban que el correo las haya causado." : "Welcome remains separate. This shows getting-started and return emails from the last 90 days. Observed actions do not prove that an email caused them."}</p></div><button type="button" onClick={() => setRevision((value) => value + 1)} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">{es ? "Actualizar" : "Refresh"}</button></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-950">{es ? "Correos de seguimiento" : "Engagement emails"}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{es ? "La bienvenida se gestiona por separado. Aquí se muestran los correos de ayuda y regreso de los últimos 90 días. Las acciones observadas no prueban que el correo las haya causado." : "Welcome remains separate. This shows getting-started and return emails from the last 90 days. Observed actions do not prove that an email caused them."}</p><p className="mt-1 text-xs leading-5 text-slate-600">{es ? "Se cuentan solo los correos enviados por la secuencia de la aplicación; las vistas previas enviadas directamente para revisión no aparecen aquí." : "Only emails sent by the app sequence are counted; previews sent directly for review do not appear here."}</p><p role="status" aria-live="polite" className="mt-2 text-xs text-slate-600">{loading ? (es ? "Actualizando…" : "Refreshing…") : updatedAt ? `${es ? "Actualizado" : "Updated"}: ${updatedAt.toLocaleString(es ? "es" : "en")}` : ""}</p></div><button type="button" onClick={() => setRevision((value) => value + 1)} disabled={loading} className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60">{loading ? (es ? "Actualizando…" : "Refreshing…") : (es ? "Actualizar" : "Refresh")}</button></div>
     {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!data && !error && <p role="status" className="mt-4 text-sm text-slate-600">{es ? "Cargando…" : "Loading…"}</p>}
     {data && <>
