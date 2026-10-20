@@ -19,12 +19,37 @@ type CustomerContact = {
 type ContactForm = Omit<CustomerContact, "id">;
 
 const emptyForm: ContactForm = { name: "", email: "", phone: "", job_address: "" };
+const mapsEmbedKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY;
+
+function CustomerMap({ address, language }: { address: string; language: "en" | "es" }) {
+  const [appleDevice, setAppleDevice] = useState(false);
+  useEffect(() => {
+    setAppleDevice(/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent));
+  }, []);
+
+  const destination = encodeURIComponent(address.trim());
+  const directionsUrl = appleDevice
+    ? `https://maps.apple.com/?daddr=${destination}&dirflg=d`
+    : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving&dir_action=navigate`;
+  const previewUrl = mapsEmbedKey
+    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(mapsEmbedKey)}&q=${destination}`
+    : null;
+
+  return <div className="space-y-2">
+    <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="group relative block aspect-square w-full max-w-80 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" aria-label={language === "es" ? `Abrir indicaciones a ${address}` : `Open directions to ${address}`}>
+      {previewUrl ? <iframe src={previewUrl} title={language === "es" ? `Vista previa del mapa de ${address}` : `Map preview of ${address}`} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" tabIndex={-1} aria-hidden="true" className="pointer-events-none h-full w-full border-0" /> : <span className="flex h-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-slate-100 to-blue-100 px-5 text-center text-slate-700"><span aria-hidden="true" className="text-5xl">⌖</span><span className="text-sm font-semibold">{language === "es" ? "Vista previa del mapa no configurada" : "Map preview not configured"}</span></span>}
+      <span className="absolute bottom-3 left-3 right-3 rounded-lg bg-white/95 px-3 py-2 text-center text-sm font-semibold text-slate-900 shadow-sm group-hover:bg-white">{language === "es" ? "Abrir indicaciones ↗" : "Open directions ↗"}</span>
+    </a>
+    <p className="max-w-80 text-xs text-slate-600">{language === "es" ? "Confirma la dirección antes de iniciar el viaje." : "Confirm the address before starting your trip."}</p>
+  </div>;
+}
 
 export default function CustomersPage() {
   const { language } = useLanguage();
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [form, setForm] = useState<ContactForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [openContactId, setOpenContactId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -128,6 +153,7 @@ export default function CustomersPage() {
     if (deleteError) setError("Could not delete this customer. Please try again.");
     else {
       if (editingId === contact.id) resetForm();
+      if (openContactId === contact.id) setOpenContactId(null);
       setNotice("Customer deleted. Existing estimates are unchanged.");
       await loadContacts();
     }
@@ -186,17 +212,30 @@ export default function CustomersPage() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {visibleContacts.map((contact) => (
-                  <article key={contact.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold">{contact.name}</h3>
-                      {contact.email && <p className="break-all text-sm text-slate-600">{contact.email}</p>}
-                      {contact.phone && <p className="text-sm text-slate-600">{contact.phone}</p>}
-                      {contact.job_address && <p className="text-sm text-slate-600">{contact.job_address}</p>}
+                  <article key={contact.id} className="px-5 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold">{contact.name}</h3>
+                        {contact.email && <p className="break-all text-sm text-slate-600">{contact.email}</p>}
+                        {contact.phone && <p className="text-sm text-slate-600">{contact.phone}</p>}
+                        {contact.job_address && <p className="text-sm text-slate-600">{contact.job_address}</p>}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" aria-expanded={openContactId === contact.id} onClick={() => setOpenContactId((current) => current === contact.id ? null : contact.id)} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{openContactId === contact.id ? (language === "es" ? "Ocultar perfil" : "Hide profile") : (language === "es" ? "Ver perfil" : "View profile")}</button>
+                        <button type="button" onClick={() => editContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
+                        <button type="button" onClick={() => void deleteContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => editContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</button>
-                      <button type="button" onClick={() => void deleteContact(contact)} className="inline-flex min-h-12 items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button>
-                    </div>
+                    {openContactId === contact.id && <div className="mt-5 grid gap-5 border-t border-slate-100 pt-5 sm:grid-cols-[minmax(0,1fr)_minmax(220px,320px)]">
+                      <div className="space-y-2 text-sm">
+                        <h4 className="font-semibold text-slate-900">{language === "es" ? "Perfil del cliente" : "Customer profile"}</h4>
+                        <p className="text-slate-700">{contact.name}</p>
+                        {contact.email && <a href={`mailto:${contact.email}`} className="block break-all font-medium text-blue-700 underline">{contact.email}</a>}
+                        {contact.phone && <a href={`tel:${contact.phone}`} className="block font-medium text-blue-700 underline">{contact.phone}</a>}
+                        <p className="text-slate-700">{contact.job_address || (language === "es" ? "Agrega una dirección de servicio para ver el mapa y las indicaciones." : "Add a service address to see the map and directions.")}</p>
+                      </div>
+                      {contact.job_address?.trim() && <CustomerMap address={contact.job_address} language={language} />}
+                    </div>}
                   </article>
                 ))}
               </div>
