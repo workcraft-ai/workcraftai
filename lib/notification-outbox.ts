@@ -56,7 +56,8 @@ export async function processNotifications(admin:SupabaseClient, ids?:string[], 
   await Promise.all(rows.slice(offset,offset+4).map(async row=>{
    let quota:unknown;
    try{
-    if(row.source==="auth"&&Date.now()-new Date(row.created_at).getTime()>10*60000){await retry(row,"auth_link_expired",true);results.push({id:row.id,sent:false});return;}
+    // Auth links expire quickly; MFA recovery notices have no link and must remain retryable.
+    if(row.source==="auth"&&!row.send_key.startsWith("mfa-recovery-notice-")&&Date.now()-new Date(row.created_at).getTime()>10*60000){await retry(row,"auth_link_expired",true);results.push({id:row.id,sent:false});return;}
     if(row.source==="engagement"){
      const {data:allowed,error:eligibilityError}=await admin.rpc("workcraft_engagement_send_allowed",{p_outbox_id:row.id});
      if(eligibilityError)throw new Error("engagement_eligibility");

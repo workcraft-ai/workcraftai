@@ -27,6 +27,8 @@ type Account = {
 type AccountDetail = {
   account: { id: string; email: string; business_name: string; created_at: string; last_sign_in_at: string | null; last_active_at: string | null; deletion_status: "active" | "pending_deletion" | "deleting"; deletion_notice_sent_at: string | null; deletion_due_at: string | null; is_admin: boolean; email_confirmed_at: string | null; status: string; current_period_end: string | null; banned_until: string | null; has_stripe_subscription: boolean; subscription_updated_at: string | null; active_pro_grant: ProGrant | null };
   ai_usage: { daily_date: string; daily_used: number; daily_limit: number; monthly_month: string; monthly_used: number; monthly_limit: number } | null;
+  mfa_factors: { id: string; friendly_name: string | null; factor_type: string; status: string }[];
+  mfa_factors_unavailable: boolean;
   pro_grants: ProGrant[];
   notes: { id: string; note: string; category: string; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
   audit: { id: string; action: string; reason: string; outcome: string; details: Record<string, unknown>; created_at: string; actor_user_id: string | null; actor_email: string | null }[];
@@ -101,6 +103,11 @@ export default function AdminPage() {
   const [noteCategory, setNoteCategory] = useState("support");
   const [noteReason, setNoteReason] = useState("");
   const [recoveryReason, setRecoveryReason] = useState("");
+  const [mfaRecoveryReason, setMfaRecoveryReason] = useState("");
+  const [mfaVerificationMethod, setMfaVerificationMethod] = useState("");
+  const [mfaVerificationDetails, setMfaVerificationDetails] = useState("");
+  const [recoveryFactorId, setMfaRecoveryFactorId] = useState("");
+  const [mfaConfirmEmail, setMfaConfirmEmail] = useState("");
   const [couponId, setCouponId] = useState("");
   const [billingReason, setBillingReason] = useState("");
   const [proGrantType, setProGrantType] = useState<"temporary" | "permanent">("temporary");
@@ -138,6 +145,11 @@ export default function AdminPage() {
     setDeletionReason("");
     setRetentionReason("");
     setAiUsageResetReason("");
+    setMfaRecoveryReason("");
+    setMfaVerificationMethod("");
+    setMfaVerificationDetails("");
+    setMfaRecoveryFactorId("");
+    setMfaConfirmEmail("");
     try {
       setDetail(await requestJson(`/api/admin/accounts/${encodeURIComponent(id)}`));
     } catch (cause) {
@@ -375,6 +387,32 @@ export default function AdminPage() {
     if (!selectedId || !recoveryReason.trim()) return;
     if (!window.confirm(`Send a password recovery email to ${detail?.account.email}?`)) return;
     void runAction("recovery", `/api/admin/accounts/${encodeURIComponent(selectedId)}/reset-password`, { reason: recoveryReason }, "Recovery email requested.").then((sent) => { if (sent) setRecoveryReason(""); });
+  };
+
+  const resetMfaFactor = (event: FormEvent) => {
+    event.preventDefault();
+    if (!detail || !selectedId || !recoveryFactorId || mfaRecoveryReason.trim().length < 8
+      || mfaVerificationDetails.trim().length < 12
+      || mfaConfirmEmail.trim().toLowerCase() !== detail.account.email.toLowerCase()) return;
+    const message = language === "es"
+      ? `¿Quitar el autenticador seleccionado de ${detail.account.email}? Se cerrarán sus sesiones activas.`
+      : `Remove the selected authenticator from ${detail.account.email}? Their active sessions will be signed out.`;
+    if (!window.confirm(message)) return;
+    void runAction("mfa-recovery", `/api/admin/accounts/${encodeURIComponent(selectedId)}/mfa-recovery`, {
+      factor_id: recoveryFactorId,
+      confirm_email: mfaConfirmEmail,
+      reason: mfaRecoveryReason,
+      verification_method: mfaVerificationMethod,
+      verification_details: mfaVerificationDetails,
+    }, "Authenticator removed.").then((done) => {
+      if (done) {
+        setMfaRecoveryReason("");
+        setMfaVerificationMethod("");
+        setMfaVerificationDetails("");
+        setMfaRecoveryFactorId("");
+        setMfaConfirmEmail("");
+      }
+    });
   };
 
   const resetAccountAiUsage = () => {
@@ -819,6 +857,22 @@ export default function AdminPage() {
           {detail.account.deletion_status === "deleting" && <p role="status" className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">An account deletion is currently being processed.</p>}
 
           <div className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Password assistance</h3><p className="mt-1 text-xs leading-5 text-slate-600">Sends a Supabase recovery email. You cannot view or set the customer’s existing password.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Reason for support action<input value={recoveryReason} onChange={(event) => setRecoveryReason(event.target.value)} maxLength={500} placeholder="For example: customer requested account access help" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="button" onClick={sendRecovery} disabled={busy !== "" || recoveryReason.trim().length < 8} className="mt-3 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "recovery" ? "Sending…" : "Send password recovery email"}</button></div>
+
+          {role === "super_admin" && <section className="border-t border-slate-100 pt-4" aria-labelledby="mfa-recovery-heading">
+            <h3 id="mfa-recovery-heading" className="font-bold text-slate-900">{language === "es" ? "Recuperación de autenticador" : "Authenticator recovery"}</h3>
+            {detail.account.is_admin ? <p className="mt-2 text-sm text-slate-600">{language === "es" ? "Las cuentas administrativas requieren un proceso de recuperación separado." : "Administrator accounts require a separate recovery process."}</p>
+              : detail.mfa_factors_unavailable ? <p role="alert" className="mt-2 text-sm text-red-800">{language === "es" ? "No se pudieron cargar los autenticadores. Vuelve a abrir la cuenta." : "Authenticators could not be loaded. Reopen the account."}</p>
+              : (detail.mfa_factors ?? []).length === 0 ? <p className="mt-2 text-sm text-slate-600">{language === "es" ? "Esta cuenta no tiene autenticadores activos." : "This account has no active authenticators."}</p>
+              : <form onSubmit={resetMfaFactor} className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm leading-6 text-amber-950">{language === "es" ? "Úsalo solo si la persona perdió todos sus autenticadores. Verifica su identidad por otro medio antes de continuar. Se cerrarán sus sesiones y se le enviará un aviso de seguridad." : "Use this only when the owner has lost access to every authenticator. Independently verify their identity first. Their sessions will be signed out and a security notice sent."}</p>
+                <label className="block text-xs font-semibold text-slate-800">{language === "es" ? "Autenticador que se quitará" : "Authenticator to remove"}<select required value={recoveryFactorId} onChange={(event) => setMfaRecoveryFactorId(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="">{language === "es" ? "Seleccionar" : "Select a factor"}</option>{detail.mfa_factors.map((factor) => <option key={factor.id} value={factor.id}>{factor.friendly_name || factor.factor_type} · {factor.id.slice(0, 8)}</option>)}</select></label>
+                <label className="block text-xs font-semibold text-slate-800">{language === "es" ? "Cómo verificaste su identidad" : "How you verified the owner"}<select required value={mfaVerificationMethod} onChange={(event) => setMfaVerificationMethod(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal"><option value="">{language === "es" ? "Seleccionar" : "Select a method"}</option><option value="registered_phone_callback">{language === "es" ? "Devolución de llamada al número registrado" : "Callback to the phone on file"}</option><option value="business_records">{language === "es" ? "Datos comerciales existentes verificados" : "Verified existing business records"}</option></select></label>
+                <label className="block text-xs font-semibold text-slate-800">{language === "es" ? "Detalles de la verificación (sin contraseñas ni códigos)" : "Verification details (no passwords or codes)"}<textarea required value={mfaVerificationDetails} onChange={(event) => setMfaVerificationDetails(event.target.value)} minLength={12} maxLength={500} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+                <label className="block text-xs font-semibold text-slate-800">{language === "es" ? "Motivo de recuperación" : "Recovery reason"}<input required value={mfaRecoveryReason} onChange={(event) => setMfaRecoveryReason(event.target.value)} minLength={8} maxLength={500} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+                <label className="block text-xs font-semibold text-slate-800">{language === "es" ? "Escribe el correo de la cuenta para confirmar" : "Type the account email to confirm"}<input required type="email" autoComplete="off" value={mfaConfirmEmail} onChange={(event) => setMfaConfirmEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" /></label>
+                <button type="submit" disabled={busy !== "" || !recoveryFactorId || !mfaVerificationMethod || mfaVerificationDetails.trim().length < 12 || mfaRecoveryReason.trim().length < 8 || mfaConfirmEmail.trim().toLowerCase() !== detail.account.email.toLowerCase()} className="min-h-11 rounded-lg bg-amber-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy === "mfa-recovery" ? (language === "es" ? "Quitando…" : "Removing…") : (language === "es" ? "Quitar autenticador" : "Remove authenticator")}</button>
+              </form>}
+          </section>}
 
           {role !== "support" && <form onSubmit={applyCoupon} className="border-t border-slate-100 pt-4"><h3 className="font-bold text-slate-900">Temporary subscription discount</h3><p className="mt-1 text-xs leading-5 text-slate-600">Apply an existing Stripe 100% off coupon lasting once or up to 3 months. Create the coupon in Stripe first.</p><label className="mt-3 block text-xs font-semibold text-slate-700">Stripe coupon ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} maxLength={120} placeholder="e.g. support_one_month" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><label className="mt-3 block text-xs font-semibold text-slate-700">Reason<input value={billingReason} onChange={(event) => setBillingReason(event.target.value)} maxLength={500} placeholder="Service issue and agreed credit" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-normal" /></label><button type="submit" disabled={busy !== "" || couponId.trim().length < 3 || billingReason.trim().length < 8 || !detail.account.has_stripe_subscription || !["active", "trialing"].includes(detail.account.status)} className="mt-3 rounded-lg bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy === "billing" ? "Applying…" : "Apply Stripe coupon"}</button><p className="mt-2 text-xs text-slate-500">Billing action is recorded in the admin audit log.</p></form>}
 
