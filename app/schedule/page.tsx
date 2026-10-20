@@ -40,6 +40,16 @@ const statusLabels: Record<JobStatus, string> = {
   cancelled: "Cancelled",
 };
 
+function DirectionsLinks({ address, language }: { address: string; language: "en" | "es" }) {
+  const destination = encodeURIComponent(address.trim());
+  if (!destination) return null;
+
+  return <div className="mt-3 flex flex-wrap gap-2">
+    <a href={`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving&dir_action=navigate`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={language === "es" ? `Indicaciones a ${address} en Google Maps` : `Directions to ${address} in Google Maps`}>Google Maps ↗</a>
+    <a href={`https://maps.apple.com/?daddr=${destination}&dirflg=d`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label={language === "es" ? `Indicaciones a ${address} en Apple Maps` : `Directions to ${address} in Apple Maps`}>Apple Maps ↗</a>
+  </div>;
+}
+
 export default function SchedulePage() {
   const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { language } = useLanguage();
@@ -202,6 +212,15 @@ export default function SchedulePage() {
   const activeCount = jobs.filter((job) => job.status === "scheduled" || job.status === "in_progress").length;
   const today = new Date().toDateString();
   const todayCount = jobs.filter((job) => job.scheduled_at && new Date(job.scheduled_at).toDateString() === today && job.status !== "cancelled").length;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const nextJob = jobs
+    .filter((job) => job.job_address?.trim() && (job.status === "in_progress" || (job.status === "scheduled" && job.scheduled_at && new Date(job.scheduled_at) >= startOfToday)))
+    .sort((a, b) => {
+      if (a.status === "in_progress" && b.status !== "in_progress") return -1;
+      if (b.status === "in_progress" && a.status !== "in_progress") return 1;
+      return (a.scheduled_at || "9999").localeCompare(b.scheduled_at || "9999");
+    })[0];
 
   return (
     <LocalizedTree>
@@ -229,6 +248,14 @@ export default function SchedulePage() {
           <Metric label="On the schedule today" value={String(todayCount)} />
           <Metric label="Completed jobs" value={String(jobs.filter((job) => job.status === "completed").length)} />
         </section>
+
+        {nextJob && <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm" aria-labelledby="next-job-heading">
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-800">{language === "es" ? "Próximo destino" : "Next destination"}</p>
+          <h2 id="next-job-heading" className="mt-1 text-lg font-semibold text-slate-900">{nextJob.title}</h2>
+          <p className="mt-1 text-sm text-slate-700">{nextJob.client_name ? `${nextJob.client_name} · ` : ""}{nextJob.job_address}</p>
+          <p className="mt-1 text-sm text-slate-600">{nextJob.status === "in_progress" ? (language === "es" ? "En curso" : "In progress") : nextJob.scheduled_at ? new Date(nextJob.scheduled_at).toLocaleString(locale) : ""}</p>
+          <DirectionsLinks address={nextJob.job_address} language={language} />
+        </section>}
 
         {showForm && (
           <form onSubmit={createJob} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -263,6 +290,7 @@ export default function SchedulePage() {
                     <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{job.title}</h3><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{statusLabels[job.status]}</span></div>
                     <p className="mt-1 text-sm text-slate-600">{job.client_name || "No customer"}{job.job_address ? ` · ${job.job_address}` : ""}</p>
                     <p className="mt-1 text-xs text-slate-500">{job.scheduled_at ? new Date(job.scheduled_at).toLocaleString(locale) : "No date set"}{job.quoted_total ? ` · ${new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(Number(job.quoted_total))}` : ""}</p>
+                    {job.job_address?.trim() && <DirectionsLinks address={job.job_address} language={language} />}
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600" title={`${language === "es" ? "Zona horaria" : "Time zone"}: ${localTimeZone}`}>{language === "es" ? "Reprogramar" : "Reschedule"} ({localTimeZone})<input type="datetime-local" defaultValue={toLocalDateTimeInput(job.scheduled_at)} onBlur={(event) => { const value = event.target.value; if (value !== toLocalDateTimeInput(job.scheduled_at)) void updateSchedule(job.id, value); }} className="min-h-12 rounded-md border border-slate-300 bg-white px-2 py-2 text-xs" /></label>
                     {job.notes && <p className="mt-2 text-sm text-slate-600">{job.notes}</p>}
                     <label className="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-slate-600">Actual job cost<input type="number" min="0" step="0.01" defaultValue={Number(job.actual_cost || 0)} onBlur={(event) => { if (Number(event.target.value) !== Number(job.actual_cost || 0)) void updateActualCost(job.id, event.target.value); }} className="w-28 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs" /></label>
