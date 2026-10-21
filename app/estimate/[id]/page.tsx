@@ -408,6 +408,11 @@ export default function ClientEstimatePage() {
             {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && (ownerHasPro
               ? <button type="button" disabled={creatingInvoice} onClick={() => void createOrOpenInvoice()} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60">{creatingInvoice ? "Creating invoice…" : invoiceJobId ? "View invoice" : "Create invoice"}</button>
               : <div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-orange-100">Invoice creation is included with Pro:</span><ProPlanAction className="inline-flex min-h-10 items-center rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-100 hover:bg-slate-800" /> </div>)}
+            {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && ownerHasPro && (
+              <button type="button" onClick={() => router.push(wasConverted ? "/schedule" : `/schedule?estimate=${encodeURIComponent(id)}`)} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors">
+                {wasConverted ? "View scheduled job" : "Schedule job"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => router.push(`/estimate/${id}/edit`)}
@@ -617,7 +622,6 @@ export default function ClientEstimatePage() {
               ✓ {estimate.accepted_at || estimate.signature_name
                 ? "Your approval has been recorded. The contractor will contact you about payment and next steps."
                 : "The contractor marked this estimate as accepted. Contact them about payment and next steps."}
-              {isOwner && (wasConverted ? <p className="mt-2 text-xs font-medium">This estimate has already been added to your job schedule.</p> : <button type="button" onClick={() => router.push(`/schedule?estimate=${encodeURIComponent(id)}`)} className="mt-3 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white">Schedule this approved job</button>)}
               {paymentSummary.available && paymentSummary.totalCents > paymentSummary.amountPaidCents && <div className="mt-4 border-t border-green-200 pt-4 text-left">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>Paid so far</span><strong>${(paymentSummary.amountPaidCents / 100).toFixed(2)}</strong></div>
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs"><span>Remaining balance</span><strong>${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}</strong></div>
