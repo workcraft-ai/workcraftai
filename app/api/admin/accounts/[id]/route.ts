@@ -8,7 +8,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: userData, error: userError } = await access.admin.auth.admin.getUserById(id);
   if (userError || !userData.user) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
-  const [{ data: subscription, error: subscriptionError }, { data: notes, error: notesError }, { data: audit, error: auditError }, { data: questions, error: questionsError }, { data: emails, error: emailsError }, { data: lifecycle, error: lifecycleError }, { data: adminMembership, error: adminError }, { data: proGrants, error: proGrantsError }] = await Promise.all([
+  const [{ data: subscription, error: subscriptionError }, { data: notes, error: notesError }, { data: audit, error: auditError }, { data: questions, error: questionsError }, { data: emails, error: emailsError }, { data: lifecycle, error: lifecycleError }, { data: adminMembership, error: adminError }, { data: proGrants, error: proGrantsError }, factorsResult] = await Promise.all([
     access.admin.from("subscriptions").select("status, current_period_end, stripe_customer_id, stripe_subscription_id, updated_at").eq("user_id", id).maybeSingle(),
     access.admin.from("tradeflow_support_notes").select("id, note, category, created_at, actor_user_id, actor_email").eq("target_user_id", id).order("created_at", { ascending: false }).limit(50),
     access.admin.from("tradeflow_admin_audit_log").select("id, action, reason, outcome, details, created_at, actor_user_id, actor_email").eq("target_user_id", id).order("created_at", { ascending: false }).limit(50),
@@ -20,11 +20,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ? Promise.resolve({ data: [], error: null })
       : access.admin.from("tradeflow_pro_access_grants").select("id, grant_type, reason, created_at, starts_at, expires_at, revoked_at")
         .eq("user_id", id).order("created_at", { ascending: false }).limit(20),
+    access.role === "super_admin"
+      ? access.admin.auth.admin.mfa.listFactors({ userId: id })
+      : Promise.resolve({ data: { factors: [] }, error: null }),
   ]);
   if (subscriptionError || notesError || auditError || questionsError || emailsError || lifecycleError || adminError || proGrantsError) {
     console.error("Admin account detail lookup failed:", subscriptionError?.message ?? notesError?.message ?? auditError?.message ?? questionsError?.message ?? emailsError?.message ?? lifecycleError?.message ?? adminError?.message ?? proGrantsError?.message);
     return NextResponse.json({ error: "Could not load account support history." }, { status: 502 });
   }
+  if (factorsResult.error) console.error("Admin MFA factor lookup failed:", factorsResult.error.message);
   let aiUsage: { daily_date: string; daily_used: number; daily_limit: number; monthly_month: string; monthly_used: number; monthly_limit: number } | null = null;
   if (access.role === "super_admin") {
     const today = new Date().toISOString().slice(0, 10);
@@ -77,6 +81,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       active_pro_grant: activeProGrant,
     },
     ai_usage: aiUsage,
+    mfa_factors: (factorsResult.data?.factors ?? []).filter((factor) => factor.status === "verified").map((factor) => ({
+      id: factor.id, friendly_name: factor.friendly_name ?? null, factor_type: factor.factor_type, status: factor.status,
+    })),
+    mfa_factors_unavailable: Boolean(factorsResult.error),
     pro_grants: proGrantHistory,
     notes: notes ?? [],
     audit: audit ?? [],

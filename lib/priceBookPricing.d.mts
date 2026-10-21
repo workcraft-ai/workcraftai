@@ -6,6 +6,8 @@ export type PriceBookRate = {
   unit: string;
   unit_price: number;
   pricing_basis?: string;
+  aliases?: string[];
+  learned_aliases?: string[];
 };
 
 export type DraftLine = { description: string; quantity: number; unit?: string; unit_price: number; pricing_basis?: string };
@@ -20,5 +22,6 @@ export function applyPriceBookRates<T extends DraftLine>(
   matchedCount: number;
   unmatchedCount: number;
   matchedIndexes: number[];
+  matchedItemsByIndex: Record<number, PriceBookRate>;
   suggestionsByIndex: Record<number, Array<PriceBookRate & { match_score: number }>>;
 };

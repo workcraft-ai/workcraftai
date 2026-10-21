@@ -5,7 +5,6 @@ import Link from "next/link";
 import { readAllPages } from "@/lib/read-all-pages";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
 import { estimateDraftReviewNotes } from "@/lib/estimateDraftReview.mjs";
 import { isEstimateQuotaLimitError } from "@/lib/free-estimate-limit.mjs";
 import { clearOfflineEstimateDraft, loadOfflineEstimateDraft, saveOfflineEstimateDraft } from "@/lib/offlineEstimateDraft";
@@ -25,7 +24,7 @@ interface LineItemInput {
   unit?: string;
   unit_price: number;
   pricing_basis?: string;
-  pricing_source?: "price_book" | "ai_suggested" | "unpriced" | "manual" | "contractor_provided";
+  pricing_source?: "price_book" | "price_book_choice" | "ai_suggested" | "unpriced" | "manual" | "contractor_provided";
   quantity_source?: "ai_estimated";
   pricing_assumption?: string;
   pricing_assumption_es?: string;
@@ -33,6 +32,14 @@ interface LineItemInput {
   review_note_es?: string;
   review_notes?: string[];
   price_book_suggestions?: PriceBookSuggestion[];
+  ai_starting_unit_price?: number;
+  ai_generation_id?: string;
+  ai_line_index?: number;
+  ai_original_description?: string;
+  ai_original_quantity?: number;
+  ai_original_unit_price?: number;
+  matched_price_book_item_id?: string | null;
+  matched_price_book_name?: string | null;
 }
 
 interface PriceBookItem {
@@ -388,15 +395,12 @@ export default function CreateEstimatePage() {
       }
 
       if (!Array.isArray(data.line_items) || data.line_items.length === 0) throw new Error("No usable line items were returned.");
-      const priced = applyPriceBookRates(data.line_items, priceBookItems, trade);
-      const priceBookMatches = new Set<number>(priced.matchedIndexes);
       const generatedScopeContext = promptText;
-      const draftLines = priced.lines.map((item: LineItemInput, index: number) => ({
+      const draftLines = data.line_items.map((item: LineItemInput) => ({
         ...item,
         unit: item.unit || "each",
-        pricing_source: priceBookMatches.has(index) ? "price_book" as const : item.pricing_source === "contractor_provided" ? "manual" as const : Number(item.unit_price) > 0 ? "ai_suggested" as const : "unpriced" as const,
         review_notes: [],
-        price_book_suggestions: priceBookMatches.has(index) ? [] : priced.suggestionsByIndex[index] ?? [],
+        price_book_suggestions: item.price_book_suggestions ?? [],
       }));
       setLineItems(draftLines);
       setReviewPromptContext(generatedScopeContext);
@@ -404,11 +408,11 @@ export default function CreateEstimatePage() {
       setAiRateConfirmationKey("");
       setDraftReviewConfirmationKey("");
       setProposalSummary(typeof data.proposal_summary === "string" ? data.proposal_summary.trim().slice(0, 1200) : "");
-      const aiSuggestionCount = draftLines.filter((item) => item.pricing_source === "ai_suggested").length;
-      const unpricedCount = draftLines.filter((item) => item.pricing_source === "unpriced").length;
+      const aiSuggestionCount = draftLines.filter((item: LineItemInput) => item.pricing_source === "ai_suggested").length;
+      const pendingCount = draftLines.filter((item: LineItemInput) => item.pricing_source === "price_book_choice").length;
       setDraftMessage(language === "es"
-        ? `${priced.matchedCount} partida(s) coincidieron con tu lista de precios; ${aiSuggestionCount} recibieron precios iniciales de IA y ${unpricedCount} aún necesitan precio. Revisa las tarifas antes de compartir. Los precios de IA no son cotizaciones locales en tiempo real.`
-        : `${priced.matchedCount} line(s) matched your Price Book; ${aiSuggestionCount} received AI starting prices and ${unpricedCount} still need a price. Review rates before sharing. AI suggestions are not live local quotes.`);
+        ? `${data.match_counts?.price_book ?? 0} partida(s) usan tu lista de precios; ${pendingCount} necesitan que elijas una coincidencia y ${aiSuggestionCount} tienen precios iniciales de IA. Revisa cada precio antes de compartir.`
+        : `${data.match_counts?.price_book ?? 0} line(s) use your Price Book; ${pendingCount} need you to choose a match and ${aiSuggestionCount} have AI starting prices. Review every rate before sharing.`);
       setPromptText("");
     } catch (err: unknown) {
       void fetch("/api/generate-estimate", { cache: "no-store" }).then(async (response) => {
@@ -457,8 +461,22 @@ export default function CreateEstimatePage() {
       unit_price: Number(suggestion.unit_price),
       pricing_basis: suggestion.pricing_basis ?? item.pricing_basis,
       pricing_source: "price_book",
+      matched_price_book_item_id: suggestion.id ?? null,
+      matched_price_book_name: suggestion.name,
       pricing_assumption: undefined,
       pricing_assumption_es: undefined,
+      price_book_suggestions: [],
+    } : item));
+    setAiRateConfirmationKey("");
+  };
+
+  const applyAiStartingPrice = (lineIndex: number) => {
+    setLineItems((current) => current.map((item, index) => index === lineIndex ? {
+      ...item,
+      unit_price: Number(item.ai_starting_unit_price) || 0,
+      pricing_source: Number(item.ai_starting_unit_price) > 0 ? "ai_suggested" : "unpriced",
+      matched_price_book_item_id: null,
+      matched_price_book_name: null,
       price_book_suggestions: [],
     } : item));
     setAiRateConfirmationKey("");
@@ -493,6 +511,11 @@ export default function CreateEstimatePage() {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
     if (field === "description" || field === "unit") updated[index].price_book_suggestions = [];
+    if (field === "unit_price" || field === "unit") {
+      updated[index].pricing_source = "manual";
+      updated[index].matched_price_book_item_id = null;
+      updated[index].matched_price_book_name = null;
+    }
     if (field === "description" || field === "quantity" || field === "unit") {
       updated[index].review_notes = [];
       updated[index].review_note = undefined;
@@ -511,6 +534,7 @@ export default function CreateEstimatePage() {
   const zeroRateReviewKey = JSON.stringify(lineItems.filter((item) => item.description.trim()).map(({ description, quantity, unit_price }) => [description.trim(), Number(quantity), Number(unit_price)]));
   const zeroRateConfirmed = zeroRateLineItems.length === 0 || zeroRateConfirmationKey === zeroRateReviewKey;
   const aiSuggestedLineItems = lineItems.filter((item) => item.description.trim() && item.pricing_source === "ai_suggested");
+  const pendingPriceBookChoices = lineItems.filter((item) => item.description.trim() && item.pricing_source === "price_book_choice");
   const aiRateReviewKey = JSON.stringify(aiSuggestedLineItems.map(({ description, quantity, unit, unit_price }) => [description.trim(), Number(quantity), unit || "each", Number(unit_price)]));
   const aiRatesConfirmed = aiSuggestedLineItems.length === 0 || aiRateConfirmationKey === aiRateReviewKey;
   const unresolvedUnitLineItems = lineItems.filter((item) => item.description.trim() && /^(unknown|unspecified|n\/a)$/i.test(item.unit?.trim() ?? ""));
@@ -590,6 +614,10 @@ export default function CreateEstimatePage() {
       showValidationError(language === "es" ? "El resumen debe tener 1.200 caracteres o menos." : "The work summary must be 1,200 characters or less.", document.getElementById("proposal-summary"));
       return;
     }
+    if (pendingPriceBookChoices.length) {
+      showValidationError(language === "es" ? "Elige una tarifa de tu lista de precios o usa el precio inicial de IA para cada partida marcada." : "Choose a Price Book rate or use the AI starting price for each flagged line.", document.querySelector<HTMLElement>("[data-price-book-choice] button"));
+      return;
+    }
     if (!zeroRateConfirmed) return;
     if (!aiRatesConfirmed) return;
     if (!draftReviewConfirmed) return;
@@ -667,6 +695,28 @@ export default function CreateEstimatePage() {
       if (createResult.share_ready === false) {
         shareInitializationFailed = true;
         throw new Error("The estimate was saved, but its customer link is not ready. Open it from your dashboard and replace the customer link before sharing.");
+      }
+
+      const generationIds = [...new Set(nonEmptyLineItems.flatMap((item) => item.ai_generation_id ? [item.ai_generation_id] : []))];
+      for (const generationId of generationIds) {
+        try {
+          await fetch("/api/generate-estimate/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              generation_id: generationId,
+              estimate_id: createdEstimateId,
+              lines: nonEmptyLineItems.filter((item) => item.ai_generation_id === generationId && Number.isInteger(item.ai_line_index)).map((item) => ({
+                line_index: item.ai_line_index,
+                final_source: item.pricing_source === "price_book" ? "price_book" : item.pricing_source === "ai_suggested" ? "ai_price" : "manual",
+                item_id: item.pricing_source === "price_book" ? item.matched_price_book_item_id ?? null : null,
+                quantity_changed: Number(item.quantity) !== Number(item.ai_original_quantity),
+                price_changed: Number(item.unit_price) !== Number(item.ai_original_unit_price),
+                alias: item.ai_original_description ?? "",
+              })),
+            }),
+          });
+        } catch { /* Metrics must not block a saved estimate. */ }
       }
 
       for (const attachment of attachments) {
@@ -1020,13 +1070,14 @@ export default function CreateEstimatePage() {
                   )}
                 </div>
                 {item.pricing_source === "ai_suggested" && <p className="text-[11px] font-medium text-amber-800">{language === "es" ? "Precio inicial sugerido por IA · no hubo una coincidencia clara en la lista de precios para este oficio, unidad y base de precio. Revísalo antes de compartir." : "AI suggested starting price · no confident Price Book match for this trade, unit, and pricing basis. Review before sharing."}</p>}
-                {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">{language === "es" ? "Se aplicó la tarifa de la lista de precios." : "Price Book rate applied."}</p>}
+                {item.pricing_source === "price_book" && <p className="text-[11px] font-medium text-green-800">{language === "es" ? `Tarifa de tu lista de precios: ${item.matched_price_book_name ?? "partida guardada"}.` : `Your Price Book rate: ${item.matched_price_book_name ?? "saved item"}.`}</p>}
                 {item.pricing_source === "ai_suggested" && (item.pricing_assumption || item.pricing_assumption_es) && <p className="text-[11px] text-slate-600"><strong>{language === "es" ? "Suposición de precio de IA para verificar:" : "AI pricing assumption to verify:"}</strong> {language === "es" ? item.pricing_assumption_es || item.pricing_assumption : item.pricing_assumption}</p>}
                 {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">{language === "es" ? "Elige una unidad reconocida antes de guardar." : "Choose a recognized unit before saving this estimate."}</p>}
                 {reviewNotesByIndex[index].map((note, noteIndex) => <p key={`${index}-review-${noteIndex}`} role="note" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">{note}</p>)}
-                {!!item.price_book_suggestions?.length && <div className="rounded-md border border-blue-200 bg-blue-50/70 p-2">
-                  <p className="text-[11px] font-semibold text-blue-950">{language === "es" ? "Posibles coincidencias de la lista de precios. No se aplicaron automáticamente porque la descripción, la unidad o la base de precio no coincidieron con suficiente certeza." : "Possible Price Book matches. They were not applied automatically because the description, unit, or pricing basis was not a confident match."}</p>
+                {!!item.price_book_suggestions?.length && <div data-price-book-choice className="rounded-md border border-blue-200 bg-blue-50/70 p-2">
+                  <p className="text-[11px] font-semibold text-blue-950">{language === "es" ? "Elige una tarifa de tu lista de precios. Si ninguna corresponde a este trabajo, usa el precio inicial de IA y revísalo." : "Choose a rate from your Price Book. If none fits this work, use and review the AI starting price."}</p>
                   <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-12 items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">{language === "es" ? "Usar" : "Use"} {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}{suggestion.pricing_basis ? ` · ${suggestion.pricing_basis}` : ""} · {suggestion.match_score}%</button>)}</div>
+                  <button type="button" onClick={() => applyAiStartingPrice(index)} className="mt-2 min-h-11 rounded-md border border-amber-300 bg-white px-3 py-2 text-[11px] font-semibold text-amber-950">{language === "es" ? "Ninguna coincide · usar precio inicial de IA" : "None fit · use AI starting price"}{Number(item.ai_starting_unit_price) > 0 ? ` ($${Number(item.ai_starting_unit_price).toFixed(2)})` : ""}</button>
                 </div>}
                 <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={language === "es" ? `Descripción en español para ${item.description || `partida ${index + 1}`}` : `Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>

@@ -46,7 +46,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://r.stripe.com https://m.stripe.network https://challenges.cloudflare.com",
-      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com",
+      "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com https://www.google.com",
       `media-src 'self' blob:${mediaOrigin}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
