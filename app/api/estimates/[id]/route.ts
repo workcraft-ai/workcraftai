@@ -4,6 +4,7 @@ import { createUserSupabaseClient } from "@/app/utils/supabase/server";
 import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
 import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
+import { createClient } from "@supabase/supabase-js";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -67,6 +68,17 @@ export async function GET(
   }
   if (!estimate) return jsonError("Estimate not found.", 404);
 
+  let verbalApproval: { verbal_contact_name: string | null; verbal_note: string | null; accepted_at: string } | null = null;
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    const { data, error: approvalError } = await admin.from("estimate_acceptances")
+      .select("verbal_contact_name, verbal_note, accepted_at")
+      .eq("estimate_id", id).eq("user_id", user.id).eq("approval_method", "contractor_verbal")
+      .maybeSingle();
+    if (approvalError) console.error("Verbal approval lookup failed:", approvalError.message);
+    else verbalApproval = data;
+  }
+
   const { data: lineItems, error: itemError } = await supabase
     .from("line_items")
     .select("id, description, description_es, quantity, unit, unit_price")
@@ -92,7 +104,7 @@ export async function GET(
     .limit(50);
   if (questionError) console.error("Estimate question lookup failed:", questionError.message);
 
-  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean), questions: questions ?? [] }, {
+  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean), questions: questions ?? [], verbalApproval }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

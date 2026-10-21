@@ -39,6 +39,8 @@ interface Estimate {
   signature_name?: string | null;
   selected_package?: string | null;
   accepted_at?: string | null;
+  approval_method?: "customer_online" | "contractor_verbal" | null;
+  verbal_contact_name?: string | null;
   customer_declined_at?: string | null;
 }
 
@@ -88,6 +90,14 @@ export default function ClientEstimatePage() {
   const [invoiceJobId, setInvoiceJobId] = useState<string | null>(null);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState("");
+  const [showVerbalApproval, setShowVerbalApproval] = useState(false);
+  const [verbalContactName, setVerbalContactName] = useState("");
+  const [verbalPackage, setVerbalPackage] = useState("");
+  const [verbalNote, setVerbalNote] = useState("");
+  const [verbalConfirmed, setVerbalConfirmed] = useState(false);
+  const [verbalApprovalNote, setVerbalApprovalNote] = useState("");
+  const [verbalBusy, setVerbalBusy] = useState(false);
+  const [verbalError, setVerbalError] = useState("");
   const [wasConverted, setWasConverted] = useState(false);
   const [questionName, setQuestionName] = useState("");
   const [questionEmail, setQuestionEmail] = useState("");
@@ -114,6 +124,9 @@ export default function ClientEstimatePage() {
       setDecliningBusy(false);
       setContractor({ businessName: "Your Contractor", phone: "", address: "", logoUrl: "", brandColor: "#c85b2d" });
       setInvoiceError("");
+      setShowVerbalApproval(false);
+      setVerbalError("");
+      setVerbalApprovalNote("");
       setInvoiceJobId(null);
       setCreatingInvoice(false);
       setIsOwner(false);
@@ -156,6 +169,7 @@ export default function ClientEstimatePage() {
             if (!isCurrent) return;
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
             if (Array.isArray(ownerData.questions)) setOwnerQuestions(ownerData.questions as OwnerQuestion[]);
+            if (ownerData.verbalApproval && typeof ownerData.verbalApproval.verbal_note === "string") setVerbalApprovalNote(ownerData.verbalApproval.verbal_note);
             const convertedJobId = ownerData.estimate?.converted_job_id;
             setInvoiceJobId(typeof convertedJobId === "string" && convertedJobId ? convertedJobId : null);
             try {
@@ -303,6 +317,33 @@ export default function ClientEstimatePage() {
     }
   };
 
+  const recordVerbalApproval = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setVerbalError("");
+    setVerbalBusy(true);
+    try {
+      const response = await fetch(`/api/estimates/${encodeURIComponent(id)}/verbal-approval`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactName: verbalContactName.trim(), selectedPackage: verbalPackage || null, note: verbalNote.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.success !== true) throw new Error(result.error || "Could not record verbal approval.");
+      const acceptedAt = new Date().toISOString();
+      setEstimate((current) => current ? { ...current, status: "accepted", signature_name: null, accepted_at: acceptedAt,
+        approval_method: "contractor_verbal", verbal_contact_name: verbalContactName.trim(), selected_package: verbalPackage || null } : current);
+      setVerbalApprovalNote(verbalNote.trim());
+      const agreedPackageIndex = verbalPackage && estimate?.package_options ? estimate.package_options.findIndex((option) => option.name === verbalPackage) : -1;
+      setSelectedPackage(agreedPackageIndex >= 0 ? agreedPackageIndex : null);
+      if (typeof result.acceptedTotalCents === "number") setPaymentSummary((current) => ({ ...current, totalCents: result.acceptedTotalCents }));
+      setShowVerbalApproval(false);
+      if (ownerHasPro) router.push(`/schedule?estimate=${encodeURIComponent(id)}`);
+    } catch (error) {
+      setVerbalError(error instanceof Error ? error.message : "Could not record verbal approval.");
+    } finally {
+      setVerbalBusy(false);
+    }
+  };
+
   const handleDecline = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setDecliningBusy(true);
@@ -405,6 +446,7 @@ export default function ClientEstimatePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {estimate.status === "pending" && <button type="button" onClick={() => { setVerbalContactName(estimate.client_name); setVerbalPackage(""); setVerbalNote(""); setVerbalConfirmed(false); setVerbalError(""); setShowVerbalApproval(true); }} className="rounded-lg bg-green-700 px-3 py-1.5 font-semibold text-white hover:bg-green-600">Record verbal approval</button>}
             {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && (ownerHasPro
               ? <button type="button" disabled={creatingInvoice} onClick={() => void createOrOpenInvoice()} className="bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-60">{creatingInvoice ? "Creating invoice…" : invoiceJobId ? "View invoice" : "Create invoice"}</button>
               : <div className="flex flex-wrap items-center justify-end gap-2"><span className="text-xs text-orange-100">Invoice creation is included with Pro:</span><ProPlanAction className="inline-flex min-h-10 items-center rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-100 hover:bg-slate-800" /> </div>)}
@@ -413,6 +455,7 @@ export default function ClientEstimatePage() {
                 {wasConverted ? "View scheduled job" : "Schedule job"}
               </button>
             )}
+            {["accepted", "paid"].includes(estimate.status) && ownerPlanLoaded && !ownerHasPro && <div className="flex items-center gap-2"><span>Job scheduling is included with Pro:</span><ProPlanAction className="inline-flex min-h-10 items-center rounded-lg border border-orange-300 px-3 py-1.5 text-sm font-semibold text-orange-100 hover:bg-slate-800" /></div>}
             <button
               type="button"
               onClick={() => router.push(`/estimate/${id}/edit`)}
@@ -430,6 +473,36 @@ export default function ClientEstimatePage() {
             </button>
           </div>
           {invoiceError && <p role="alert" className="basis-full rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">{invoiceError}</p>}
+        </div>}
+
+        {isOwner && estimate.status === "pending" && showVerbalApproval && <form onSubmit={(event) => void recordVerbalApproval(event)} className="print:hidden space-y-3 rounded-xl border border-green-300 bg-white p-4 shadow-sm">
+          <h2 className="text-base font-bold">Record verbal approval</h2>
+          <p className="text-sm text-slate-700">Use this only after the customer agrees directly. This records your account of the conversation; it is not a customer signature. Payment remains due.</p>
+          <label className="block text-sm font-semibold">Person who approved
+            <input required minLength={2} maxLength={120} value={verbalContactName} onChange={(event) => setVerbalContactName(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm" />
+          </label>
+          {Boolean(estimate.package_options?.length) && <label className="block text-sm font-semibold">Agreed package
+            <select required value={verbalPackage} onChange={(event) => setVerbalPackage(event.target.value)} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm">
+              <option value="">Select a package</option>
+              {estimate.package_options?.map((option, index) => <option key={`${option.name}-${index}`} value={option.name}>{option.name} · ${Number(option.total).toFixed(2)}</option>)}
+            </select>
+          </label>}
+          <label className="block text-sm font-semibold">Payment or conversation note (optional)
+            <textarea maxLength={500} rows={2} value={verbalNote} onChange={(event) => setVerbalNote(event.target.value)} placeholder="For example: Customer will pay cash after the job." className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </label>
+          <p className="text-xs text-slate-600">Recording approval does not mark this estimate as paid. Keep track of cash you receive separately.</p>
+          <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" required checked={verbalConfirmed} onChange={(event) => setVerbalConfirmed(event.target.checked)} className="mt-1" /><span>I confirm this person verbally approved the scope and price.</span></label>
+          {verbalError && <p role="alert" className="text-sm text-red-700">{verbalError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={verbalBusy || !verbalConfirmed || verbalContactName.trim().length < 2 || Boolean(estimate.package_options?.length && !verbalPackage)} className="min-h-11 rounded-lg bg-green-700 px-4 text-sm font-semibold text-white disabled:opacity-50">{verbalBusy ? "Recording…" : ownerHasPro ? "Record approval and schedule" : "Record approval"}</button>
+            <button type="button" disabled={verbalBusy} onClick={() => setShowVerbalApproval(false)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold">Cancel</button>
+          </div>
+        </form>}
+
+        {isOwner && estimate.approval_method === "contractor_verbal" && <div className="print:hidden rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+          <p className="font-semibold">Verbal approval recorded by contractor{estimate.verbal_contact_name ? ` · ${estimate.verbal_contact_name}` : ""}</p>
+          <p>{estimate.status === "paid" ? "Payment has been recorded. This is not a customer signature." : "Payment remains due. This is not a customer signature."}</p>
+          {verbalApprovalNote && <p className="mt-1 whitespace-pre-wrap">Note: {verbalApprovalNote}</p>}
         </div>}
 
         {isOwner && <section id="customer-questions" className="print:hidden scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 space-y-3">
@@ -619,9 +692,9 @@ export default function ClientEstimatePage() {
             </div>
           ) : estimate.status === "accepted" ? (
             <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-xl text-center font-semibold text-sm">
-              ✓ {estimate.accepted_at || estimate.signature_name
-                ? "Your approval has been recorded. The contractor will contact you about payment and next steps."
-                : "The contractor marked this estimate as accepted. Contact them about payment and next steps."}
+              ✓ {estimate.approval_method === "contractor_verbal"
+                ? "The contractor recorded verbal approval for this estimate. Contact them if this is incorrect or to discuss payment and next steps."
+                : "Your approval has been recorded. The contractor will contact you about payment and next steps."}
               {paymentSummary.available && paymentSummary.totalCents > paymentSummary.amountPaidCents && <div className="mt-4 border-t border-green-200 pt-4 text-left">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>Paid so far</span><strong>${(paymentSummary.amountPaidCents / 100).toFixed(2)}</strong></div>
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs"><span>Remaining balance</span><strong>${((paymentSummary.totalCents - paymentSummary.amountPaidCents) / 100).toFixed(2)}</strong></div>

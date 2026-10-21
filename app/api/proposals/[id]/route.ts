@@ -31,6 +31,15 @@ export async function GET(
   }
   if (!estimate) return NextResponse.json({ error: "Proposal not found or link expired." }, { status: 404 });
 
+  const { data: acceptance, error: acceptanceError } = await admin.from("estimate_acceptances")
+    .select("approval_method, verbal_contact_name")
+    .eq("estimate_id", id)
+    .maybeSingle();
+  if (acceptanceError) {
+    console.error("Proposal approval source lookup failed:", acceptanceError.message);
+    return NextResponse.json({ error: "Unable to load proposal approval details." }, { status: 500 });
+  }
+
   const { data: ownerData } = estimate.user_id
     ? await admin.auth.admin.getUserById(estimate.user_id)
     : { data: { user: null } };
@@ -92,6 +101,8 @@ export async function GET(
   const publicEstimate = Object.fromEntries(Object.entries(estimate).filter(([key]) =>
     publicFields.includes(key) && !(estimate.proposal_display_mode === "summary" && ["tax_rate", "markup_percentage"].includes(key))
   ));
+  publicEstimate.approval_method = acceptance?.approval_method ?? null;
+  publicEstimate.verbal_contact_name = acceptance?.approval_method === "contractor_verbal" ? acceptance.verbal_contact_name : null;
   return NextResponse.json({ estimate: publicEstimate, converted: Boolean(estimate.converted_job_id), lineItems: lineItems ?? [], contractor, photos: photos.filter(Boolean), paymentSummary }, {
     headers: {
       "Cache-Control": "private, no-store",
