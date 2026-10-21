@@ -56,10 +56,10 @@ export const POST = withApiFailureMetrics("/api/estimates/[id]/invoice", async (
   });
   if (acceptanceError) {
     console.error("Invoice acceptance lookup failed:", acceptanceError.message);
-    return jsonError("We could not verify customer approval for this estimate. Refresh and try again.", 503);
+    return jsonError("We could not verify approval for this estimate. Refresh and try again.", 503);
   }
   if (acceptedTotalCents === null) {
-    return jsonError("A customer must approve this estimate before you create its invoice.", 409);
+    return jsonError("This estimate must be approved before you create its invoice.", 409);
   }
 
   if (!["accepted", "paid"].includes(String(estimate.status).toLowerCase())) {
