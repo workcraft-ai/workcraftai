@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { getServerProAccess } from "@/lib/pro-access";
 import { withApiFailureMetrics } from "@/lib/api-failure-metrics";
 import { buildEstimateDraftPrompt } from "@/lib/ai-estimate-prompt.mjs";
+import { applyPriceBookRates } from "@/lib/priceBookPricing.mjs";
+import { readAllPages } from "@/lib/read-all-pages";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -200,6 +202,27 @@ export const POST = withApiFailureMetrics("/api/generate-estimate", async (reque
 
   const model = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const [priceBookResult, aliasResult] = await Promise.all([
+    readAllPages((from, to) => admin.from("price_book_items")
+      .select("id, name, description, trade, unit, unit_price, pricing_basis, aliases")
+      .eq("user_id", user.id).order("id").range(from, to)),
+    readAllPages((from, to) => admin.from("tradeflow_price_book_learned_aliases")
+      .select("price_book_item_id, alias, selections")
+      .eq("user_id", user.id).gte("selections", 2).order("price_book_item_id").order("alias").range(from, to)),
+  ]);
+  if (priceBookResult.error || aliasResult.error) {
+    console.error("Could not load Price Book matching data:", priceBookResult.error?.message ?? aliasResult.error?.message);
+    return NextResponse.json({ error: "The Price Book could not be checked. Try again later." }, { status: 503 });
+  }
+  const learnedByItem = new Map<string, string[]>();
+  for (const alias of aliasResult.data ?? []) {
+    const previous = learnedByItem.get(alias.price_book_item_id) ?? [];
+    previous.push(alias.alias);
+    learnedByItem.set(alias.price_book_item_id, previous);
+  }
+  const priceBookRates = (priceBookResult.data ?? []).map((item) => ({
+    ...item, unit_price: Number(item.unit_price), learned_aliases: learnedByItem.get(item.id) ?? [],
+  }));
   const { data: reservationRows, error: reservationError } = await admin.rpc("reserve_workcraft_ai_generation", {
     p_user_id: user.id,
     p_prompt_characters: prompt.length,
@@ -339,9 +362,50 @@ export const POST = withApiFailureMetrics("/api/generate-estimate", async (reque
     return NextResponse.json({ error: "The AI returned no usable line items. Add scope details and try again." }, { status: 502 });
   }
 
+  const priced = applyPriceBookRates(line_items, priceBookRates, trade);
+  const matchedIndexes = new Set(priced.matchedIndexes);
+  const reviewedLines = priced.lines.map((line, index) => {
+    const matchedItem = priced.matchedItemsByIndex[index];
+    const suggestions = priced.suggestionsByIndex[index] ?? [];
+    const explicitPrice = line.pricing_source === "contractor_provided";
+    const source = matchedIndexes.has(index) ? "price_book" : explicitPrice ? "contractor_provided" : suggestions.length ? "price_book_choice" : "ai_suggested";
+    return {
+      ...line,
+      unit: matchedItem?.unit ?? line.unit,
+      unit_price: source === "price_book_choice" ? 0 : line.unit_price,
+      ai_starting_unit_price: source === "price_book_choice" ? line.unit_price : undefined,
+      pricing_source: source,
+      matched_price_book_item_id: matchedItem?.id ?? null,
+      matched_price_book_name: matchedItem?.name ?? null,
+      price_book_suggestions: suggestions.map((candidate) => ({
+        id: candidate.id, name: candidate.name, description: candidate.description,
+        trade: candidate.trade, unit: candidate.unit, unit_price: candidate.unit_price,
+        pricing_basis: candidate.pricing_basis, match_score: candidate.match_score,
+      })),
+      ai_generation_id: generationId,
+      ai_line_index: index,
+      ai_original_description: line.description,
+      ai_original_quantity: line.quantity,
+      ai_original_unit_price: source === "price_book_choice" ? line.unit_price : source === "price_book" ? matchedItem?.unit_price ?? line.unit_price : line.unit_price,
+    };
+  });
+  const { error: matchLogError } = await admin.from("tradeflow_ai_match_lines").insert(reviewedLines.map((line) => ({
+    generation_id: generationId,
+    line_index: line.ai_line_index,
+    user_id: user.id,
+    initial_source: line.pricing_source === "price_book" ? "price_book" : line.pricing_source === "price_book_choice" ? "suggested" : line.pricing_source === "contractor_provided" ? "contractor_price" : "ai_price",
+    initial_item_id: line.matched_price_book_item_id,
+    suggestion_count: line.price_book_suggestions.length,
+  })));
+  if (matchLogError) console.error("Could not record AI Price Book match metrics:", matchLogError.message);
   await complete("succeeded", response.status, line_items.length, inputTokens, outputTokens);
   return NextResponse.json({
-    line_items,
+    line_items: reviewedLines,
+    match_counts: {
+      price_book: priced.matchedCount,
+      needs_choice: reviewedLines.filter((line) => line.pricing_source === "price_book_choice").length,
+      ai_price: reviewedLines.filter((line) => line.pricing_source === "ai_suggested").length,
+    },
     proposal_summary: typeof parsed.proposal_summary === "string" ? parsed.proposal_summary.trim().slice(0, 1200) : "",
     remaining_daily_generations: reservation.remaining,
     remaining_monthly_generations: reservation.remaining_monthly,

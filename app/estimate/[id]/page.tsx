@@ -151,6 +151,7 @@ export default function ClientEstimatePage() {
           if (ownerResponse.ok) {
             estimateOwner = true;
             setIsOwner(true);
+            void fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "previewed" }) }).catch(() => null);
             const ownerData = await ownerResponse.json();
             if (!isCurrent) return;
             if (Array.isArray(ownerData.attachments)) setOwnerAttachments(ownerData.attachments as OwnerAttachment[]);
@@ -224,7 +225,7 @@ export default function ClientEstimatePage() {
       if (result.url) {
         await navigator.clipboard.writeText(result.url);
         setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied.");
-        if (isOwner && new URLSearchParams(window.location.search).get("setup") === "1") {
+        if (isOwner) {
           const progressResponse = await fetch("/api/onboarding", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "shared" }),

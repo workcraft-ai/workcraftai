@@ -13,7 +13,8 @@ import SetupReturnLink from "@/app/components/SetupReturnLink";
 import { DEFAULT_ESTIMATE_TRADES, parseEstimateTradeOptions } from "@/lib/estimate-trades";
 import { hasAtMostTwoDecimalPlaces } from "@/lib/estimate-money.mjs";
 
-type PriceItem = { id: string; name: string; description: string; trade: string; unit: string; unit_price: number; pricing_basis?: string };
+type PriceItem = { id: string; name: string; description: string; aliases: string[]; trade: string; unit: string; unit_price: number; pricing_basis?: string };
+type LearnedAlias = { price_book_item_id: string; alias: string; selections: number };
 type EstimateLine = { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number };
 type EstimateTemplate = { id: string; name: string; trade: string; line_items: EstimateLine[]; package_options?: { name: string; description: string; total: number }[]; require_deposit: boolean; deposit_percentage: number };
 
@@ -24,6 +25,7 @@ export default function PriceBookPage() {
   const { language } = useLanguage();
   const [tab, setTab] = useState<"items" | "templates">("items");
   const [items, setItems] = useState<PriceItem[]>([]);
+  const [learnedAliases, setLearnedAliases] = useState<LearnedAlias[]>([]);
   const [templates, setTemplates] = useState<EstimateTemplate[]>([]);
   const [trades, setTrades] = useState(() => DEFAULT_ESTIMATE_TRADES.map((option) => option.value));
   const initialTradeSelected = useRef(false);
@@ -32,6 +34,7 @@ export default function PriceBookPage() {
   const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [aliasesInput, setAliasesInput] = useState("");
   const [trade, setTrade] = useState("Plumbing");
   const [unit, setUnit] = useState("each");
   const [pricingBasis, setPricingBasis] = useState("unknown");
@@ -43,9 +46,10 @@ export default function PriceBookPage() {
   const savingItemRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    const [itemResult, templateResult, tradeResult] = await Promise.all([
-      readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to)),
+    const [itemResult, templateResult, aliasResult, tradeResult] = await Promise.all([
+      readAllPages((from, to) => supabase.from("price_book_items").select("id, name, description, aliases, trade, unit, unit_price, pricing_basis").order("name").order("id").range(from, to)),
       readAllPages((from, to) => supabase.from("estimate_templates").select("id, name, trade, line_items, package_options, require_deposit, deposit_percentage").order("name").order("id").range(from, to)),
+      readAllPages((from, to) => supabase.from("tradeflow_price_book_learned_aliases").select("price_book_item_id, alias, selections").order("price_book_item_id").order("alias").range(from, to)),
       fetch("/api/estimate/trades", { cache: "no-store" }).then(async (response) => response.ok ? response.json() : null).catch(() => null),
     ]);
     const configuredTrades = parseEstimateTradeOptions(tradeResult?.trades);
@@ -56,11 +60,12 @@ export default function PriceBookPage() {
         initialTradeSelected.current = true;
       }
     }
-    if (itemResult.error || templateResult.error) {
+    if (itemResult.error || templateResult.error || aliasResult.error) {
       setError("WorkCraft AI setup is needed for the price book and templates. Apply the operations migration in supabase/migrations.");
     } else {
       setItems((itemResult.data ?? []) as PriceItem[]);
       setTemplates((templateResult.data ?? []) as EstimateTemplate[]);
+      setLearnedAliases((aliasResult.data ?? []) as LearnedAlias[]);
       setError("");
     }
     setLoading(false);
@@ -74,6 +79,11 @@ export default function PriceBookPage() {
   const addItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice(""); setError("");
+    const aliases = [...new Set(aliasesInput.split(",").map((alias) => alias.trim()).filter(Boolean))];
+    if (aliases.length > 20 || aliases.some((alias) => alias.length > 160 || /[\x00-\x1f\x7f]/.test(alias))) {
+      setError(language === "es" ? "Agrega como máximo 20 nombres alternativos de hasta 160 caracteres cada uno." : "Add at most 20 alternate names of up to 160 characters each.");
+      return;
+    }
     if (!name.trim() || name.trim().length > 200 || description.length > 500 || trade.length > 60 || unit.trim().length > 40
       || !hasAtMostTwoDecimalPlaces(Number(unitPrice)) || Number(unitPrice) < 0 || Number(unitPrice) > 100000000) {
       setError(language === "es" ? "Usa un nombre de hasta 200 caracteres, descripción de hasta 500, oficio de hasta 60, unidad de hasta 40 y precio con un máximo de dos decimales." : "Use a name up to 200 characters, description up to 500, trade up to 60, unit up to 40, and a price with at most two decimal places.");
@@ -85,13 +95,13 @@ export default function PriceBookPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError(language === "es" ? "Inicia sesión para administrar tu lista de precios." : "Sign in to manage your price book."); return; }
-      const item = { name: name.trim(), description: description.trim(), trade, unit: unit.trim(), pricing_basis: pricingBasis, unit_price: Number(unitPrice), updated_at: new Date().toISOString() };
+      const item = { name: name.trim(), description: description.trim(), aliases, trade, unit: unit.trim(), pricing_basis: pricingBasis, unit_price: Number(unitPrice), updated_at: new Date().toISOString() };
       const { error: insertError } = editingId
         ? await supabase.from("price_book_items").update(item).eq("id", editingId).eq("user_id", user.id)
         : await supabase.from("price_book_items").insert({ ...item, user_id: user.id });
       if (insertError) setError(language === "es" ? "No se pudo guardar este artículo. Revisa los datos e inténtalo de nuevo." : "Could not save this Price Book item. Please check the details and try again.");
       else {
-        setName(""); setDescription(""); setUnitPrice("0"); setEditingId(null);
+        setName(""); setDescription(""); setAliasesInput(""); setUnitPrice("0"); setEditingId(null);
         setNotice(editingId ? "Price book item updated." : "Price book item added.");
         await loadData();
         if (new URLSearchParams(window.location.search).get("setup") === "1") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -105,12 +115,19 @@ export default function PriceBookPage() {
   };
 
   const editItem = (item: PriceItem) => {
-    setEditingId(item.id); setName(item.name); setDescription(item.description); setTrade(item.trade); setUnit(item.unit); setPricingBasis(item.pricing_basis || "unknown"); setUnitPrice(String(item.unit_price)); setTab("items");
+    setEditingId(item.id); setName(item.name); setDescription(item.description); setAliasesInput((item.aliases ?? []).join(", ")); setTrade(item.trade); setUnit(item.unit); setPricingBasis(item.pricing_basis || "unknown"); setUnitPrice(String(item.unit_price)); setTab("items");
   };
 
   const removeItem = async (id: string) => {
     const { error: deleteError } = await supabase.from("price_book_items").delete().eq("id", id);
     if (deleteError) setError("Could not delete this Price Book item. Please try again."); else setItems((current) => current.filter((item) => item.id !== id));
+  };
+
+  const removeLearnedAlias = async (itemId: string, alias: string) => {
+    const { error: deleteError } = await supabase.from("tradeflow_price_book_learned_aliases")
+      .delete().eq("price_book_item_id", itemId).eq("alias", alias);
+    if (deleteError) setError(language === "es" ? "No se pudo quitar el nombre aprendido." : "Could not remove the learned name.");
+    else setLearnedAliases((current) => current.filter((entry) => entry.price_book_item_id !== itemId || entry.alias !== alias));
   };
 
   const selectImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -195,6 +212,8 @@ export default function PriceBookPage() {
               <h2 className="text-lg font-semibold">{editingId ? "Edit price book item" : "Add a price book item"}</h2>
               <Field label="Item or service"><input required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} placeholder="Faucet installation" /></Field>
               <Field label="Description"><input maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} className={fieldClass} placeholder="Standard fixture install" /></Field>
+              <Field label={language === "es" ? "Nombres alternativos (separados por comas)" : "Alternate names (separate with commas)"}><input maxLength={1000} value={aliasesInput} onChange={(event) => setAliasesInput(event.target.value)} className={fieldClass} placeholder={language === "es" ? "Reemplazo de calentador, instalación de calentador" : "Water heater replacement, heater installation"} /></Field>
+              <p className="text-xs text-slate-600">{language === "es" ? "La IA usa estos nombres para relacionar el trabajo con tu tarifa guardada. Puedes incluir palabras en inglés y español." : "AI uses these names to find your saved rate. You can include English and Spanish terms."}</p>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Trade"><select value={trade} onChange={(event) => setTrade(event.target.value)} className={fieldClass}>{!trades.includes(trade) && <option value={trade}>{trade}</option>}{trades.map((value) => <option key={value}>{value}</option>)}</select></Field>
                 <Field label="Unit"><input required maxLength={40} value={unit} onChange={(event) => setUnit(event.target.value)} className={fieldClass} placeholder="each, hour, sq ft" /></Field>
@@ -203,20 +222,20 @@ export default function PriceBookPage() {
               <p className="text-xs text-slate-600">AI applies a saved rate automatically only when its unit and pricing basis match. Unspecified rates remain suggestions for your review.</p>
               <Field label="Your price per unit"><input type="number" required min="0" step="0.01" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} className={fieldClass} /></Field>
               <button disabled={savingItem} className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60">{savingItem ? (language === "es" ? "Guardando…" : "Saving…") : editingId ? (language === "es" ? "Guardar tarifa" : "Save rate") : (language === "es" ? "Agregar a mi lista de precios" : "Add to my price book")}</button>
-              {editingId && <button type="button" onClick={() => { setEditingId(null); setName(""); setDescription(""); setUnitPrice("0"); }} className="inline-flex min-h-12 w-full items-center justify-center text-xs font-semibold text-slate-600 underline">Cancel edit</button>}
+              {editingId && <button type="button" onClick={() => { setEditingId(null); setName(""); setDescription(""); setAliasesInput(""); setUnitPrice("0"); }} className="inline-flex min-h-12 w-full items-center justify-center text-xs font-semibold text-slate-600 underline">Cancel edit</button>}
             </form>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><h2 className="font-semibold">Your rates</h2><p className="mt-1 text-xs text-slate-500">These are your business rates and can be edited on every estimate.</p></div>
                   <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <a download="workcraftai-pricebook-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,description,trade,unit,unit_price,pricing_basis\nFaucet installation,Standard faucet install,Plumbing,each,245.00,installed")}`} className="inline-flex min-h-12 items-center font-semibold text-blue-700 underline">Download CSV template</a>
+                    <a download="workcraftai-pricebook-template.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent("name,description,trade,unit,unit_price,pricing_basis,aliases\nFaucet installation,Standard faucet install,Plumbing,each,245.00,installed,Faucet replacement;tap installation")}`} className="inline-flex min-h-12 items-center font-semibold text-blue-700 underline">Download CSV template</a>
                     <label className="inline-flex min-h-12 cursor-pointer items-center rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Choose CSV<input type="file" accept=".csv,text/csv" onChange={(event) => void selectImportFile(event)} className="sr-only" /></label>
                   </div>
                 </div>
                 {importRows.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-900">{importRows.length} rows ready to import.</p><div className="flex items-center gap-3"><button type="button" onClick={() => { setImportRows([]); setNotice(""); }} className="inline-flex min-h-12 items-center text-xs font-semibold text-slate-600 underline">Cancel</button><button type="button" disabled={importing} onClick={() => void importPriceBook()} className="inline-flex min-h-12 items-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{importing ? "Importing…" : `Import ${importRows.length} items`}</button></div></div>}
               </div>
-              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading price book…</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Add your first labor or material rate.</p> : <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.trade} · per {item.unit}{item.description ? ` · ${item.description}` : ""}</p></div><div className="flex items-center gap-3"><span className="font-semibold tabular-nums">${Number(item.unit_price).toFixed(2)}</span><button onClick={() => editItem(item)} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline">Edit</button><button onClick={() => void removeItem(item.id)} aria-label={`Delete ${item.name}`} className="inline-flex min-h-12 items-center text-xs font-semibold text-red-700 underline">Remove</button></div></div>)}</div>}
+              {loading ? <p className="p-8 text-center text-sm text-slate-500">Loading price book…</p> : items.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">Add your first labor or material rate.</p> : <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="flex items-start justify-between gap-3 p-4"><div><p className="font-semibold">{item.name}</p><p className="text-xs text-slate-500">{item.trade} · per {item.unit}{item.description ? ` · ${item.description}` : ""}</p>{!!item.aliases?.length && <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Nombres alternativos" : "Alternate names"}: {item.aliases.join(", ")}</p>}{learnedAliases.filter((entry) => entry.price_book_item_id === item.id).map((entry) => <div key={entry.alias} className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600"><span>{language === "es" ? "Aprendido de tus selecciones" : "Learned from your choices"}: {entry.alias} · {entry.selections} {language === "es" ? "selecciones" : "selections"}{entry.selections < 2 ? (language === "es" ? " · pendiente" : " · pending") : ""}</span><button type="button" onClick={() => void removeLearnedAlias(item.id, entry.alias)} className="font-semibold text-red-700 underline">{language === "es" ? "Quitar" : "Remove"}</button></div>)}</div><div className="flex items-center gap-3"><span className="font-semibold tabular-nums">${Number(item.unit_price).toFixed(2)}</span><button onClick={() => editItem(item)} className="inline-flex min-h-12 items-center text-xs font-semibold text-blue-700 underline">Edit</button><button onClick={() => void removeItem(item.id)} aria-label={`Delete ${item.name}`} className="inline-flex min-h-12 items-center text-xs font-semibold text-red-700 underline">Remove</button></div></div>)}</div>}
             </section>
           </div>
         ) : (

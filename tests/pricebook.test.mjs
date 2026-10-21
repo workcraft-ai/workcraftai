@@ -125,3 +125,53 @@ test("a unique diagnostic visit uses an each-priced diagnostic fee without treat
 test("CSV preserves an explicitly selected pricing basis",()=>{
  assert.equal(parsePriceBookCsv("Name,Trade,Unit,Price,Pricing_basis\nOSB,Roofing,sheet,75,installed")[0].pricing_basis,"installed");
 });
+
+test("an account's approved aliases can match its saved rate", () => {
+  const result = applyPriceBookRates(
+    [{ description: "Swap hot water tank", quantity: 1, unit: "job", pricing_basis: "installed", unit_price: 975 }],
+    [{ name: "Water heater replacement", learned_aliases: ["Swap hot water tank"], trade: "Plumbing", unit: "job", pricing_basis: "installed", unit_price: 1200 }],
+    "Plumbing",
+  );
+  assert.equal(result.matchedCount, 1);
+  assert.equal(result.lines[0].unit_price, 1200);
+});
+
+test("an alias and its rate cannot cross into another trade's draft", () => {
+  const result = applyPriceBookRates(
+    [{ description: "Swap hot water tank", quantity: 1, unit: "job", pricing_basis: "installed", unit_price: 975 }],
+    [{ name: "Water heater replacement", learned_aliases: ["Swap hot water tank"], trade: "Plumbing", unit: "job", pricing_basis: "installed", unit_price: 1200 }],
+    "HVAC",
+  );
+  assert.equal(result.matchedCount, 0);
+  assert.equal(result.suggestionsByIndex[0], undefined);
+});
+
+test("CSV import preserves optional alternate names", () => {
+  const [row] = parsePriceBookCsv("name,trade,unit,unit_price,aliases\nHeater install,Plumbing,job,1200,Water heater replacement;Hot water tank swap");
+  assert.deepEqual(row.aliases, ["Water heater replacement", "Hot water tank swap"]);
+});
+
+test("equipment and material sizes cannot silently inherit a different saved rate", () => {
+  for (const [draft, saved] of [
+    ["40 gallon water heater", "50 gallon water heater"],
+    ["3/4 inch copper pipe", "1/2 inch copper pipe"],
+  ]) {
+    const result = applyPriceBookRates(
+      [{ description: draft, quantity: 1, unit: "each", pricing_basis: "materials", unit_price: 400 }],
+      [{ name: saved, trade: "Plumbing", unit: "each", pricing_basis: "materials", unit_price: 600 }],
+      "Plumbing",
+    );
+    assert.equal(result.matchedCount, 0);
+    assert.equal(result.suggestionsByIndex[0], undefined);
+  }
+});
+
+test("a missing equipment size requires an explicit contractor choice", () => {
+  const result = applyPriceBookRates(
+    [{ description: "Water heater replacement", quantity: 1, unit: "job", pricing_basis: "installed", unit_price: 900 }],
+    [{ name: "50 gallon water heater replacement", trade: "Plumbing", unit: "job", pricing_basis: "installed", unit_price: 1200 }],
+    "Plumbing",
+  );
+  assert.equal(result.matchedCount, 0);
+  assert.equal(result.suggestionsByIndex[0][0].unit_price, 1200);
+});

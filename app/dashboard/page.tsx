@@ -207,6 +207,7 @@ export default function DashboardPage() {
       if (typeof result.url !== "string") throw new Error("Customer sharing is disabled or expired. Open the estimate to replace the customer link.");
       try {
         await navigator.clipboard.writeText(result.url);
+        await fetch("/api/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "shared" }) }).catch(() => null);
         setSendMessage("Customer link copied. Share it with your customer by text or your own email. Copying does not send a message.");
       } catch {
         setShareFallbackUrl(result.url);

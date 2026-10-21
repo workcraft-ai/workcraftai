@@ -5,6 +5,7 @@ export type ImportedPriceBookItem = {
   unit: string;
   unit_price: number;
   pricing_basis?: string;
+  aliases?: string[];
 };
 
 export function parsePriceBookCsv(text: string): ImportedPriceBookItem[];
