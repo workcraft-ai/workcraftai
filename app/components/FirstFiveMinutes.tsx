@@ -24,7 +24,7 @@ const copy = {
   en: {
     kicker: "First 5 minutes", title: "Let's get your first estimate ready", intro: "Follow these steps at your own pace. You can skip setup and return later.",
     steps: ["Set your business preferences", "Create an estimate", "Preview the customer view", "Copy a test customer link", "Save a reusable rate"],
-    name: "Your name (optional)", business: "Business name", address: "Business address (optional)", phone: "Business phone (optional)", tax: "Default sales tax %", markup: "Default markup %", logo: "Public logo URL (optional)", color: "Brand color",
+    name: "Your name (optional)", business: "Business name", address: "Business address (optional)", phone: "Business phone (optional)", tax: "Default sales tax %", markup: "Default markup %", logo: "Public logo URL (optional)", color: "Brand color", moreDetails: "Add contact, tax, and branding details (optional)", laterDetails: "You can add these details later in Profile.",
     taxHelp: "Use rates you have verified for your location and work. These defaults can be changed on each estimate.",
     save: "Save preferences", saving: "Saving…", estimate: "Create an estimate", preview: "Preview my estimate", share: "Copy my test link",
     fallback: "Your link is ready. Select and copy it, then confirm below.", copied: "I copied the link", rate: "Add a Price Book rate",
@@ -35,7 +35,7 @@ const copy = {
   es: {
     kicker: "Primeros 5 minutos", title: "Preparemos tu primera cotización", intro: "Sigue estos pasos a tu ritmo. Puedes omitir la configuración y volver después.",
     steps: ["Configura tu negocio", "Crea una cotización", "Revisa la vista del cliente", "Copia un enlace de prueba", "Guarda un precio reutilizable"],
-    name: "Tu nombre (opcional)", business: "Nombre del negocio", address: "Dirección del negocio (opcional)", phone: "Teléfono del negocio (opcional)", tax: "Impuesto sobre ventas predeterminado %", markup: "Recargo predeterminado %", logo: "URL pública del logotipo (opcional)", color: "Color de marca",
+    name: "Tu nombre (opcional)", business: "Nombre del negocio", address: "Dirección del negocio (opcional)", phone: "Teléfono del negocio (opcional)", tax: "Impuesto sobre ventas predeterminado %", markup: "Recargo predeterminado %", logo: "URL pública del logotipo (opcional)", color: "Color de marca", moreDetails: "Agregar contacto, impuestos y marca (opcional)", laterDetails: "Puedes agregar estos datos más adelante en Perfil.",
     taxHelp: "Usa tasas que hayas verificado para tu ubicación y trabajo. Puedes cambiarlas en cada cotización.",
     save: "Guardar preferencias", saving: "Guardando…", estimate: "Crear una cotización", preview: "Revisar mi cotización", share: "Copiar mi enlace de prueba",
     fallback: "El enlace está listo. Selecciónalo y cópialo; después confirma abajo.", copied: "Copié el enlace", rate: "Agregar un precio a la lista",
@@ -184,16 +184,22 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
       </div>
       <ol className="mt-5 grid gap-2 sm:grid-cols-5">{t.steps.map((label, index) => <li key={label} aria-current={active === index ? "step" : undefined} className={`rounded-lg border p-3 text-xs font-semibold ${completed[index] ? "border-green-200 bg-green-50 text-green-800" : active === index ? "border-orange-300 bg-orange-50 text-orange-900" : "border-slate-200 text-slate-500"}`}><span className="mr-1" aria-hidden="true">{completed[index] ? "✓" : `${index + 1}.`}</span>{label}</li>)}</ol>
       <div className="mt-5 rounded-xl bg-[#f7f5ef] p-4">
-        {active === 0 && <form onSubmit={(event) => void saveProfile(event)} className="grid gap-3 sm:grid-cols-2">
-          <label className="text-sm font-semibold text-slate-800">{t.name}<input maxLength={120} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+        {active === 0 && <form onSubmit={(event) => void saveProfile(event)} className="grid gap-3">
           <label className="text-sm font-semibold text-slate-800">{t.business}<input required maxLength={120} autoComplete="organization" value={businessName} onChange={(event) => setBusinessName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.address}<input maxLength={300} autoComplete="street-address" value={businessAddress} onChange={(event) => setBusinessAddress(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "onboarding-phone-error" : undefined} onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" />{phoneError && <span id="onboarding-phone-error" role="alert" className="mt-1 block text-sm font-medium text-red-800">{phoneError}</span>}</label>
-          <label className="text-sm font-semibold text-slate-800">{t.tax}<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.markup}<input type="number" min="0" max="500" step="0.01" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800 sm:col-span-2">{t.logo}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-          <label className="text-sm font-semibold text-slate-800">{t.color}<input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} className="mt-1 h-12 w-full rounded-lg border border-slate-300 bg-white p-1" /></label>
-          <p className="text-xs leading-5 text-slate-600 sm:col-span-2">{t.taxHelp}</p>
+          <details className="rounded-lg border border-slate-200 bg-white p-3">
+            <summary className="min-h-11 cursor-pointer font-semibold text-slate-800">{t.moreDetails}</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-800">{t.name}<input maxLength={120} autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <label className="text-sm font-semibold text-slate-800">{t.address}<input maxLength={300} autoComplete="street-address" value={businessAddress} onChange={(event) => setBusinessAddress(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "onboarding-phone-error" : undefined} onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" />{phoneError && <span id="onboarding-phone-error" role="alert" className="mt-1 block text-sm font-medium text-red-800">{phoneError}</span>}</label>
+              <label className="text-sm font-semibold text-slate-800">{t.tax}<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <label className="text-sm font-semibold text-slate-800">{t.markup}<input type="number" min="0" max="500" step="0.01" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <label className="text-sm font-semibold text-slate-800 sm:col-span-2">{t.logo}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <label className="text-sm font-semibold text-slate-800">{t.color}<input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} className="mt-1 h-12 w-full rounded-lg border border-slate-300 bg-white p-1" /></label>
+              <p className="text-xs leading-5 text-slate-600 sm:col-span-2">{t.taxHelp}</p>
+            </div>
+          </details>
+          <p className="text-xs text-slate-600">{t.laterDetails}</p>
           <button type="submit" disabled={busy} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50 sm:justify-self-start">{busy ? t.saving : t.save}</button>
         </form>}
         {active === 1 && <Link href="/estimate/new?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}

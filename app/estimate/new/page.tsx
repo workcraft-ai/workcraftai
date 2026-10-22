@@ -744,11 +744,15 @@ export default function CreateEstimatePage() {
         if (metadataError) throw new Error(`Estimate saved but attachment details failed: ${metadataError.message}`);
       }
 
-      // 3. Return to the dashboard so the contractor can review and share the proposal.
+      // 3. Show the saved proposal with its next sharing actions. Keep the
+      // onboarding return path so the first-login checklist can advance.
       draftSubmissionComplete.current = true;
       clientRequestIdRef.current = null;
       await clearOfflineEstimateDraft(user.id).catch(() => undefined);
-      router.push(new URLSearchParams(window.location.search).get("setup") === "1" ? "/dashboard?estimateSaved=1#first-five-minutes" : "/dashboard?estimateSaved=1#estimates");
+      if (!createdEstimateId) throw new Error("Estimate ID missing after save.");
+      router.push(new URLSearchParams(window.location.search).get("setup") === "1"
+        ? "/dashboard?estimateSaved=1#first-five-minutes"
+        : `/estimate/${encodeURIComponent(createdEstimateId)}?saved=1`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       const quotaMessage = isEstimateQuotaLimitError(err)
@@ -937,7 +941,10 @@ export default function CreateEstimatePage() {
             </div>
           </div>
 
-          <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-12 cursor-pointer text-sm font-semibold text-slate-900">{language === "es" ? "Fotos, nota de voz e IA (opcional)" : "Photos, voice note, and AI drafting (optional)"}</summary>
+            <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Agrega archivos o usa IA solo si ayudan con este trabajo. Puedes cotizar sin ellos." : "Add field media or use AI only when it helps this job. You can create an estimate without them."}</p>
+          <section className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-sm font-semibold text-slate-900">{isProSubscriber ? "Field photos & voice note" : "Field photos & voice note · Pro"}</h2><p className="mt-1 text-xs text-slate-600">{isProSubscriber ? "Attach up to 6 job photos and one recorded voice note. These are saved privately and only photos appear on the proposal." : "Private photo and voice-note storage is included with Pro."}</p>
                 {isProSubscriber && mediaAllowance && <p role="status" className={`mt-2 text-xs ${mediaAllowance.monthly_limit_bytes - mediaAllowance.monthly_used_bytes <= 0 ? "font-semibold text-red-800" : mediaAllowance.monthly_limit_bytes - mediaAllowance.monthly_used_bytes <= 10 * 1048576 ? "font-semibold text-amber-800" : "text-slate-600"}`}>
@@ -992,6 +999,7 @@ export default function CreateEstimatePage() {
           </section>
 
           {/* Scope of Work Table */}
+          </details>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 id="estimate-line-items" className="scroll-mt-24 text-sm font-semibold text-slate-900">
@@ -1127,6 +1135,9 @@ export default function CreateEstimatePage() {
             </label>
           </div>}
 
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-12 cursor-pointer text-sm font-semibold text-slate-900">{language === "es" ? "Opciones de presentación para el cliente (opcional)" : "Customer presentation options (optional)"}</summary>
+            <div className="mt-4 space-y-4">
           <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
             <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
@@ -1148,6 +1159,8 @@ export default function CreateEstimatePage() {
             {!isProSubscriber && <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>Customer-selectable package options are included with Pro.</span><ProPlanAction variant="text" /></div>}
             {packageOptions.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold uppercase tracking-wide text-slate-700">{option.name}</p><input aria-label={`${option.name} option description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="Describe what's included" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs" /><label className="block text-[11px] font-medium text-slate-600">Package total<PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold" /></label></div>)}</div>}
           </section>
+            </div>
+          </details>
 
           {/* Deposit & Financial Options */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -1196,7 +1209,9 @@ export default function CreateEstimatePage() {
             )}
           </div>
 
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <details className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-12 cursor-pointer text-sm font-semibold text-slate-900">{language === "es" ? "Condiciones de pago del cliente (opcional)" : "Customer payment terms (optional)"}</summary>
+          <section className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
             <label className="block text-xs font-medium text-slate-700">Payment terms (English)
               <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
@@ -1205,6 +1220,7 @@ export default function CreateEstimatePage() {
               <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
             </label>
           </section>
+          </details>
 
           <details className="rounded-lg border border-slate-200 bg-white px-3 py-2">
             <summary className="cursor-pointer text-xs font-semibold text-blue-700">Save this scope as a reusable template</summary>
@@ -1216,7 +1232,7 @@ export default function CreateEstimatePage() {
           </details>
 
           {/* Submit Button */}
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Al guardar se crea un enlace para compartir, pero no se envía ningún correo. Encuéntralo en el panel; tu cupo actual de correos aparece allí y en Perfil." : "Saving creates a shareable proposal link but does not send an email. Find it on your Dashboard; your current email allowance appears there and in Profile."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1"><p className="text-center text-xs text-slate-600">{language === "es" ? "Guardar abre la cotización para revisarla. No envía ningún correo; después podrás copiar el enlace del cliente." : "Saving opens the estimate for review. It does not send an email; you can copy the customer link afterward."}</p>{!isProSubscriber && <ProPlanAction variant="text" />}</div>
           <button
             type="submit"
             disabled={saving || !connectionOnline || Boolean(partialSavedEstimateId)}
