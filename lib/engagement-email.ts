@@ -1,4 +1,4 @@
-import { brandedEmailButton } from "@/lib/branded-email.mjs";
+import { brandedEmailButton, brandedEmailTextFooter } from "@/lib/branded-email.mjs";
 import { emailAddressFromConfig } from "@/lib/email-address";
 import { escapeEmailHtml, notificationFrame, type NotificationMail } from "@/lib/notification-outbox";
 
@@ -63,13 +63,13 @@ export function makeEngagementMail(
   const footer = es
     ? `Correo de producto de WorkCraft AI. Dejar de recibir consejos: ${unsubscribe}\nTambién puedes solicitar la baja o comunicar inquietudes a ${support}.\nPreferencias: ${preference}${postalAddress ? `\n${postalAddress}` : ""}`
     : `WorkCraft AI product email. Stop product tips: ${unsubscribe}\nYou can also request removal or raise concerns at ${support}.\nPreferences: ${preference}${postalAddress ? `\n${postalAddress}` : ""}`;
-  const footerHtml = `<p style="margin:24px 0 0;border-top:1px solid #d9ddd7;padding-top:16px;color:#52615a;font-size:12px;line-height:1.6">${es ? "Puedes dejar de recibir consejos sin afectar avisos esenciales de tu cuenta." : "You can stop product tips without affecting essential account notices."}<br><a href="${escapeEmailHtml(unsubscribe)}">${es ? "Dejar de recibir consejos" : "Stop product tips"}</a> · <a href="${escapeEmailHtml(preference)}">${es ? "Preferencias" : "Preferences"}</a><br>${es ? "También puedes solicitar la baja o comunicar inquietudes a" : "You can also request removal or raise concerns at"} <a href="mailto:${escapeEmailHtml(support)}">${escapeEmailHtml(support)}</a>${postalAddress ? `<br>${escapeEmailHtml(postalAddress)}` : ""}</p>`;
+  const footerHtml = `<p style="margin:0 0 8px">${es ? "Puedes dejar de recibir consejos sin afectar avisos esenciales de tu cuenta." : "You can stop product tips without affecting essential account notices."}</p><p style="margin:0 0 8px"><a href="${escapeEmailHtml(unsubscribe)}">${es ? "Dejar de recibir consejos" : "Stop product tips"}</a> · <a href="${escapeEmailHtml(preference)}">${es ? "Preferencias" : "Preferences"}</a></p>${postalAddress ? `<p style="margin:0 0 8px">${escapeEmailHtml(postalAddress)}</p>` : ""}`;
   return {
     to: [candidate.email],
     reply_to: support,
     subject: content.subject,
-    text: `${content.body}\n\n${content.action}: ${content.href}\n\n${footer}`,
+    text: `${content.body}\n\n${content.action}: ${content.href}\n\n${footer}\n\n${brandedEmailTextFooter(candidate.language)}`,
     html: notificationFrame(candidate.language, content.subject,
-      `<p style="font-size:16px;line-height:1.65">${escapeEmailHtml(content.body)}</p>${brandedEmailButton(content.href, content.action)}${footerHtml}`),
+      `<p style="font-size:16px;line-height:1.65">${escapeEmailHtml(content.body)}</p>${brandedEmailButton(content.href, content.action)}`, footerHtml),
   };
 }

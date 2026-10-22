@@ -2,7 +2,7 @@
 
 The welcome email after account verification remains unchanged. A separate Vercel Cron route, `/api/cron/engagement`, checks eligible accounts daily at 13:00 UTC. On Vercel Hobby, execution may occur later within that hour.
 
-The route is authenticated with `CRON_SECRET`. Product emails include an unsubscribe link and support email in plain-text and HTML footers. `ENGAGEMENT_POSTAL_ADDRESS` is optional in the current deployment; when supplied, its value appears in the footer. This is a known U.S. CAN-SPAM compliance gap until a valid business mailing address or PO box is supplied. Do not use a private home address without deciding to publish it. Essential account, security, trial, payment, and customer emails are unaffected.
+The route is authenticated with `CRON_SECRET`. Product emails include an unsubscribe link, preferences link, support email, and the shared English/Spanish WorkCraft AI footer in plain-text and HTML. The centered HTML footer links to Help, Privacy, and Terms, and uses linked Facebook, Instagram, and LinkedIn PNG logos with accessible names. Plain-text mail keeps labeled social URLs. `ENGAGEMENT_POSTAL_ADDRESS` is optional in the current deployment; when supplied, its value appears in the product-email footer. This is a known U.S. CAN-SPAM compliance gap until a valid business mailing address or PO box is supplied. Do not use a private home address without deciding to publish it. Essential account, security, trial, payment, and customer emails have the shared informational footer without an unsubscribe link.
 
 Only accounts created after the first enabled daily run are enrolled in the getting-started sequence. Eligibility is based on the first confirmed, authenticated app visit:
 
