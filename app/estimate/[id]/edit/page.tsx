@@ -51,6 +51,8 @@ export default function EditEstimatePage() {
   const [proposalSummary, setProposalSummary] = useState("");
   const [paymentTerms, setPaymentTerms] = useState("");
   const [paymentTermsEs, setPaymentTermsEs] = useState("");
+  const [presentationOpen, setPresentationOpen] = useState(false);
+  const [paymentTermsOpen, setPaymentTermsOpen] = useState(false);
 
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemInput[]>([]);
@@ -84,6 +86,7 @@ export default function EditEstimatePage() {
         setProposalSummary(typeof estimate.proposal_summary === "string" ? estimate.proposal_summary : "");
         setPaymentTerms(typeof estimate.payment_terms === "string" ? estimate.payment_terms : "");
         setPaymentTermsEs(typeof estimate.payment_terms_es === "string" ? estimate.payment_terms_es : "");
+        setPaymentTermsOpen(Boolean(estimate.payment_terms?.trim() || estimate.payment_terms_es?.trim()));
         const { data: { user } } = await supabase.auth.getUser();
         const entitlement = user ? await getClientProEntitlement() : null;
         const activePro = entitlement?.has_pro === true;
@@ -91,6 +94,7 @@ export default function EditEstimatePage() {
         setRequireDeposit(activePro ? (estimate.require_deposit ?? false) : false);
         setDepositPercentage(estimate.deposit_percentage || 20);
         setPackageOptions(activePro && Array.isArray(estimate.package_options) ? estimate.package_options : []);
+        setPresentationOpen(estimate.proposal_display_mode === "summary" || Boolean(activePro && estimate.package_options?.length));
 
         setLineItems(
         items.map((i: { description: string; description_es?: string; quantity: number; unit?: string; unit_price: number }) => ({
@@ -140,6 +144,8 @@ export default function EditEstimatePage() {
   const zeroRateLineItems = lineItems.filter((item) => item.description.trim() && Number(item.unit_price) === 0);
   const zeroRateReviewKey = JSON.stringify(lineItems.filter((item) => item.description.trim()).map(({ description, quantity, unit_price }) => [description.trim(), Number(quantity), Number(unit_price)]));
   const zeroRateConfirmed = zeroRateLineItems.length === 0 || zeroRateConfirmationKey === zeroRateReviewKey;
+  const presentationConfigured = proposalDisplayMode === "summary" || packageOptions.length > 0;
+  const paymentTermsConfigured = Boolean(paymentTerms.trim() || paymentTermsEs.trim());
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,14 +164,17 @@ export default function EditEstimatePage() {
       return;
     }
     if (packageOptions.some((option) => !hasAtMostTwoDecimalPlaces(Number(option.total)))) {
+      setPresentationOpen(true);
       setFormError(language === "es" ? "Los totales de los paquetes deben tener como máximo dos decimales." : "Package totals must have no more than two decimal places.");
       return;
     }
     if (proposalDisplayMode === "summary" && !proposalSummary.trim()) {
+      setPresentationOpen(true);
       setFormError(translate(language, "Add a customer-facing work summary or choose detailed line items."));
       return;
     }
     if (proposalSummary.trim().length > 1200) {
+      setPresentationOpen(true);
       setFormError(translate(language, "The work summary must be 1,200 characters or less."));
       return;
     }
@@ -198,8 +207,8 @@ export default function EditEstimatePage() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      // Return to the dashboard so the contractor can review and share the updated proposal.
-      router.push("/dashboard");
+      // Return to the updated proposal to review and share it deliberately.
+      router.push(`/estimate/${encodeURIComponent(id)}?saved=1`);
     } catch (err: unknown) {
       console.error("Estimate update failed:", err instanceof Error ? err.message : "unknown error");
       setFormError(language === "es" ? "No se pudo actualizar la cotización. Revisa los datos e inténtalo de nuevo." : "We couldn’t update this estimate. Check the details and try again.");
@@ -423,6 +432,12 @@ export default function EditEstimatePage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-medium text-slate-700">Markup (%)<input type="number" min="0" max="500" step="0.01" value={markupPercentage} onChange={(event) => setMarkupPercentage(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label><label className="text-xs font-medium text-slate-700">Sales tax (%)<input type="number" min="0" max="100" step="0.001" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm" /></label></div>
           </section>
 
+          <details open={presentationOpen} onToggle={(event) => setPresentationOpen(event.currentTarget.open)} className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-12 cursor-pointer text-sm font-semibold text-slate-900">
+              {language === "es" ? "Opciones de presentación para el cliente (opcional)" : "Customer presentation options (optional)"}
+              {presentationConfigured && <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs text-green-900">{language === "es" ? "Configuradas" : "Configured"}</span>}
+            </summary>
+            <div className="mt-4 space-y-4">
           <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer quote format</h2><p className="mt-1 text-xs text-slate-600">Choose how much detail the customer sees on the proposal.</p></div>
             <fieldset className="flex flex-wrap gap-3" aria-label="Proposal detail">
@@ -440,6 +455,8 @@ export default function EditEstimatePage() {
             <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold text-slate-900">Good / Better / Best</h2><p className="mt-1 text-xs text-slate-500">Add or adjust service options customers can choose from.</p></div><button type="button" onClick={() => setPackageOptions(packageOptions.length ? [] : ["Good", "Better", "Best"].map((name) => ({ name: name as EstimatePackage["name"], description: "", description_es: "", total: subtotal })))} className="text-xs font-semibold text-blue-700 underline">{packageOptions.length ? "Remove options" : "Add options"}</button></div>
             {packageOptions.length > 0 && <div className="grid gap-3 md:grid-cols-3">{packageOptions.map((option, index) => <div key={option.name} className="space-y-2 rounded-lg bg-slate-50 p-3"><p className="text-xs font-bold uppercase text-slate-600">{option.name}</p><input aria-label={`${option.name} description`} value={option.description} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item))} placeholder="What's included?" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><input aria-label={`${option.name} Spanish description`} value={option.description_es ?? ""} onChange={(event) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description_es: event.target.value } : item))} placeholder="Spanish description (optional)" className="w-full rounded-md border border-slate-300 bg-white p-2 text-xs" /><PackageTotalInput name={option.name} total={option.total} onChange={(total) => setPackageOptions((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, total } : item))} className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm" /></div>)}</div>}
           </section> : <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><span>Good / Better / Best options are included with Pro.</span>{" "}<ProPlanAction variant="text" /></section>}
+            </div>
+          </details>
 
           {/* Financial Totals */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200/60">
@@ -486,7 +503,12 @@ export default function EditEstimatePage() {
             )}
           </div>
 
-          <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <details open={paymentTermsOpen} onToggle={(event) => setPaymentTermsOpen(event.currentTarget.open)} className="rounded-xl border border-slate-200 bg-white p-4">
+            <summary className="min-h-12 cursor-pointer text-sm font-semibold text-slate-900">
+              {language === "es" ? "Condiciones de pago del cliente (opcional)" : "Customer payment terms (optional)"}
+              {paymentTermsConfigured && <span className="ml-2 rounded-full bg-green-100 px-2 py-1 text-xs text-green-900">{language === "es" ? "Configuradas" : "Configured"}</span>}
+            </summary>
+          <section className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div><h2 className="text-sm font-semibold text-slate-900">Customer payment terms</h2><p className="mt-1 text-xs text-slate-600">Optional. State your deposit, cancellation, and refund terms for this job. Customers will see them before approval and payment.</p></div>
             <label className="block text-xs font-medium text-slate-700">Payment terms (English)
               <textarea value={paymentTerms} maxLength={1000} onChange={(event) => setPaymentTerms(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
@@ -495,8 +517,9 @@ export default function EditEstimatePage() {
               <textarea value={paymentTermsEs} maxLength={1000} onChange={(event) => setPaymentTermsEs(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal" />
             </label>
           </section>
+          </details>
 
-          <p className="text-center text-xs text-slate-600">Updating the proposal does not send an email. Share it from your Dashboard when you are ready.</p>
+          <p className="text-center text-xs text-slate-600">{language === "es" ? "Guardar abre la cotización actualizada para revisarla. No envía ningún correo; después podrás compartir el enlace del cliente." : "Saving opens the updated estimate for review. It does not send an email; you can share the customer link afterward."}</p>
           {/* Actions */}
           <div className="flex gap-3">
             <button
