@@ -322,23 +322,30 @@ export default function EditEstimatePage() {
               {lineItems.map((item, index) => (
                 <div
                   key={index}
+                  role="group"
+                  aria-label={language === "es" ? `Partida ${index + 1}` : `Line item ${index + 1}`}
                   className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5"
                 >
                   <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:items-center">
+                  <label className="col-span-2 min-w-0 text-xs font-semibold text-slate-700 sm:flex-1">
+                    {language === "es" ? "Descripción" : "Description"}
                   <input
-                    aria-label={`Line item ${index + 1} description`}
                     type="text"
                     value={item.description}
                     onChange={(e) =>
                       handleItemChange(index, "description", e.target.value)
                     }
                     placeholder="Description"
-                    className="col-span-2 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-1 sm:flex-1"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-16">
+                    {language === "es" ? "Cantidad" : "Quantity"}
                   <input
-                    aria-label={`Line item ${index + 1} quantity`}
                     type="number"
-                    min="1"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
                     value={item.quantity}
                     onChange={(e) =>
                       handleItemChange(
@@ -347,19 +354,23 @@ export default function EditEstimatePage() {
                         parseFloat(e.target.value) || 0
                       )
                     }
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-24">
+                    {language === "es" ? "Unidad" : "Unit"}
                   <input
-                    aria-label={`Line item ${index + 1} unit`}
                     type="text"
                     maxLength={40}
                     value={item.unit || "each"}
                     onChange={(e) => handleItemChange(index, "unit", e.target.value)}
                     placeholder="Unit"
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-24">
+                    {language === "es" ? "Precio unitario" : "Unit price"}
                   <input
-                    aria-label={`Line item ${index + 1} rate`}
                     type="number"
                     min="0"
                     step="0.01"
@@ -371,8 +382,10 @@ export default function EditEstimatePage() {
                         parseFloat(e.target.value) || 0
                       )
                     }
-                    className="min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    inputMode="decimal"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
                   <div className="flex min-w-0 items-center justify-between rounded-md px-2 text-sm font-semibold text-slate-700 sm:ml-auto sm:w-20 sm:justify-end sm:rounded-none sm:px-0 sm:text-right sm:text-xs">
                     <span className="text-xs font-medium text-slate-500 sm:hidden">Amount</span>
                     <span className="whitespace-nowrap">${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}</span>
@@ -387,7 +400,9 @@ export default function EditEstimatePage() {
                     ✕
                   </button>
                   </div>
-                  <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={`Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <label className="block text-xs font-semibold text-slate-700">{language === "es" ? "Descripción en español (opcional)" : "Spanish description (optional)"}
+                    <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} className="mt-1 min-h-12 w-full rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </label>
                 </div>
               ))}
             </div>

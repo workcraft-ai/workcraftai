@@ -433,7 +433,7 @@ export default function DashboardPage() {
             <div className="hidden lg:block">
             <EstimateTableScroll>
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase font-semibold">
                   <tr>
                     <th className="p-3.5">Client</th>
                     <th className="p-3.5">Job Location</th>
