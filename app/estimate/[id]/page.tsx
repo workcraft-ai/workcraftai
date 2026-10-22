@@ -64,8 +64,12 @@ export default function ClientEstimatePage() {
   const id = params?.id as string;
 
   const [shareNotice, setShareNotice] = useState("");
+  const [shareFallbackUrl, setShareFallbackUrl] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
   const [shareDays, setShareDays] = useState("30");
+  const [justSaved, setJustSaved] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailNotice, setEmailNotice] = useState("");
   const customerSuffix = () => { const token = new URL(window.location.href).searchParams.get("token"); return token ? `?token=${encodeURIComponent(token)}` : ""; };
 
   const [estimate, setEstimate] = useState<Estimate | null>(null);
@@ -108,6 +112,10 @@ export default function ClientEstimatePage() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>({ amountPaidCents: 0, totalCents: 0, available: false });
   const [startingPayment, setStartingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+
+  useEffect(() => {
+    setJustSaved(new URLSearchParams(window.location.search).get("saved") === "1");
+  }, [id]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -231,14 +239,22 @@ export default function ClientEstimatePage() {
   const depositAmount = estimateMoney.depositCents / 100;
 
   const manageShare = async (action: "copy" | "replace" | "disable") => {
-    setShareBusy(true); setShareNotice("");
+    setShareBusy(true); setShareNotice(""); setShareFallbackUrl("");
     try {
       const response = await fetch(`/api/estimates/${id}/share`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action, expiresInDays: shareDays === "none" ? null : Number(shareDays)})});
       const result = await response.json();
       if (!response.ok) throw new Error("Could not update the customer link. Refresh and try again.");
       if (result.url) {
-        await navigator.clipboard.writeText(result.url);
-        setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied.");
+        try {
+          await navigator.clipboard.writeText(result.url);
+        } catch {
+          setShareFallbackUrl(result.url);
+          setShareNotice(language === "es"
+            ? "El enlace está listo. Selecciónalo y cópialo abajo; aún no se ha enviado."
+            : "The link is ready. Select and copy it below; nothing has been sent.");
+          return;
+        }
+        setShareNotice(action === "replace" ? "New customer link copied. Previous links no longer work." : "Customer link copied. Share it by text or your own email.");
         if (isOwner) {
           const progressResponse = await fetch("/api/onboarding", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -252,6 +268,22 @@ export default function ClientEstimatePage() {
       else setShareNotice("Customer sharing is disabled. Existing Stripe checkout sessions may remain open.");
     } catch (error) {setShareNotice(error instanceof Error ? error.message : "Could not copy the customer link.");}
     finally {setShareBusy(false);}
+  };
+
+  const sendEstimateEmail = async () => {
+    setEmailBusy(true); setEmailNotice("");
+    try {
+      const response = await fetch(`/api/estimates/${encodeURIComponent(id)}/send`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Email could not be sent.");
+      setEmailNotice(result.notificationPending
+        ? language === "es" ? "Correo en cola. El envío aún no se ha confirmado." : "Email queued. Delivery has not been confirmed yet."
+        : language === "es" ? "Correo de la cotización enviado al cliente." : "Estimate email sent to your customer.");
+    } catch (error) {
+      setEmailNotice(error instanceof Error ? error.message : "Email could not be sent.");
+    } finally {
+      setEmailBusy(false);
+    }
   };
 
   const sendQuestion = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -430,6 +462,21 @@ export default function ClientEstimatePage() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-3xl mx-auto space-y-4">
         {isOwner && <SetupReturnLink step="proposal" />}
+        {isOwner && justSaved && <section aria-labelledby="saved-next-title" className="print:hidden rounded-xl border border-green-300 bg-green-50 p-5 text-green-950 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wider">{language === "es" ? "Cotización guardada" : "Estimate saved"}</p>
+          <h2 id="saved-next-title" className="mt-1 text-lg font-bold">{language === "es" ? "Revisa la propuesta y compártela" : "Review the proposal, then share it"}</h2>
+          <p className="mt-2 text-sm">{language === "es" ? "Guardar no envió un correo. Revisa lo que verá el cliente y luego copia el enlace o envíalo por correo si tu plan lo permite." : "Saving did not send an email. Review what your customer will see, then copy the link or email it if your plan allows."}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href="#customer-proposal" className="inline-flex min-h-12 items-center rounded-lg bg-green-800 px-4 text-sm font-semibold text-white">{language === "es" ? "Revisar vista del cliente" : "Preview customer view"}</a>
+            <button type="button" disabled={shareBusy} onClick={() => void manageShare("copy")} className="min-h-12 rounded-lg border border-green-800 bg-white px-4 text-sm font-semibold text-green-900 disabled:opacity-50">{language === "es" ? "Copiar enlace del cliente" : "Copy customer link"}</button>
+            {ownerPlanLoaded && ownerHasPro && estimate.client_email?.trim() && <button type="button" disabled={emailBusy} onClick={() => void sendEstimateEmail()} className="min-h-12 rounded-lg border border-green-800 bg-white px-4 text-sm font-semibold text-green-900 disabled:opacity-50">{emailBusy ? (language === "es" ? "Enviando…" : "Sending…") : (language === "es" ? "Enviar por correo" : "Email customer")}</button>}
+          </div>
+          {ownerPlanLoaded && !ownerHasPro && <p className="mt-3 text-sm">{language === "es" ? "El correo desde WorkCraft AI está incluido con Pro." : "Email from WorkCraft AI is included with Pro."} <ProPlanAction variant="text" /></p>}
+          {ownerPlanLoaded && ownerHasPro && !estimate.client_email?.trim() && <p className="mt-3 text-sm">{language === "es" ? "Para enviar por correo, agrega el email del cliente al editar la cotización." : "To email the customer, add their address while editing this estimate."}</p>}
+          {emailNotice && <p role="status" className="mt-3 text-sm font-medium">{emailNotice}</p>}
+          {shareNotice && <p role="status" className="mt-3 text-sm font-medium">{shareNotice}</p>}
+          {shareFallbackUrl && <label className="mt-3 block text-sm font-semibold">{language === "es" ? "Enlace del cliente" : "Customer link"}<input readOnly value={shareFallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-1 min-h-12 w-full rounded-lg border border-green-300 bg-white px-3 font-normal text-slate-900" /></label>}
+        </section>}
         {/* Contractor-only status and navigation controls */}
         {isOwner && <div className="print:hidden bg-slate-900 text-white p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
           <div className="flex items-center space-x-2">
@@ -523,11 +570,12 @@ export default function ClientEstimatePage() {
             <button disabled={shareBusy} onClick={()=>void manageShare("replace")} className="min-h-12 rounded-lg border px-3 text-xs font-semibold">Replace customer link</button>
             <button disabled={shareBusy} onClick={()=>void manageShare("disable")} className="min-h-12 rounded-lg border px-3 text-xs font-semibold">Disable customer link</button>
           </div>
-          {shareNotice && <p role="status" className="break-words text-xs text-slate-700">{shareNotice}</p>}
+          {!justSaved && shareNotice && <p role="status" className="break-words text-xs text-slate-700">{shareNotice}</p>}
+          {!justSaved && shareFallbackUrl && <label className="block text-xs font-semibold text-slate-700">{language === "es" ? "Enlace del cliente" : "Customer link"}<input readOnly value={shareFallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>}
         </section>}
 
         {/* Client Proposal Card */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+        <div id="customer-proposal" className="scroll-mt-6 bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
           {/* Proposal Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
             <div>
