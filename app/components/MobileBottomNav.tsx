@@ -91,20 +91,20 @@ export default function MobileBottomNav({ pathname, adminRole }: MobileBottomNav
               href={href}
               aria-current={active ? "page" : undefined}
               onClick={() => setMoreOpen(false)}
-              className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-[10px] font-semibold leading-none transition-colors ${active ? "text-orange-800" : "text-slate-600 hover:bg-slate-100"}`}
+              className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-xs font-semibold leading-tight transition-colors ${active ? "text-orange-800" : "text-slate-600 hover:bg-slate-100"}`}
             >
               <NavIcon name={icon} />
-              <span className="max-w-full truncate">{translate(language, label)}</span>
+              <span className="max-w-full whitespace-normal text-center">{translate(language, label)}</span>
             </Link>
           );
         })}
-        <button type="button" aria-expanded={moreOpen} aria-current={moreActive ? "page" : undefined} aria-controls="mobile-more-menu" onClick={() => setMoreOpen((open) => !open)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-[10px] font-semibold leading-none transition-colors ${moreOpen || moreActive ? "text-orange-800" : "text-slate-600 hover:bg-slate-100"}`}>
+        <button type="button" aria-expanded={moreOpen} aria-current={moreActive ? "page" : undefined} aria-controls="mobile-more-menu" onClick={() => setMoreOpen((open) => !open)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-xs font-semibold leading-tight transition-colors ${moreOpen || moreActive ? "text-orange-800" : "text-slate-600 hover:bg-slate-100"}`}>
           <NavIcon name="more" />
           <span>{translate(language, "More")}</span>
         </button>
       </nav>
       {moreOpen && (
-        <div id="mobile-more-menu" className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-[51] w-64 rounded-2xl border border-slate-200 bg-white p-2 text-slate-800 shadow-xl lg:hidden">
+        <div id="mobile-more-menu" className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-[51] w-64 rounded-2xl border border-slate-200 bg-white p-2 text-slate-800 shadow-xl lg:hidden">
           <p className="px-3 pb-2 pt-1 text-xs font-bold uppercase tracking-wide text-slate-500">{translate(language, "More tools")}</p>
           {moreLinks.map(({ href, label, icon }) => {
             const active = isPathActive(pathname, href);

@@ -612,7 +612,7 @@ export default function ClientEstimatePage() {
             </div>
             <div className="hidden overflow-x-auto rounded-xl border border-slate-200 sm:block">
               <table className="w-full min-w-[520px] text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
                   <tr>
                     <th className="p-3">Description</th>
                     <th className="p-3 text-center">Qty / Unit</th>

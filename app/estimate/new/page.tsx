@@ -818,15 +818,18 @@ export default function CreateEstimatePage() {
           {formError && <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm font-medium text-red-900"><p>{formError}</p>{partialSavedEstimateId && <Link href={`/estimate/${encodeURIComponent(partialSavedEstimateId)}`} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">{language === "es" ? "Abrir cotización guardada" : "Open saved estimate"}</Link>}</div>}
 
           <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div><h2 className="text-sm font-semibold text-slate-800">{language === "es" ? "Cotización sin terminar" : "Unfinished estimate"}</h2><p className="mt-1 text-xs text-slate-600">{language === "es" ? "Los borradores se guardan automáticamente solo en este navegador y dispositivo. Incluyen datos de contacto del cliente; bórralos en dispositivos compartidos." : "Drafts auto-save in this browser on this device only. They include customer contact details; clear them on shared devices."}</p></div>
-              <div className="flex flex-wrap gap-2">
+            <details open={savedDraftNeedsChoice || undefined}>
+              <summary className="min-h-12 cursor-pointer rounded-lg text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
+                {language === "es" ? "Cotización sin terminar · opciones de borrador" : "Unfinished estimate · draft options"}
+              </summary>
+              <p className="mt-1 text-xs text-slate-600">{language === "es" ? "Los borradores se guardan automáticamente solo en este navegador y dispositivo. Incluyen datos de contacto del cliente; bórralos en dispositivos compartidos." : "Drafts auto-save in this browser on this device only. They include customer contact details; clear them on shared devices."}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={saveDraftOnDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Guardar en este dispositivo" : "Save on this device"}</button>
                 <button type="button" onClick={restoreDraftFromDevice} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Restaurar borrador" : "Restore saved draft"}</button>
                 {savedDraftNeedsChoice && <button type="button" onClick={() => void startNewEstimateOnDevice()} className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">{language === "es" ? "Crear cotización nueva" : "Start new estimate"}</button>}
                 <button type="button" onClick={deleteDraftFromDevice} className="inline-flex min-h-12 items-center px-2 py-2 text-xs font-semibold text-red-700 underline">{language === "es" ? "Borrar borrador guardado" : "Clear saved draft"}</button>
               </div>
-            </div>
+            </details>
             {savedDraftNeedsChoice && <p role="status" className="mt-3 text-xs font-semibold text-amber-900">{language === "es" ? "Ya hay un borrador guardado en este dispositivo. Restáuralo o crea una cotización nueva antes de continuar." : "A saved draft already exists on this device. Restore it or start a new estimate before continuing."}</p>}
             {draftStorageMessage && <p role="status" className="mt-3 text-xs text-slate-600">{draftStorageMessage}</p>}
           </section>
@@ -1013,18 +1016,21 @@ export default function CreateEstimatePage() {
 
             <div className="space-y-3">
               {lineItems.map((item, index) => (
-                <div key={index} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5">
+                <div key={index} role="group" aria-label={language === "es" ? `Partida ${index + 1}` : `Line item ${index + 1}`} className="space-y-2 rounded-lg border border-slate-200/80 bg-slate-50 p-2.5">
                 <div className="grid grid-cols-2 items-center gap-2 sm:flex sm:items-center">
+                  <label className="col-span-2 min-w-0 text-xs font-semibold text-slate-700 sm:flex-1">
+                    {language === "es" ? "Descripción" : "Description"}
                   <input
-                    aria-label={`Line item ${index + 1} description`}
                     type="text"
                     placeholder="Item or service description"
                     value={item.description}
                     onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                    className="col-span-2 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-1 sm:flex-1"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-16">
+                    {language === "es" ? "Cantidad" : "Quantity"}
                   <input
-                    aria-label={`Line item ${index + 1} quantity`}
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -1032,19 +1038,23 @@ export default function CreateEstimatePage() {
                     placeholder="Qty"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, "quantity", parseFloat(e.target.value) || 0)}
-                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-16"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-24">
+                    {language === "es" ? "Unidad" : "Unit"}
                   <input
-                    aria-label={`Line item ${index + 1} unit`}
                     type="text"
                     maxLength={40}
                     placeholder="Unit"
                     value={item.unit || "each"}
                     onChange={(e) => handleItemChange(index, "unit", e.target.value)}
-                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
+                  <label className="min-w-0 text-xs font-semibold text-slate-700 sm:w-24">
+                    {language === "es" ? "Precio unitario" : "Unit price"}
                   <input
-                    aria-label={`Line item ${index + 1} rate`}
                     type="number"
                     min="0"
                     step="0.01"
@@ -1052,8 +1062,9 @@ export default function CreateEstimatePage() {
                     placeholder="Rate"
                     value={item.unit_price}
                     onChange={(e) => handleItemChange(index, "unit_price", parseFloat(e.target.value) || 0)}
-                    className="min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-24"
+                    className="mt-1 min-h-12 min-w-0 w-full rounded-md border border-slate-200 bg-white p-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  </label>
                   <div className="flex min-w-0 items-center justify-between rounded-md px-2 text-sm font-semibold text-slate-700 sm:ml-auto sm:w-20 sm:justify-end sm:rounded-none sm:px-0 sm:text-right sm:text-xs">
                     <span className="text-xs font-medium text-slate-500 sm:hidden">Amount</span>
                     <span className="whitespace-nowrap">${(estimateMoney.lineItemCents[index] / 100).toFixed(2)}</span>
@@ -1075,11 +1086,13 @@ export default function CreateEstimatePage() {
                 {item.unit && /^(unknown|unspecified|n\/a)$/i.test(item.unit.trim()) && <p role="alert" className="text-[11px] font-semibold text-red-800">{language === "es" ? "Elige una unidad reconocida antes de guardar." : "Choose a recognized unit before saving this estimate."}</p>}
                 {reviewNotesByIndex[index].map((note, noteIndex) => <p key={`${index}-review-${noteIndex}`} role="note" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-950">{note}</p>)}
                 {!!item.price_book_suggestions?.length && <div data-price-book-choice className="rounded-md border border-blue-200 bg-blue-50/70 p-2">
-                  <p className="text-[11px] font-semibold text-blue-950">{language === "es" ? "Elige una tarifa de tu lista de precios. Si ninguna corresponde a este trabajo, usa el precio inicial de IA y revísalo." : "Choose a rate from your Price Book. If none fits this work, use and review the AI starting price."}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="inline-flex min-h-12 items-center rounded-md border border-blue-200 bg-white px-3 py-2 text-left text-[11px] font-semibold text-blue-900 hover:bg-blue-100">{language === "es" ? "Usar" : "Use"} {suggestion.name} · {suggestion.unit} · ${Number(suggestion.unit_price).toFixed(2)}{suggestion.pricing_basis ? ` · ${suggestion.pricing_basis}` : ""} · {suggestion.match_score}%</button>)}</div>
-                  <button type="button" onClick={() => applyAiStartingPrice(index)} className="mt-2 min-h-11 rounded-md border border-amber-300 bg-white px-3 py-2 text-[11px] font-semibold text-amber-950">{language === "es" ? "Ninguna coincide · usar precio inicial de IA" : "None fit · use AI starting price"}{Number(item.ai_starting_unit_price) > 0 ? ` ($${Number(item.ai_starting_unit_price).toFixed(2)})` : ""}</button>
+                  <p className="text-sm font-semibold text-blue-950">{language === "es" ? "Elige una tarifa de tu lista de precios. Si ninguna corresponde a este trabajo, usa el precio inicial de IA y revísalo." : "Choose a rate from your Price Book. If none fits this work, use and review the AI starting price."}</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">{item.price_book_suggestions.map((suggestion) => <button key={suggestion.id ?? `${suggestion.name}-${suggestion.unit}`} type="button" onClick={() => applyPriceBookSuggestion(index, suggestion)} className="flex min-h-14 w-full flex-col justify-center gap-1 rounded-lg border border-blue-200 bg-white p-3 text-left text-blue-900 transition-colors hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><span className="flex w-full items-start justify-between gap-3 text-sm font-semibold"><span>{suggestion.name}</span><span className="shrink-0 tabular-nums">${Number(suggestion.unit_price).toFixed(2)}</span></span><span className="text-xs text-slate-600">{language === "es" ? "Usar esta tarifa" : "Use this rate"} · {suggestion.unit}{suggestion.pricing_basis ? ` · ${suggestion.pricing_basis}` : ""} · {suggestion.match_score}% {language === "es" ? "coincidencia" : "match"}</span></button>)}</div>
+                  <button type="button" onClick={() => applyAiStartingPrice(index)} className="mt-2 min-h-12 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700">{language === "es" ? "Ninguna coincide · usar precio inicial de IA" : "None fit · use AI starting price"}{Number(item.ai_starting_unit_price) > 0 ? ` ($${Number(item.ai_starting_unit_price).toFixed(2)})` : ""}</button>
                 </div>}
-                <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} placeholder="Spanish description (optional)" aria-label={language === "es" ? `Descripción en español para ${item.description || `partida ${index + 1}`}` : `Spanish description for ${item.description || `line item ${index + 1}`}`} className="w-full rounded-md border border-slate-200 bg-white p-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <label className="block text-xs font-semibold text-slate-700">{language === "es" ? "Descripción en español (opcional)" : "Spanish description (optional)"}
+                  <input type="text" value={item.description_es ?? ""} onChange={(event) => handleItemChange(index, "description_es", event.target.value)} className="mt-1 min-h-12 w-full rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </label>
                 </div>
               ))}
             </div>

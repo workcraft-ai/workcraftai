@@ -93,10 +93,10 @@
 .payment-faq-item summary:after{content:'+';position:absolute;right:0;color:#a94727;font-size:20px;font-weight:500}
 .payment-faq-item[open] summary:after{content:'−'}
 .payment-faq-item summary:focus-visible{outline:2px solid var(--orange);outline-offset:3px;border-radius:2px}
-.payment-faq-item p{margin:0;padding:0 0 18px;color:#56615a;font-size:12px;line-height:1.75}
-.payment-faq-note{margin:22px 0 0;color:#56615a;font-size:11px;text-align:center}
+.payment-faq-item p{margin:0;padding:0 0 18px;color:#56615a;font-size:14px;line-height:1.65}
+.payment-faq-note{margin:22px 0 0;color:#56615a;font-size:14px;text-align:center}
 .payment-faq-note a{color:#a94727;font-weight:700;text-decoration:underline;text-underline-offset:3px}
-@media(max-width:650px){.payment-faq-section{padding-top:58px;padding-bottom:60px}.payment-faq-list{grid-template-columns:1fr;gap:9px}.payment-faq-item{padding-inline:15px}.payment-faq-item summary{min-height:54px;font-size:12px}.payment-faq-item p{font-size:11px}}
+@media(max-width:650px){.payment-faq-section{padding-top:58px;padding-bottom:60px}.payment-faq-list{grid-template-columns:1fr;gap:9px}.payment-faq-item{padding-inline:15px}.payment-faq-item summary{min-height:54px;font-size:15px}.payment-faq-item p{font-size:15px}}
 
 /* Readable secondary text and generous standalone navigation targets. */
 .footer-app-link,.footer-bottom a,.text-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:48px;padding:8px 12px;font-size:12px}
@@ -220,6 +220,7 @@ a:focus-visible,button:focus-visible{outline:3px solid #9b3e1f;outline-offset:3p
 .analytics-actions button{min-height:44px;padding:10px 14px;border-radius:6px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .analytics-decline{border:1px solid #b7c1b8;background:white;color:#1d2925}
 .analytics-accept{border:1px solid #1d2925;background:#1d2925;color:white}
+@media(min-width:701px){.analytics-banner{left:auto;right:16px;transform:none;width:min(420px,calc(100% - 32px));align-items:stretch;flex-direction:column;gap:12px}}
 @media(max-width:700px){.analytics-banner{align-items:stretch;flex-direction:column;gap:13px;padding:15px}.analytics-actions{justify-content:flex-end}.analytics-actions button{flex:1}}
 @media(max-width:650px){.footer-bottom{height:auto;min-height:52px}.footer-links{min-width:0;flex-wrap:wrap;gap:8px 16px}.footer-links a,.analytics-choice{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:48px}.analytics-actions button{min-height:48px}}
 /* Third-party SaaS directory listing badge in the public-site footer. */
