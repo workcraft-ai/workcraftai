@@ -1,5 +1,6 @@
 import { customerShareUrl } from "@/lib/proposal-sharing";
 import { createHash } from "node:crypto";
+import { brandedEmailFooter, brandedEmailTextFooter } from "@/lib/branded-email.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createUserSupabaseClient } from "@/app/utils/supabase/server";
@@ -162,7 +163,7 @@ export async function POST(
     ? `<p style="margin:18px 0 0;color:#68736c;font-size:13px">${spanish ? "Si el contratista habilitó los pagos en línea, puedes revisar las opciones disponibles en la cotización aceptada." : "If your contractor enabled online payments, you can review available options on the accepted estimate."}</p><p style="margin:18px 0"><a href="${estimateLink}" style="display:inline-block;background:#c85b2d;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">${spanish ? "Ver cotización y opciones de pago" : "View estimate and payment options"}</a></p>`
     : "";
   const safeCustomerName = escapeHtml(customerName);
-  const html = `<div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:0 auto;padding:24px">${logoUrl}<p style="margin:0 0 16px;font-size:13px;font-weight:bold;letter-spacing:1px;color:#68736c">WORKCRAFT AI</p><h1 style="font-size:24px;line-height:1.3;color:${brandColor}">${spanish ? "Factura de" : "Invoice from"} ${escapeHtml(contractorName)}</h1><p>${spanish ? "Hola" : "Hi"} ${safeCustomerName},</p><p>${spanish ? "Aquí está la factura de tu trabajo." : "Here is the invoice for your job."}</p>${reference}<section style="margin:20px 0;padding:16px;background:#f8f7f2;border:1px solid #e5e7eb;border-radius:10px"><p style="margin:0;font-weight:bold">${escapeHtml(title)}</p>${addressLine}</section>${packageNote}${lineTable}<p style="margin:20px 0;text-align:right;font-size:20px;font-weight:bold">${totalLabel}: ${amount(invoiceTotalForEmail)}</p>${paymentNote}<p style="margin-top:28px;color:#68736c;font-size:12px">${spanish ? "Enviado con WorkCraft AI. Para responder, usa la opción de responder a este correo." : "Sent with WorkCraft AI. Reply to this email to contact your contractor."}</p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;color:#1d2925;max-width:640px;margin:0 auto;padding:24px">${logoUrl}<p style="margin:0 0 16px;font-size:13px;font-weight:bold;letter-spacing:1px;color:#68736c">WORKCRAFT AI</p><h1 style="font-size:24px;line-height:1.3;color:${brandColor}">${spanish ? "Factura de" : "Invoice from"} ${escapeHtml(contractorName)}</h1><p>${spanish ? "Hola" : "Hi"} ${safeCustomerName},</p><p>${spanish ? "Aquí está la factura de tu trabajo." : "Here is the invoice for your job."}</p>${reference}<section style="margin:20px 0;padding:16px;background:#f8f7f2;border:1px solid #e5e7eb;border-radius:10px"><p style="margin:0;font-weight:bold">${escapeHtml(title)}</p>${addressLine}</section>${packageNote}${lineTable}<p style="margin:20px 0;text-align:right;font-size:20px;font-weight:bold">${totalLabel}: ${amount(invoiceTotalForEmail)}</p>${paymentNote}<p style="margin-top:28px;color:#68736c;font-size:12px">${spanish ? "Enviado con WorkCraft AI. Para responder, usa la opción de responder a este correo." : "Sent with WorkCraft AI. Reply to this email to contact your contractor."}</p>${brandedEmailFooter(spanish ? "es" : "en")}</div>`;
   const textRows = items.map((item, index) => {
     const description = spanish ? item.description_es?.trim() || item.description : item.description;
     return `${description} — ${Number(item.quantity)} × ${amount(Number(item.unit_price))} = ${amount(invoiceMoney.lineItemCents[index] / 100)}`;
@@ -178,7 +179,7 @@ export async function POST(
       source: "invoice",
       send_key: `invoice-send-${job.id}-${new Date(job.updated_at).getTime()}-${createHash("sha256").update(recipient.toLowerCase()).digest("hex").slice(0, 16)}`,
       payload: { from: getWorkCraftNoReplySender(), reply_to: contractorReplyEmail, to: [recipient],
-        subject: spanish ? `Factura de ${title} · ${contractorName}` : `Invoice for ${title} · ${contractorName}`, text, html },
+        subject: spanish ? `Factura de ${title} · ${contractorName}` : `Invoice for ${title} · ${contractorName}`, text: `${text}\n\n${brandedEmailTextFooter(spanish ? "es" : "en")}`, html },
     });
     const result = queued.status === "sent" ? null : await processNotifications(admin, [queued.id], 1);
     const sent = queued.status === "sent" || Boolean(result?.sent);

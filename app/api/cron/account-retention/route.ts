@@ -5,6 +5,7 @@ import { getTrustedAppOrigin } from "@/lib/security.mjs";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { releaseAppEmail, reserveAppEmail } from "@/lib/email-quota";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
+import { brandedEmailFrame, brandedEmailTextFooter, escapeEmailHtml } from "@/lib/branded-email.mjs";
 
 export const maxDuration = 60;
 
@@ -12,14 +13,14 @@ function warningEmail(language: string, appUrl: string, supportEmail: string) {
   if (language === "es") {
     return {
       subject: "Tu cuenta de WorkCraft AI está programada para eliminarse",
-      text: `No hemos registrado actividad en tu cuenta de WorkCraft AI durante 12 meses. Si no vuelves a iniciar sesión durante los próximos 30 días, eliminaremos tu cuenta y los datos asociados. Inicia sesión en ${appUrl}/login para mantener tu cuenta. Si necesitas ayuda, escribe a ${supportEmail}.`,
-      html: `<p>No hemos registrado actividad en tu cuenta de WorkCraft AI durante 12 meses.</p><p>Si no vuelves a iniciar sesión durante los próximos 30 días, eliminaremos tu cuenta y los datos asociados.</p><p><a href="${appUrl}/login">Inicia sesión para mantener tu cuenta</a>.</p><p>Si necesitas ayuda, escribe a <a href="mailto:${supportEmail}">${supportEmail}</a>.</p>`,
+      text: `No hemos registrado actividad en tu cuenta de WorkCraft AI durante 12 meses. Si no vuelves a iniciar sesión durante los próximos 30 días, eliminaremos tu cuenta y los datos asociados. Inicia sesión en ${appUrl}/login para mantener tu cuenta. Si necesitas ayuda, escribe a ${supportEmail}.\n\n${brandedEmailTextFooter("es")}`,
+      html: brandedEmailFrame({ language: "es", title: "Tu cuenta de WorkCraft AI está programada para eliminarse", preheader: "Inicia sesión para conservar tu cuenta.", eyebrow: "AVISO DE CUENTA", content: `<p>No hemos registrado actividad en tu cuenta de WorkCraft AI durante 12 meses.</p><p>Si no vuelves a iniciar sesión durante los próximos 30 días, eliminaremos tu cuenta y los datos asociados.</p><p><a href="${escapeEmailHtml(appUrl)}/login">Inicia sesión para mantener tu cuenta</a>.</p><p>Si necesitas ayuda, escribe a <a href="mailto:${escapeEmailHtml(supportEmail)}">${escapeEmailHtml(supportEmail)}</a>.</p>` }),
     };
   }
   return {
     subject: "Your WorkCraft AI account is scheduled for deletion",
-    text: `We have not recorded activity on your WorkCraft AI account for 12 months. If you do not sign in during the next 30 days, we will delete your account and associated data. Sign in at ${appUrl}/login to keep your account. If you need help, contact ${supportEmail}.`,
-    html: `<p>We have not recorded activity on your WorkCraft AI account for 12 months.</p><p>If you do not sign in during the next 30 days, we will delete your account and associated data.</p><p><a href="${appUrl}/login">Sign in to keep your account</a>.</p><p>If you need help, contact <a href="mailto:${supportEmail}">${supportEmail}</a>.</p>`,
+    text: `We have not recorded activity on your WorkCraft AI account for 12 months. If you do not sign in during the next 30 days, we will delete your account and associated data. Sign in at ${appUrl}/login to keep your account. If you need help, contact ${supportEmail}.\n\n${brandedEmailTextFooter("en")}`,
+    html: brandedEmailFrame({ language: "en", title: "Your WorkCraft AI account is scheduled for deletion", preheader: "Sign in to keep your account.", eyebrow: "ACCOUNT NOTICE", content: `<p>We have not recorded activity on your WorkCraft AI account for 12 months.</p><p>If you do not sign in during the next 30 days, we will delete your account and associated data.</p><p><a href="${escapeEmailHtml(appUrl)}/login">Sign in to keep your account</a>.</p><p>If you need help, contact <a href="mailto:${escapeEmailHtml(supportEmail)}">${escapeEmailHtml(supportEmail)}</a>.</p>` }),
   };
 }
 

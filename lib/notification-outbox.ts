@@ -2,14 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getWorkCraftNoReplySender } from "@/lib/email-senders";
 import { reserveAppEmail, releaseAppEmail } from "@/lib/email-quota";
 import { getTrustedAppOrigin } from "@/lib/security.mjs";
-import { brandedEmailFrame } from "@/lib/branded-email.mjs";
+import { brandedEmailFrame, brandedEmailTextFooter } from "@/lib/branded-email.mjs";
 import { createBoundedFetch } from "@/lib/bounded-fetch";
 
 export type NotificationMail = { from?: string; to: string[]; reply_to?: string; subject: string; text: string; html: string };
 type Notification = { id: string; user_id: string | null; estimate_id: string | null; job_id: string | null; source: "estimate"|"proposal_question"|"invoice"|"follow_up"|"billing"|"auth"|"welcome"|"engagement"; send_key: string; payload: Partial<NotificationMail>; attempts: number; reservation_id: string | null; first_attempt_at: string | null; created_at: string };
 export const escapeEmailHtml = (value: string) => value.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
-export function notificationFrame(language: "en"|"es", title: string, content: string) {
-  return brandedEmailFrame({language,title,preheader:title,eyebrow:language==="es"?"ACTUALIZACIÓN DE WORKCRAFT AI":"WORKCRAFT AI UPDATE",content});
+export function notificationFrame(language: "en"|"es", title: string, content: string, footerExtra = "") {
+  return brandedEmailFrame({language,title,preheader:title,eyebrow:language==="es"?"ACTUALIZACIÓN DE WORKCRAFT AI":"WORKCRAFT AI UPDATE",content,footerExtra});
 }
 export async function enqueueNotification(admin: SupabaseClient, value: {user_id?: string; estimate_id?: string|null; job_id?:string; source:Notification["source"]; send_key:string; payload:NotificationMail}) {
   const { data: existing, error: lookup } = await admin.from("notification_outbox").select("id,status,provider_email_id").eq("send_key",value.send_key).maybeSingle();
@@ -80,7 +80,10 @@ export async function processNotifications(admin:SupabaseClient, ids?:string[], 
      if(saveError){await releaseAppEmail(admin,reservation.reservation_id);throw new Error("quota_save");}
      row.reservation_id=reservation.reservation_id;
     }
-    const response=await createBoundedFetch(timeoutMs,deadlineAt)("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":row.send_key},body:JSON.stringify({...mail,from:mail.from||getWorkCraftNoReplySender()})});
+    const language=/<html\b[^>]*\blang=["']es["']/i.test(mail.html)?"es":"en";
+    const textFooter=brandedEmailTextFooter(language);
+    const text=mail.text.includes(textFooter)?mail.text:`${mail.text}\n\n${textFooter}`;
+    const response=await createBoundedFetch(timeoutMs,deadlineAt)("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":row.send_key},body:JSON.stringify({...mail,text,from:mail.from||getWorkCraftNoReplySender()})});
     if(!response.ok){
      const permanent=response.status>=400&&response.status<500&&![408,409,425,429].includes(response.status);
      if(permanent&&row.reservation_id)await releaseAppEmail(admin,row.reservation_id);
