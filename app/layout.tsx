@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import React from "react";
 import HeaderNav from "@/app/components/HeaderNav";
 import HeaderLanguageToggle from "@/app/components/HeaderLanguageToggle";
@@ -24,7 +24,12 @@ export const metadata: Metadata = {
     description: "For the people who get the work done. Keep good work moving.",
     url: "https://app.workcraftai.com",
   },
-  icons: { icon: "/workcraftai-mark.svg" },
+  icons: { icon: "/workcraftai-mark.svg", apple: "/apple-icon.png" },
+  appleWebApp: { capable: true, title: "WorkCraft AI", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1c2b25",
 };
 
 export default function RootLayout({

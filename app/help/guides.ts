@@ -9,6 +9,16 @@ export type HelpGuide = {
 
 export const helpGuides: HelpGuide[] = [
   {
+    slug: "install-on-phone", title: { en: "Add WorkCraft AI to your phone", es: "Agrega WorkCraft AI a tu teléfono" },
+    summary: { en: "Put the WorkCraft AI icon on your Home Screen for quick access.", es: "Coloca el ícono de WorkCraft AI en la pantalla de inicio para entrar rápidamente." },
+    steps: {
+      en: ["On iPhone, open app.workcraftai.com in Safari and sign in.", "Tap Share, then Add to Home Screen. If shown, turn on Open as Web App, then tap Add.", "On Android, open app.workcraftai.com in Chrome and sign in.", "Open Chrome's menu and choose Install app or Add to Home screen, then confirm.", "Open the WorkCraft AI icon from your Home Screen. Sign in again if your browser asks you to."],
+      es: ["En iPhone, abre app.workcraftai.com en Safari e inicia sesión.", "Toca Compartir y luego Agregar a pantalla de inicio. Si aparece la opción, activa Abrir como app y toca Agregar.", "En Android, abre app.workcraftai.com en Chrome e inicia sesión.", "Abre el menú de Chrome y elige Instalar app o Agregar a pantalla principal; después confirma.", "Abre el ícono de WorkCraft AI desde la pantalla de inicio. Vuelve a iniciar sesión si el navegador te lo pide."],
+    },
+    note: { en: "This adds the web app to your phone; it does not download an App Store or Play Store app. WorkCraft AI still needs an internet connection for estimates, customer records, and payments.", es: "Esto agrega la aplicación web a tu teléfono; no descarga una app de App Store ni Play Store. WorkCraft AI aún necesita internet para cotizaciones, datos de clientes y pagos." },
+    action: { href: "/dashboard", en: "Open Dashboard", es: "Abrir Panel" },
+  },
+  {
     slug: "start-pro-trial", title: { en: "Start your 14-day Pro trial", es: "Inicia tu prueba de Pro de 14 días" },
     summary: { en: "Find your trial offer, understand eligibility, and know what happens when it ends.", es: "Encuentra la oferta de prueba, consulta los requisitos y conoce qué pasa cuando termina." },
     steps: {

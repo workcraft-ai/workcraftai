@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
@@ -363,6 +364,12 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold text-slate-900">Profile & Preferences</h1>
         <p className="text-xs text-slate-500 mt-1">
           Manage your account details and default estimate preferences.
+        </p>
+        <p className="mt-3 text-sm text-slate-600">
+          {language === "es" ? "¿Quieres acceder más rápido desde tu teléfono? " : "Want quicker access from your phone? "}
+          <Link href="/help/install-on-phone" className="font-semibold text-orange-800 underline underline-offset-2 hover:text-orange-900">
+            {language === "es" ? "Agrega WorkCraft AI a la pantalla de inicio" : "Add WorkCraft AI to your Home Screen"}
+          </Link>
         </p>
       </div>
 
