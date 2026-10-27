@@ -8,6 +8,7 @@ import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { isValidOptionalBusinessPhone } from "@/lib/business-phone";
 import MfaSecurity from "@/app/components/MfaSecurity";
 import EmailPreferences from "@/app/components/EmailPreferences";
+import CalendarSyncSettings from "@/app/components/CalendarSyncSettings";
 
 type UsageSnapshot = {
   plan: "free" | "pro";
@@ -398,6 +399,7 @@ export default function ProfilePage() {
 
       <MfaSecurity />
       <EmailPreferences language={language} />
+      {hasProAccess && <div className="mb-6"><CalendarSyncSettings /></div>}
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="account-usage-heading">
         <h2 id="account-usage-heading" className="text-lg font-bold text-slate-900">Your usage and allowances</h2>
