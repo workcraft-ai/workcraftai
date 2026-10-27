@@ -10,7 +10,7 @@ import { LocalizedTree, useLanguage } from "@/app/components/LanguageProvider";
 import { ProPlanAction } from "@/app/components/ProPlanExperience";
 import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { AddressMap } from "@/app/components/AddressMap";
-import CalendarSyncSettings from "@/app/components/CalendarSyncSettings";
+import CalendarSyncSummary from "@/app/components/CalendarSyncSummary";
 
 type JobStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
 interface Job {
@@ -273,7 +273,7 @@ export default function SchedulePage() {
           <Metric label="Completed jobs" value={String(jobs.filter((job) => job.status === "completed").length)} />
         </section>
 
-        <CalendarSyncSettings />
+        <CalendarSyncSummary />
 
         {nextJob && <section className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm" aria-labelledby="next-job-heading">
           <p className="text-xs font-bold uppercase tracking-wide text-blue-800">{language === "es" ? "Próximo destino" : "Next destination"}</p>

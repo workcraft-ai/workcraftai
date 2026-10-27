@@ -28,6 +28,14 @@ export default function CalendarSyncSettings() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    if (window.location.hash !== "#calendar-subscription") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("calendar-subscription")?.scrollIntoView({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     // A language change only changes labels; it must not overwrite edits the
     // contractor has made to checkboxes before pressing Save.
@@ -88,7 +96,7 @@ export default function CalendarSyncSettings() {
     { key: "show_customer_name", en: "Show customer name", es: "Mostrar nombre del cliente", helpEn: "When off, calendar titles say only “WorkCraft AI job.” Job notes and customer emails are never included.", helpEs: "Si está apagado, el título solo dice «Trabajo de WorkCraft AI». Nunca se incluyen notas ni correos del cliente." },
   ];
 
-  return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6" aria-labelledby="calendar-sync-heading">
+  return <section id="calendar-subscription" className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6" aria-labelledby="calendar-sync-heading">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="calendar-sync-heading" className="text-lg font-semibold text-slate-900">{spanish ? "Sincronizar calendario" : "Calendar sync"}</h2>
