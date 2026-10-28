@@ -172,8 +172,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
       const questionId = notification.question_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notification.question_id)
         ? `?question=${encodeURIComponent(notification.question_id)}` : "";
       // A full navigation also opens the selected question when already on this estimate.
+      const destination = `/estimate/${encodeURIComponent(safeEstimateId)}${questionId}#customer-questions`;
+      if (window.location.pathname + window.location.search + window.location.hash === destination) {
+        window.location.reload();
+        return;
+      }
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign(`/estimate/${encodeURIComponent(safeEstimateId)}${questionId}#customer-questions`);
+      window.location.assign(destination);
       return;
     }
     router.push(safeEstimateId ? "/estimate/" + encodeURIComponent(safeEstimateId) : "/dashboard");
