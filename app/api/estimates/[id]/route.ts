@@ -98,7 +98,7 @@ export async function GET(
   }));
 
   const { data: questions, error: questionError } = await readAllPages((from, to) => supabase.from("proposal_questions")
-    .select("id, customer_name, customer_email, message, created_at, read_at, responded_at, archived_at")
+    .select("id, estimate_id, customer_name, customer_email, message, created_at, read_at, responded_at, archived_at")
     .eq("estimate_id", id)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
