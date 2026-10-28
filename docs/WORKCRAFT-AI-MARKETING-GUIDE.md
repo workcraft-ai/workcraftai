@@ -53,6 +53,7 @@ Create a folder or a simple spreadsheet with columns for `topic`, `approved fact
 - AI can help draft estimate scope and line items; the contractor must verify details, quantities, rates, taxes, and terms.
 - Down payments and full customer payments are Pro-only and require Stripe Connect setup. Do not advertise collection as live until the Stripe Connect production checks are complete.
 - Do not claim integrations, customer outcomes, or automation that are not actually live.
+- Describe the current Free plan as **$0/month with published limits** and the separate eligible **14-day Pro trial**. Do not write “always free,” “free forever,” “gratis para siempre,” or similar lifetime promises. Check the live pricing page before scheduling a post because plan terms may change.
 - Demo content and screenshots must use fictional names and data.
 
 Use repeatable themes so posts stay useful without inventing new product claims:
@@ -115,7 +116,7 @@ Use these stages when reviewing a source each week: public-page visit → signup
 
 ### 14-day Pro trial campaign copy
 
-Use these drafts when promoting the trial. Keep the eligibility and billing terms visible in the post or linked pricing page; do not imply every account will qualify or that a card is required to begin. Do not say the trial converts automatically without clarifying that the user must add billing to continue. The in-app offer appears after sign-in; it is also available under Profile → Your plan. Do not publish these drafts automatically—review each caption and link before scheduling.
+Use these drafts when promoting the trial. Keep the eligibility and billing terms visible in the post or linked pricing page; do not imply every account will qualify or that a card is required to begin. Do not say the trial converts automatically without clarifying that the user must add billing to continue. The in-app offer appears after sign-in; it is also available under Profile → Your plan. Do not publish these drafts automatically—review each caption and link against the current plan limits before scheduling. Review any already scheduled posts that promise the Free plan will never change.
 
 **Facebook / Instagram — English**
 

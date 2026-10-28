@@ -2,6 +2,8 @@
 
 This is the source-of-truth feature matrix for the app and public pricing page.
 
+Ideas that are **not available yet**, including recurring service agreements, customer Buy Now, Pay Later, and QuickBooks Online/Xero sync, are tracked in [Future feature candidates](FUTURE-FEATURES.md). They are excluded from the plan matrix below.
+
 | Feature | Free | Pro ($9.99/month) |
 | --- | --- | --- |
 | Saved estimates | 10 per UTC day; 50 per UTC month | 50 per UTC day; 500 per UTC month |
