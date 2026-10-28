@@ -10,6 +10,7 @@ import { getClientProEntitlement } from "@/lib/client-pro-access";
 import { latestEstimateEmailEvents } from "@/lib/email-delivery-status";
 import FirstFiveMinutes from "@/app/components/FirstFiveMinutes";
 import { MfaInvite } from "@/app/components/MfaSecurity";
+import CustomerQuestions, { type OwnerQuestion } from "@/app/components/CustomerQuestions";
 
 type GreetingKey = "Good morning" | "Good afternoon" | "Good evening";
 
@@ -40,7 +41,6 @@ type PipelineStage = "active" | "follow_up" | "closed_won" | "closed_lost";
 const pipelineStages: PipelineStage[] = ["active", "follow_up", "closed_won", "closed_lost"];
 type EmailAllowance = { daily_used: number; daily_limit: number; monthly_used: number; monthly_limit: number };
 
-interface ProposalQuestion { id: string; estimate_id: string; customer_name: string; customer_email: string; message: string; created_at: string; read_at: string | null; }
 interface CustomerPreview { id: string; name: string; email: string; updated_at: string; }
 interface JobPreview { id: string; title: string; client_name: string; scheduled_at: string | null; status: "scheduled" | "in_progress"; }
 
@@ -73,7 +73,8 @@ export default function DashboardPage() {
   const [sendMessage, setSendMessage] = useState("");
   const [shareFallbackUrl, setShareFallbackUrl] = useState("");
   const [emailEvents, setEmailEvents] = useState<Record<string, string>>({});
-  const [questions, setQuestions] = useState<ProposalQuestion[]>([]);
+  const [questions, setQuestions] = useState<OwnerQuestion[]>([]);
+  const [questionsLoadError, setQuestionsLoadError] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [greetingKey, setGreetingKey] = useState<GreetingKey | null>(null);
   const [emailAllowance, setEmailAllowance] = useState<EmailAllowance | null>(null);
@@ -128,8 +129,11 @@ export default function DashboardPage() {
         setEmailAllowance(null);
       }
       const { data: events } = await readAllPages((from, to) => supabase.from("estimate_email_events").select("estimate_id, provider_email_id, event, created_at").order("created_at", { ascending: false }).order("id").range(from, to));
-      const { data: questionRows } = await supabase.from("proposal_questions").select("id, estimate_id, customer_name, customer_email, message, created_at, read_at").is("archived_at", null).order("created_at", { ascending: false }).limit(20);
-      setQuestions((questionRows ?? []) as ProposalQuestion[]);
+      const { data: questionRows, error: questionError } = await readAllPages((from, to) => supabase.from("proposal_questions")
+        .select("id, estimate_id, customer_name, customer_email, message, created_at, read_at, responded_at, archived_at")
+        .order("created_at", { ascending: false }).order("id").range(from, to));
+      setQuestionsLoadError(Boolean(questionError));
+      if (!questionError) setQuestions((questionRows ?? []) as OwnerQuestion[]);
       setEmailEvents(latestEstimateEmailEvents(events ?? []));
     } catch (err: unknown) {
       console.error("Error fetching dashboard estimates:", err);
@@ -161,12 +165,6 @@ export default function DashboardPage() {
     }, 0);
     return () => window.clearTimeout(task);
   }, [language]);
-
-  const markQuestionRead = async (question: ProposalQuestion) => {
-    const readAt = new Date().toISOString();
-    const { error } = await supabase.from("proposal_questions").update({ read_at: readAt }).eq("id", question.id);
-    if (!error) setQuestions((current) => current.map((item) => item.id === question.id ? { ...item, read_at: readAt } : item));
-  };
 
   const sendEstimate = async (id: string) => {
     setSendingId(id); setSendMessage("");
@@ -330,12 +328,7 @@ export default function DashboardPage() {
           <input type="text" readOnly value={shareFallbackUrl} onFocus={(event) => event.currentTarget.select()} className="mt-2 min-h-12 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm font-normal text-slate-800" />
         </label>}
 
-        {questions.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between"><h2 className="text-base font-bold text-slate-900">Customer questions</h2><span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">{`${questions.filter((item) => !item.read_at).length} unread`}</span></div>
-          <div className="mt-3 divide-y divide-slate-100">{questions.map((question) => <article key={question.id} className="py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-900">{question.customer_name} <span className="font-normal text-slate-500">· {new Date(question.created_at).toLocaleString(locale)}</span></p><a className="inline-flex min-h-12 items-center text-xs text-blue-700 underline" href={`mailto:${encodeURIComponent(question.customer_email)}`} target="_blank" rel="noopener noreferrer">{question.customer_email}</a><p className="mt-1 text-xs text-slate-500">Click the customer’s email to reply from your email app.</p><p className="mt-1 text-sm text-slate-700">{question.message}</p></div><div className="flex gap-3 text-xs"><Link href={`/estimate/${encodeURIComponent(question.estimate_id)}?question=${encodeURIComponent(question.id)}#customer-questions`} className="inline-flex min-h-12 items-center font-semibold text-blue-700 underline">View proposal</Link>{!question.read_at && <button type="button" onClick={() => void markQuestionRead(question)} className="inline-flex min-h-12 items-center font-semibold text-slate-600 underline">Mark read</button>}</div></div>
-          </article>)}</div>
-        </section>}
+        {(questions.length > 0 || questionsLoadError) && <CustomerQuestions language={language} questions={questions} setQuestions={setQuestions} loadError={questionsLoadError} availableEstimateIds={new Set(estimates.map((estimate) => estimate.id))} />}
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="recent-customers-title">
           <div className="flex items-center justify-between gap-3">
