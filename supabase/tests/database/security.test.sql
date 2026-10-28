@@ -101,9 +101,14 @@ select ok(
   'authenticated users can manage jobs without table-wide truncate'
 );
 select ok(
-  has_table_privilege('authenticated', 'public.proposal_questions', 'SELECT,UPDATE')
-  and not has_table_privilege('authenticated', 'public.proposal_questions', 'INSERT,DELETE,TRUNCATE'),
-  'authenticated users can read and mark proposal questions without creating or deleting them'
+  has_table_privilege('authenticated', 'public.proposal_questions', 'SELECT')
+  and has_table_privilege('authenticated', 'public.proposal_questions', 'DELETE')
+  and has_column_privilege('authenticated', 'public.proposal_questions', 'read_at', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.proposal_questions', 'responded_at', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.proposal_questions', 'archived_at', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.proposal_questions', 'message', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.proposal_questions', 'INSERT,UPDATE,TRUNCATE'),
+  'authenticated users can delete their questions and update only workflow fields'
 );
 select ok(
   has_table_privilege('authenticated', 'public.estimate_attachments', 'SELECT,INSERT,UPDATE,DELETE')
