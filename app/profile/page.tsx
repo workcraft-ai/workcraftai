@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { LocalizedTree, translate, useLanguage, type Language } from "@/app/components/LanguageProvider";
@@ -84,6 +85,8 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
   const [brandColor, setBrandColor] = useState("#c85b2d");
   const [taxRate, setTaxRate] = useState("0");
   const [markupPercentage, setMarkupPercentage] = useState("0");
@@ -250,8 +253,13 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (logoBusy) return;
     setMessage(null);
     setError(null);
+    if (logoUrl.trim() && !logoUrl.trim().startsWith("https://")) {
+      setError(language === "es" ? "Usa una URL HTTPS pública para el logotipo." : "Use a public HTTPS URL for the logo.");
+      return;
+    }
     if (!isValidOptionalBusinessPhone(phone)) {
       setError(language === "es"
         ? "Ingresa un número de teléfono válido, como (555) 123-4567, o deja el campo vacío."
@@ -279,6 +287,56 @@ export default function ProfilePage() {
       setMessage("Profile and preferences updated successfully!");
     }
     setSaving(false);
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMessage(null);
+    setError(null);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size === 0 || file.size > 2 * 1024 * 1024) {
+      setError(language === "es" ? "Elige una imagen PNG, JPEG o WebP de 2 MB o menos." : "Choose a PNG, JPEG, or WebP image of 2 MB or less.");
+      event.target.value = "";
+      return;
+    }
+    const preview = URL.createObjectURL(file);
+    setLogoPreviewUrl(preview);
+    setLogoBusy(true);
+    try {
+      const form = new FormData();
+      form.set("logo", file);
+      const response = await fetch("/api/profile/logo", { method: "POST", body: form });
+      const result = await response.json();
+      if (!response.ok || typeof result.logo_url !== "string") throw new Error(result.error ?? "Could not upload the logo.");
+      setLogoUrl(result.logo_url);
+      setMessage(language === "es" ? "Logotipo subido. Aparecerá en tus cotizaciones." : "Logo uploaded. It will appear on your estimates.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not upload the logo.");
+    } finally {
+      setLogoBusy(false);
+      setLogoPreviewUrl(null);
+      URL.revokeObjectURL(preview);
+      event.target.value = "";
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setMessage(null);
+    setError(null);
+    setLogoBusy(true);
+    try {
+      const response = await fetch("/api/profile/logo", { method: "DELETE" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error ?? "Could not remove the logo.");
+      }
+      setLogoUrl("");
+      setMessage(language === "es" ? "Logotipo eliminado." : "Logo removed.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not remove the logo.");
+    } finally {
+      setLogoBusy(false);
+    }
   };
 
   const handleUpgrade = async () => {
@@ -514,8 +572,16 @@ export default function ProfilePage() {
             <input id="profile-business-address" type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} placeholder="Street, city, state, ZIP" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
           </div>
           <div>
-            <label htmlFor="profile-logo-url" className="block text-xs font-medium text-slate-700 mb-1">Public logo URL (optional)</label>
-            <input id="profile-logo-url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://your-site.com/logo.png" className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm" />
+            <label htmlFor="profile-logo-file" className="block text-xs font-medium text-slate-700 mb-1">{language === "es" ? "Subir logotipo (opcional)" : "Upload logo (optional)"}</label>
+            <input id="profile-logo-file" type="file" accept="image/png,image/jpeg,image/webp" disabled={logoBusy || saving} onChange={(event) => void handleLogoUpload(event)} className="block w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:font-semibold file:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700" />
+            <p className="mt-1 text-xs leading-5 text-slate-600">{language === "es" ? "PNG, JPEG o WebP, máximo 2 MB. Para mejores resultados, usa un logotipo cuadrado de al menos 256 × 256 píxeles, con poco espacio vacío alrededor." : "PNG, JPEG, or WebP, up to 2 MB. For best results, use a square logo at least 256 × 256 pixels with little empty space around it."}</p>
+            {(logoPreviewUrl || logoUrl.startsWith("https://")) && <div className="mt-3 flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
+              <Image unoptimized width={80} height={80} src={logoPreviewUrl ?? logoUrl} alt={language === "es" ? "Vista previa del logotipo" : "Logo preview"} className="h-20 w-20 shrink-0 object-contain" />
+              <div className="min-w-0"><p className="text-xs text-slate-600">{logoBusy ? (language === "es" ? "Subiendo…" : "Uploading…") : (language === "es" ? "Vista previa de la cotización" : "Estimate preview")}</p><button type="button" disabled={logoBusy || saving} onClick={() => void handleLogoRemove()} className="mt-1 min-h-11 text-sm font-semibold text-red-700 underline disabled:opacity-50">{language === "es" ? "Eliminar logotipo" : "Remove logo"}</button></div>
+            </div>}
+            <label htmlFor="profile-logo-url" className="mt-3 block text-xs font-medium text-slate-700">{language === "es" ? "O pega una URL pública HTTPS" : "Or paste a public HTTPS logo URL"}</label>
+            <input id="profile-logo-url" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://your-site.com/logo.png" disabled={logoBusy} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm" />
+            <p className="mt-1 text-xs leading-5 text-slate-600">{language === "es" ? "Las cotizaciones muestran el logotipo en un espacio cuadrado de aproximadamente 72–80 píxeles. Los logotipos anchos se verán pequeños." : "Estimates show the logo in a roughly 72–80 pixel square. Wide wordmarks will look small."}</p>
           </div>
           <div>
             <label htmlFor="profile-brand-color-picker" className="block text-xs font-medium text-slate-700 mb-1">Proposal accent color</label>
@@ -554,7 +620,7 @@ export default function ProfilePage() {
         <div className="pt-4 flex justify-end">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || logoBusy}
             className="min-h-12 bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors"
           >
             {saving ? "Saving Changes..." : "Save Preferences"}

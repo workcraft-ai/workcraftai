@@ -28,7 +28,7 @@ export default function PrivacyPage() {
         <header className="space-y-2 border-b border-slate-200 pb-6">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700"><LocalizedText text="WorkCraft AI · Legal" /></p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900"><LocalizedText text="Privacy Policy" /></h1>
-          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 19, 2026" /></p>
+          <p className="text-sm text-slate-600"><LocalizedText text="Last updated: October 28, 2026" /></p>
         </header>
 
         <section className="space-y-3">
@@ -40,6 +40,7 @@ export default function PrivacyPage() {
           <p className="text-sm leading-7 text-slate-700"><LocalizedText text="When you use AI drafting, we compare generated lines with your own Price Book. We record whether a match was suggested, chosen, changed, or removed to measure matching quality. These usage records contain counts and item references, not customer or job descriptions, and are removed with the related AI event after the retention period described above. If you twice select the same Price Book item for a generated description, we may save that description as a private alternate name for your account. You can remove learned names from your Price Book. We do not use one contractor's Price Book rates or learned names to price another contractor's work." /></p>
           <p className="text-sm leading-7 text-slate-700"><LocalizedText text="At signup, we record the version of the Terms you accepted and the server time of acceptance. When a connected-account payment is disputed, Stripe sends the dispute status and payment reference so we can notify the contractor. Card numbers and dispute evidence remain in Stripe, not WorkCraft AI." /></p>
           <p className="text-sm leading-7 text-slate-700"><LocalizedText text="After a new account is confirmed, we send one welcome email through our email provider. The first-login checklist stores completion and dismissal times; business preferences are saved in your account profile. You can skip the checklist and return later." /></p>
+          <p className="text-sm leading-7 text-slate-700"><LocalizedText text="A business logo you upload is stored in public image storage and appears on customer-facing estimates. Do not upload an image you want to keep private. You can replace or remove it from Profile; uploaded logos are deleted when the account is deleted." /></p>
           <p className="text-sm leading-7 text-slate-700"><LocalizedText text="After your first app visit, we may send a small number of getting-started emails based on whether you saved, reviewed, or shared an estimate or added a Price Book rate. We may send one return reminder after 14 days without use; another requires you to return first. Around day 30, we send a guide only if you opted into tips. We record email delivery and whether you take a relevant action within seven days to improve these messages. You can turn off product tips in Profile or use the unsubscribe link in each tip. Essential account, security, payment, and customer notices are separate." /></p>
         </section>
 

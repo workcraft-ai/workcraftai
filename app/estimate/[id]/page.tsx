@@ -579,8 +579,8 @@ export default function ClientEstimatePage() {
           {/* Proposal Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
             <div>
-              <div className="flex items-center gap-3">
-                {contractor.logoUrl && <Image unoptimized width={128} height={48} src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-12 w-32 object-contain" />}
+              <div className="flex items-start gap-4">
+                {contractor.logoUrl && <Image unoptimized width={80} height={80} src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-[72px] w-[72px] shrink-0 object-contain object-left sm:h-20 sm:w-20" />}
                 <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
               </div>
               <p className="mt-2 text-xs font-semibold text-slate-600"><span>Estimate #</span>{estimate.reference_number}</p>

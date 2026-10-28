@@ -11,8 +11,8 @@ export class AccountDeletionError extends Error {
   }
 }
 
-async function removeAccountMedia(admin: SupabaseClient, userId: string) {
-  const bucket = admin.storage.from("estimate-media");
+async function removeAccountMedia(admin: SupabaseClient, userId: string, bucketName: "estimate-media" | "business-logos") {
+  const bucket = admin.storage.from(bucketName);
   const paths: string[] = [];
 
   async function collect(prefix: string): Promise<void> {
@@ -82,7 +82,8 @@ export async function deleteTradeFlowAccount(input: {
     }
 
     stage = "media_cleanup";
-    await removeAccountMedia(admin, targetUserId);
+    await removeAccountMedia(admin, targetUserId, "estimate-media");
+    await removeAccountMedia(admin, targetUserId, "business-logos");
 
     stage = "payment_record_cleanup";
     const { error: paymentError } = await admin.from("customer_payments").delete().eq("user_id", targetUserId);
