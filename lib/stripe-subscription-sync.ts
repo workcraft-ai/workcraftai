@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isDeletedSubscriptionOwner } from "@/lib/stripe-subscription-errors.mjs";
 
 type CheckoutIdentity = { userId: string; attemptId: string; sessionId: string };
 
@@ -29,7 +30,10 @@ export async function syncStripeSubscription(
   const { data: acquired, error: claimError } = await admin.rpc("workcraft_claim_subscription_sync", {
     p_user_id: userId, p_token: token,
   });
-  if (claimError) throw claimError;
+  if (claimError) {
+    if (await isDeletedSubscriptionOwner(admin, userId, claimError)) return null;
+    throw claimError;
+  }
   if (acquired !== true) throw new SubscriptionRefreshBusyError();
   try {
     const { data: current, error: readError } = await admin.from("subscriptions")
@@ -60,6 +64,9 @@ export async function syncStripeSubscription(
     });
     if (error) throw error;
     return applied === true ? { userId, subscription } : null;
+  } catch (error) {
+    if (await isDeletedSubscriptionOwner(admin, userId, error)) return null;
+    throw error;
   } finally {
     const { error } = await admin.rpc("workcraft_release_subscription_sync", { p_user_id: userId, p_token: token });
     if (error) console.error("Subscription refresh lease will expire automatically.");
