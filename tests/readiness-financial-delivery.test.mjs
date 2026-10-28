@@ -7,7 +7,8 @@ import { amountToCents, calculateEstimateMoney, percentageOfCents } from '../lib
 async function loadTypescript(file) {
   const source = await readFile(new URL(file, import.meta.url), 'utf8');
   const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } });
-  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+  const resolved = outputText.replace('@/lib/stripe-subscription-errors.mjs', new URL('../lib/stripe-subscription-errors.mjs', import.meta.url).href);
+  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`);
 }
 const { latestEstimateEmailEvents } = await loadTypescript('../lib/email-delivery-status.ts');
 const { syncStripeSubscription } = await loadTypescript('../lib/stripe-subscription-sync.ts');
