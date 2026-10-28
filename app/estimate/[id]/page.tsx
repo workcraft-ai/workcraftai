@@ -577,24 +577,25 @@ export default function ClientEstimatePage() {
         {/* Client Proposal Card */}
         <div id="customer-proposal" className="scroll-mt-6 bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
           {/* Proposal Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-2">
-            <div>
-              <div className="flex items-start gap-4">
-                {contractor.logoUrl && <Image unoptimized width={80} height={80} src={contractor.logoUrl} alt={`${contractor.businessName} logo`} className="h-[72px] w-[72px] shrink-0 object-contain object-left sm:h-20 sm:w-20" />}
-                <div><h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1><p className="text-sm font-semibold text-slate-900">Service Estimate</p>{contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}{contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}</div>
-              </div>
-              <p className="mt-2 text-xs font-semibold text-slate-600"><span>Estimate #</span>{estimate.reference_number}</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(viewLanguage === "es" ? "es-ES" : "en-US")}
-              </p>
+          <div className="border-b border-slate-100 pb-4">
+            <div className="mx-auto flex max-w-sm flex-col items-center text-center">
+              {contractor.logoUrl && <Image unoptimized width={64} height={64} src={contractor.logoUrl} alt="" className="mb-2 h-14 w-14 object-contain sm:h-16 sm:w-16" />}
+              <h1 className="text-xl font-bold" style={{ color: contractor.brandColor }}>{contractor.businessName}</h1>
+              <p className="text-sm font-semibold text-slate-900">Service Estimate</p>
+              {contractor.phone && <p className="text-xs text-slate-600">{contractor.phone}</p>}
+              {contractor.address && <p className="text-xs text-slate-600">{contractor.address}</p>}
             </div>
-            <div className="text-left sm:text-right">
-              <span className="text-xs font-semibold text-slate-600 block uppercase tracking-wider">
-                Total Estimate
-              </span>
-                <span className="text-2xl font-black text-slate-900">
-                ${total.toFixed(2)}
-              </span>
+            <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 border-t border-slate-100 pt-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-600"><span>Estimate #</span>{estimate.reference_number}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  <span>Created on</span>{" "}{new Date(estimate.created_at).toLocaleDateString(viewLanguage === "es" ? "es-ES" : "en-US")}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="block text-xs font-semibold uppercase tracking-wider text-slate-600">Total Estimate</span>
+                <span className="text-2xl font-black text-slate-900">${total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
