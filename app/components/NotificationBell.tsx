@@ -10,6 +10,7 @@ type NotificationType = "customer_question" | "estimate_accepted" | "estimate_de
 type ContractorNotification = {
   id: string;
   estimate_id: string | null;
+  question_id: string | null;
   event_type: NotificationType;
   customer_name: string;
   estimate_reference: string | null;
@@ -28,7 +29,7 @@ const eventText: Record<NotificationType, string> = {
 };
 
 const notificationFields =
-  "id, estimate_id, event_type, customer_name, estimate_reference, amount_cents, currency, details, created_at, read_at";
+  "id, estimate_id, question_id, event_type, customer_name, estimate_reference, amount_cents, currency, details, created_at, read_at";
 
 function formatDate(value: string, language: string) {
   const date = new Date(value);
@@ -167,7 +168,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
     const safeEstimateId = notification.estimate_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notification.estimate_id)
       ? notification.estimate_id
       : null;
-    router.push(safeEstimateId ? "/estimate/" + encodeURIComponent(safeEstimateId) + (notification.event_type === "customer_question" ? "#customer-questions" : "") : "/dashboard");
+    if (safeEstimateId && notification.event_type === "customer_question") {
+      const questionId = notification.question_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notification.question_id)
+        ? `?question=${encodeURIComponent(notification.question_id)}` : "";
+      // A full navigation also opens the selected question when already on this estimate.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/estimate/${encodeURIComponent(safeEstimateId)}${questionId}#customer-questions`);
+      return;
+    }
+    router.push(safeEstimateId ? "/estimate/" + encodeURIComponent(safeEstimateId) : "/dashboard");
   };
 
   const markAllRead = async () => {

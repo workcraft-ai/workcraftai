@@ -5,6 +5,7 @@ import { readLimitedJsonObject } from "@/lib/read-limited-body.mjs";
 import { getServerProAccess } from "@/lib/pro-access";
 import { isValidOptionalPhone } from "@/lib/phone-validation.mjs";
 import { createClient } from "@supabase/supabase-js";
+import { readAllPages } from "@/lib/read-all-pages";
 
 const MAX_ESTIMATE_BODY_BYTES = 128_000;
 
@@ -96,15 +97,16 @@ export async function GET(
     return data?.signedUrl ? { id: attachment.id, media_type: attachment.media_type, content_type: attachment.content_type, created_at: attachment.created_at, url: data.signedUrl } : null;
   }));
 
-  const { data: questions, error: questionError } = await supabase.from("proposal_questions")
-    .select("id, customer_name, customer_email, message, created_at, read_at")
+  const { data: questions, error: questionError } = await readAllPages((from, to) => supabase.from("proposal_questions")
+    .select("id, customer_name, customer_email, message, created_at, read_at, responded_at, archived_at")
     .eq("estimate_id", id)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .order("id")
+    .range(from, to));
   if (questionError) console.error("Estimate question lookup failed:", questionError.message);
 
-  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean), questions: questions ?? [], verbalApproval }, {
+  return NextResponse.json({ estimate, lineItems: lineItems ?? [], attachments: attachments.filter(Boolean), questions: questions ?? [], questionsError: Boolean(questionError), verbalApproval }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

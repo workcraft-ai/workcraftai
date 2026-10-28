@@ -229,7 +229,9 @@ export async function processVerifiedStripeEvent(event: Stripe.Event) {
   if (completeError) throw completeError;
   return NextResponse.json({ received: true });
   } catch (processingError) {
-    const message = processingError instanceof Error ? processingError.message : "unknown error";
+    const message = processingError instanceof Error ? processingError.message
+      : processingError && typeof processingError === "object" && "code" in processingError && typeof processingError.code === "string"
+        ? `Database error ${processingError.code}` : "unknown error";
     // Reserve a separate short cleanup budget after the processing deadline.
     // If this fails, the claim lease expires and the durable worker can retry.
     const { error: retryError } = await getServiceSupabase(1_500).rpc("workcraft_fail_stripe_webhook", { p_event_id: event.id, p_error: message });
