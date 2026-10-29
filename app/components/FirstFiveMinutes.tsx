@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/app/components/LanguageProvider";
@@ -31,6 +32,7 @@ const copy = {
     later: "Skip for now", resume: "Continue setup", hide: "Hide steps", next: "Next", help: "Get step-by-step help", error: "We couldn't save that step. Please try again.", finishedTitle: "Your first estimate setup is ready", finishedBody: "You can keep creating estimates and reuse the rate you saved.",
     shareHelp: "Open it yourself first. Copying a link does not email a customer.", done: "Done", optional: "Optional after your first quote: add a logo, AI, or Stripe payments.",
     phoneError: "Enter a valid phone number, such as (555) 123-4567, or leave this field blank.",
+    uploadLogo: "Upload logo (optional)", logoGuidance: "PNG, JPEG, or WebP, up to 2 MB. A square image at least 256 × 256 pixels with little empty space works best.", logoPrivacy: "Uploaded logos are public and appear on customer estimates. You can replace or remove yours in Profile.", logoUrlLabel: "Or paste a public HTTPS logo URL", logoPreview: "Logo preview", uploading: "Uploading…", uploadError: "Could not upload the logo. Please choose a PNG, JPEG, or WebP image of 2 MB or less and try again.", uploaded: "Logo uploaded. It will appear on your estimates.",
   },
   es: {
     kicker: "Primeros 5 minutos", title: "Preparemos tu primera cotización", intro: "Sigue estos pasos a tu ritmo. Puedes omitir la configuración y volver después.",
@@ -42,6 +44,7 @@ const copy = {
     later: "Omitir por ahora", resume: "Continuar configuración", hide: "Ocultar pasos", next: "Siguiente", help: "Ver las guías paso a paso", error: "No pudimos guardar este paso. Inténtalo de nuevo.", finishedTitle: "La configuración inicial está lista", finishedBody: "Ya puedes seguir creando cotizaciones y reutilizar el precio que guardaste.",
     shareHelp: "Ábrelo tú primero. Copiar un enlace no envía un correo al cliente.", done: "Listo", optional: "Después de tu primera cotización puedes agregar logotipo, IA o pagos de Stripe.",
     phoneError: "Ingresa un número válido, como (555) 123-4567, o deja este campo vacío.",
+    uploadLogo: "Subir logotipo (opcional)", logoGuidance: "PNG, JPEG o WebP, máximo 2 MB. Es mejor una imagen cuadrada de al menos 256 × 256 píxeles con poco espacio vacío.", logoPrivacy: "Los logotipos subidos son públicos y aparecen en las cotizaciones para clientes. Puedes reemplazarlo o eliminarlo en Perfil.", logoUrlLabel: "O pega una URL pública HTTPS del logotipo", logoPreview: "Vista previa del logotipo", uploading: "Subiendo…", uploadError: "No se pudo subir el logotipo. Elige una imagen PNG, JPEG o WebP de 2 MB o menos e inténtalo de nuevo.", uploaded: "Logotipo subido. Aparecerá en tus cotizaciones.",
   },
 };
 
@@ -59,6 +62,8 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
   const [taxRate, setTaxRate] = useState("0");
   const [markup, setMarkup] = useState("0");
   const [busy, setBusy] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoMessage, setLogoMessage] = useState("");
   const [error, setError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
@@ -132,6 +137,26 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
     } catch { setError(t.error); } finally { setBusy(false); }
   }
 
+  async function uploadLogo(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setError(""); setLogoMessage("");
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || !file.size || file.size > 2 * 1024 * 1024) {
+      setError(t.uploadError); input.value = ""; return;
+    }
+    setLogoBusy(true);
+    try {
+      const form = new FormData();
+      form.set("logo", file);
+      const response = await fetch("/api/profile/logo", { method: "POST", body: form });
+      const result = await response.json();
+      if (!response.ok || typeof result.logo_url !== "string") throw new Error("upload failed");
+      setLogoUrl(result.logo_url);
+      setLogoMessage(t.uploaded);
+    } catch { setError(t.uploadError); } finally { setLogoBusy(false); input.value = ""; }
+  }
+
   async function preview() {
     if (!progress?.estimateId) return;
     setBusy(true); setError("");
@@ -194,13 +219,20 @@ export default function FirstFiveMinutes({ onVisibilityChange }: { onVisibilityC
               <label className="text-sm font-semibold text-slate-800">{t.phone}<input type="tel" maxLength={40} autoComplete="tel" value={phone} aria-invalid={Boolean(phoneError)} aria-describedby={phoneError ? "onboarding-phone-error" : undefined} onChange={(event) => { setPhone(event.target.value); setPhoneError(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" />{phoneError && <span id="onboarding-phone-error" role="alert" className="mt-1 block text-sm font-medium text-red-800">{phoneError}</span>}</label>
               <label className="text-sm font-semibold text-slate-800">{t.tax}<input type="number" min="0" max="100" step="0.01" inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
               <label className="text-sm font-semibold text-slate-800">{t.markup}<input type="number" min="0" max="500" step="0.01" inputMode="decimal" value={markup} onChange={(event) => setMarkup(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
-              <label className="text-sm font-semibold text-slate-800 sm:col-span-2">{t.logo}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              <div className="sm:col-span-2">
+                <label htmlFor="onboarding-logo-file" className="text-sm font-semibold text-slate-800">{t.uploadLogo}</label>
+                <input id="onboarding-logo-file" type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || logoBusy} onChange={(event) => void uploadLogo(event)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-200 file:px-3 file:py-2 file:font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 disabled:opacity-50" />
+                <p className="mt-1 text-xs leading-5 text-slate-600">{t.logoGuidance}</p><p className="text-xs leading-5 text-slate-600">{t.logoPrivacy}</p>
+                {logoUrl.startsWith("https://") && <Image unoptimized width={80} height={80} src={logoUrl} alt={t.logoPreview} className="mt-2 h-20 w-20 rounded-lg border border-slate-200 bg-white object-contain" />}
+                <p role="status" className="mt-1 text-xs text-slate-700">{logoBusy ? t.uploading : logoMessage}</p>
+                <label className="mt-2 block text-sm font-semibold text-slate-800">{t.logoUrlLabel}<input type="url" maxLength={2048} placeholder="https://" value={logoUrl} disabled={logoBusy} onChange={(event) => { setLogoUrl(event.target.value); setLogoMessage(""); }} className="mt-1 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 font-normal" /></label>
+              </div>
               <label className="text-sm font-semibold text-slate-800">{t.color}<input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} className="mt-1 h-12 w-full rounded-lg border border-slate-300 bg-white p-1" /></label>
               <p className="text-xs leading-5 text-slate-600 sm:col-span-2">{t.taxHelp}</p>
             </div>
           </details>
           <p className="text-xs text-slate-600">{t.laterDetails}</p>
-          <button type="submit" disabled={busy} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50 sm:justify-self-start">{busy ? t.saving : t.save}</button>
+          <button type="submit" disabled={busy || logoBusy} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50 sm:justify-self-start">{busy ? t.saving : t.save}</button>
         </form>}
         {active === 1 && <Link href="/estimate/new?setup=1" className="inline-flex min-h-12 items-center rounded-lg bg-orange-800 px-4 font-semibold text-white">{t.estimate}</Link>}
         {active === 2 && <button type="button" disabled={busy} onClick={() => void preview()} className="min-h-12 rounded-lg bg-orange-800 px-4 font-semibold text-white disabled:opacity-50">{t.preview}</button>}
