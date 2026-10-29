@@ -125,7 +125,8 @@ export default function CreateEstimatePage() {
   const [savedCustomers, setSavedCustomers] = useState<SavedCustomer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [savedCustomerLoadError, setSavedCustomerLoadError] = useState("");
-  const [trade, setTrade] = useState("Plumbing");
+  const [trade, setTrade] = useState(DEFAULT_ESTIMATE_TRADES[0].value);
+  const tradeChosenRef = useRef(false);
   const [estimateTrades, setEstimateTrades] = useState(() => DEFAULT_ESTIMATE_TRADES.map((option) => ({ ...option })));
   const estimateTradesRef = useRef(estimateTrades);
   const [requireDeposit, setRequireDeposit] = useState(false);
@@ -224,7 +225,7 @@ export default function CreateEstimatePage() {
   const restoreFields = (draft: Partial<LocalEstimateDraft>) => {
     setClientName(draft.clientName ?? ""); setClientEmail(draft.clientEmail ?? "");
     setClientPhone(draft.clientPhone ?? ""); setJobAddress(draft.jobAddress ?? "");
-    if (draft.trade) setTrade(estimateTradesRef.current.some((option) => option.value === draft.trade) ? draft.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value);
+    if (draft.trade) { tradeChosenRef.current = true; setTrade(estimateTradesRef.current.some((option) => option.value === draft.trade) ? draft.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value); }
     setRequireDeposit(isProSubscriber && draft.requireDeposit === true);
     setDepositPercentage(Number(draft.depositPercentage) || 20);
     setPromptText(draft.promptText ?? "");
@@ -270,7 +271,7 @@ export default function CreateEstimatePage() {
         startTransition(() => {
           if (Array.isArray(template.line_items) && template.line_items.length) setLineItems(template.line_items.map((item: LineItemInput) => ({ ...item, unit: item.unit || "each" })));
           if (Array.isArray(template.package_options)) setPackageOptions(template.package_options);
-          if (template.trade) setTrade(estimateTradesRef.current.some((option) => option.value === template.trade) ? template.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value);
+          if (template.trade) { tradeChosenRef.current = true; setTrade(estimateTradesRef.current.some((option) => option.value === template.trade) ? template.trade : estimateTradesRef.current[0]?.value ?? DEFAULT_ESTIMATE_TRADES[0].value); }
           if (typeof template.require_deposit === "boolean") setRequireDeposit(template.require_deposit);
           if (template.deposit_percentage) setDepositPercentage(Number(template.deposit_percentage));
         });
@@ -293,7 +294,7 @@ export default function CreateEstimatePage() {
           if (!options) return;
           estimateTradesRef.current = options;
           setEstimateTrades(options);
-          setTrade((current) => options.some((option) => option.value === current) ? current : options[0].value);
+          setTrade((current) => tradeChosenRef.current && options.some((option) => option.value === current) ? current : options[0].value);
         }).catch(() => {});
         void fetch("/api/account/usage", { cache: "no-store" }).then(async (response) => {
           if (!response.ok) return;
@@ -871,7 +872,7 @@ export default function CreateEstimatePage() {
                 <select
                   id="estimate-trade"
                   value={trade}
-                  onChange={(e) => setTrade(e.target.value)}
+                  onChange={(e) => { tradeChosenRef.current = true; setTrade(e.target.value); }}
                   className="min-h-12 w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {estimateTrades.map((option) => <option key={option.value} value={option.value}>{language === "es" ? option.label_es : option.value}</option>)}

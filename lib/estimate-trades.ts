@@ -1,13 +1,13 @@
 export type EstimateTradeOption = { value: string; label_es: string };
 
 export const DEFAULT_ESTIMATE_TRADES: EstimateTradeOption[] = [
+  { value: "General contracting", label_es: "Contratación general" },
   { value: "Plumbing", label_es: "Plomería" },
   { value: "Electrical", label_es: "Electricidad" },
   { value: "Roofing", label_es: "Techado" },
   { value: "HVAC", label_es: "Climatización" },
   { value: "Painting", label_es: "Pintura" },
   { value: "Carpentry", label_es: "Carpintería" },
-  { value: "General contracting", label_es: "Contratación general" },
   { value: "Other", label_es: "Otro" },
 ];
 
